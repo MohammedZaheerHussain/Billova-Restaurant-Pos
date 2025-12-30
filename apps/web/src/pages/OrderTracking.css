@@ -1,0 +1,249 @@
+/* Order Tracking Page */
+
+.order-tracking-page {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
+    color: #1a1a1a;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding-bottom: 100px;
+}
+
+.order-tracking-page.loading,
+.order-tracking-page.error,
+.order-tracking-page.cancelled {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    gap: 16px;
+    min-height: 100vh;
+}
+
+.order-tracking-page.error {
+    color: #dc2626;
+}
+
+.order-tracking-page.cancelled {
+    color: #dc2626;
+}
+
+.order-tracking-page.cancelled h2 {
+    margin-top: 16px;
+}
+
+.sub-text {
+    color: #888;
+    font-size: 14px;
+}
+
+/* Header */
+.ot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 20px;
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
+}
+
+.ot-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.ot-type {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-top: 4px;
+}
+
+.refresh-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+}
+
+.refresh-btn.spinning svg {
+    animation: spin 1s linear infinite;
+}
+
+/* Progress Steps */
+.ot-progress {
+    display: flex;
+    justify-content: space-between;
+    padding: 32px 20px;
+    position: relative;
+}
+
+.ot-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+}
+
+.step-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e5e5e5;
+    color: #999;
+    border-radius: 50%;
+    transition: all 0.3s;
+}
+
+.ot-step.active .step-icon {
+    background: #dc2626;
+    color: white;
+}
+
+.ot-step.current .step-icon {
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0.2);
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.step-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #999;
+    text-align: center;
+}
+
+.ot-step.active .step-label {
+    color: #1a1a1a;
+}
+
+.step-line {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    width: 100%;
+    height: 3px;
+    background: #e5e5e5;
+    z-index: -1;
+}
+
+.step-line.filled {
+    background: #dc2626;
+}
+
+/* Status Card */
+.ot-status-card {
+    margin: 0 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    text-align: center;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #444;
+}
+
+/* Order Items */
+.ot-items {
+    margin: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.ot-items h3 {
+    font-size: 16px;
+    margin: 0 0 16px;
+    color: #1a1a1a;
+}
+
+.ot-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+
+.ot-item span:first-child {
+    color: #dc2626;
+    font-weight: 600;
+    min-width: 30px;
+}
+
+.ot-total {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 16px;
+    margin-top: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.ot-total span:last-child {
+    color: #dc2626;
+}
+
+/* Footer */
+.ot-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px;
+    background: white;
+    border-top: 1px solid #e5e5e5;
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+}
+
+.powered {
+    margin-top: 4px;
+}
+
+.powered strong {
+    color: #dc2626;
+}
+
+/* Spinner */
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #fee2e2;
+    border-top-color: #dc2626;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

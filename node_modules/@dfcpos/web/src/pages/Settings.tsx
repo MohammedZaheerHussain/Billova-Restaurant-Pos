@@ -1,7 +1,8 @@
 // Settings Page
 import { useState } from 'react';
-import { Settings as SettingsIcon, Store, Printer, Wifi, Database, Globe } from 'lucide-react';
+import { Store, Printer, Database, Globe, Share2, Copy, ExternalLink } from 'lucide-react';
 import { useAuthStore } from '../store';
+import toast from 'react-hot-toast';
 import './Settings.css';
 
 export default function SettingsPage() {
@@ -63,6 +64,38 @@ export default function SettingsPage() {
                                 <input type="text" placeholder="Enter GSTIN" />
                             </div>
                         )}
+                    </div>
+                </div>
+
+                <div className="settings-card highlight">
+                    <div className="settings-card-header">
+                        <Share2 size={20} />
+                        <h3>Online Menu</h3>
+                    </div>
+                    <div className="settings-form">
+                        <p className="settings-desc">Share your menu online with customers. They can view your menu without needing to download an app.</p>
+                        <div className="menu-link-box">
+                            <input
+                                type="text"
+                                readOnly
+                                value={`${window.location.origin}/m/${user?.branch?.id}`}
+                            />
+                            <button
+                                className="btn btn-icon"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/m/${user?.branch?.id}`);
+                                    toast.success('Menu link copied!');
+                                }}
+                            >
+                                <Copy size={16} />
+                            </button>
+                            <button
+                                className="btn btn-icon"
+                                onClick={() => window.open(`/m/${user?.branch?.id}`, '_blank')}
+                            >
+                                <ExternalLink size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
 

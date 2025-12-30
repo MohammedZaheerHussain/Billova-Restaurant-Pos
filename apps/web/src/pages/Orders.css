@@ -930,3 +930,69 @@
         border-bottom: 1px solid var(--border);
     }
 }
+
+/* ========== Bulk Selection Styles ========== */
+
+/* Checkbox Column */
+.checkbox-col {
+    width: 50px;
+    text-align: center;
+}
+
+.select-all-btn,
+.row-checkbox {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-normal);
+}
+
+.select-all-btn:hover,
+.row-checkbox:hover {
+    color: var(--primary);
+}
+
+.row-checkbox .checked,
+.select-all-btn .lucide-check-square {
+    color: var(--primary);
+}
+
+/* Selected Row */
+.orders-table tbody tr.selected-row {
+    background: rgba(220, 38, 38, 0.08);
+}
+
+.orders-table tbody tr.selected-row:hover {
+    background: rgba(220, 38, 38, 0.12);
+}
+
+/* Bulk Close Button */
+.bulk-close-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.bulk-close-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

@@ -131,6 +131,84 @@
     letter-spacing: 0.5px;
 }
 
+/* Notification Bell */
+.notification-bell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px;
+    padding: 12px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.notification-bell:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.notification-bell.has-orders {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.3);
+    color: var(--primary);
+    animation: bell-pulse 2s infinite;
+}
+
+@keyframes bell-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.2);
+    }
+}
+
+.notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    background: var(--primary);
+    color: white;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    animation: badge-pop 0.3s ease;
+}
+
+@keyframes badge-pop {
+    0% {
+        transform: scale(0);
+    }
+
+    60% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.notification-label {
+    white-space: nowrap;
+}
+
 /* Locked Nav Item */
 .nav-item.locked {
     opacity: 0.5;

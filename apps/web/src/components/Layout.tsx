@@ -1,12 +1,14 @@
 // Main Layout with Sidebar
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
-    BarChart3, Users, Settings, LogOut, ChevronLeft, ChevronRight, Shield, Package, Lock
+    BarChart3, Users, Settings, LogOut, ChevronLeft, ChevronRight, Shield, Package, Lock, Bell, Warehouse
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscription, { FeatureKey } from '../hooks/useSubscription';
+import { ordersAPI } from '../api';
 import './Layout.css';
 
 interface NavItem {
@@ -23,6 +25,7 @@ const navItems: NavItem[] = [
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', requiredFeature: 'menuManagement' },
     { path: '/reports', icon: BarChart3, label: 'Reports', requiredFeature: 'reports' },
     { path: '/inventory', icon: Package, label: 'Inventory', requiredFeature: 'inventory' },
+    { path: '/warehouse', icon: Warehouse, label: 'Warehouse', requiredFeature: 'inventory' },
     { path: '/users', icon: Users, label: 'Users' },
     { path: '/settings', icon: Settings, label: 'Settings' },
 ];
@@ -39,6 +42,30 @@ export default function Layout() {
     };
 
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+    // Online orders notification
+    const [pendingOnlineOrders, setPendingOnlineOrders] = useState(0);
+
+    useEffect(() => {
+        if (isSuperAdmin) return;
+
+        const fetchPendingOrders = async () => {
+            try {
+                const res = await ordersAPI.getAll();
+                const pending = res.data.filter((o: any) =>
+                    (o.orderType === 'DELIVERY' || o.orderType === 'TAKEAWAY') &&
+                    o.status === 'PENDING'
+                ).length;
+                setPendingOnlineOrders(pending);
+            } catch (e) {
+                console.error('Error fetching pending orders:', e);
+            }
+        };
+
+        fetchPendingOrders();
+        const interval = setInterval(fetchPendingOrders, 10000); // Poll every 10 seconds
+        return () => clearInterval(interval);
+    }, [isSuperAdmin]);
 
     return (
         <div className="layout">
@@ -64,6 +91,21 @@ export default function Layout() {
                     <div className="subscription-badge" style={{ borderColor: getPlanColor() }}>
                         <span style={{ color: getPlanColor() }}>{currentPlan}</span>
                     </div>
+                )}
+
+                {/* Online Order Notifications */}
+                {!isSuperAdmin && (
+                    <button
+                        className={`notification-bell ${pendingOnlineOrders > 0 ? 'has-orders' : ''}`}
+                        onClick={() => navigate('/orders')}
+                        title={pendingOnlineOrders > 0 ? `${pendingOnlineOrders} pending online orders` : 'No pending orders'}
+                    >
+                        <Bell size={20} />
+                        {pendingOnlineOrders > 0 && (
+                            <span className="notification-badge">{pendingOnlineOrders}</span>
+                        )}
+                        {sidebarOpen && <span className="notification-label">Online Orders</span>}
+                    </button>
                 )}
 
                 {/* Navigation */}

@@ -274,3 +274,77 @@
 .btn-danger:hover {
     background: #b91c1c;
 }
+
+/* QR Button */
+.table-actions .btn-qr {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    border-color: transparent;
+    color: white;
+    flex: 0;
+    padding: 8px 10px;
+}
+
+.table-actions .btn-qr:hover {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+}
+
+/* QR Modal */
+.qr-modal {
+    max-width: 450px;
+}
+
+.qr-content {
+    padding: 24px;
+    text-align: center;
+}
+
+.qr-image {
+    width: 160px;
+    height: 160px;
+    margin: 0 auto 20px;
+    background: white;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a2e;
+}
+
+.qr-instructions {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.qr-url-box {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    margin-bottom: 16px;
+}
+
+.qr-url-box input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 12px;
+    padding: 8px;
+}
+
+.qr-url-box .btn-sm {
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.qr-tip {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 12px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: var(--radius-sm);
+}

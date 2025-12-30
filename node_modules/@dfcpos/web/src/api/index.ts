@@ -84,6 +84,8 @@ export const tablesAPI = {
     updateStatus: (id: string, status: string) =>
         api.patch(`/tables/${id}/status`, { status }),
     delete: (id: string) => api.delete(`/tables/${id}`),
+    generateQRToken: (id: string) => api.post(`/tables/${id}/qr-token`),
+    removeQRToken: (id: string) => api.delete(`/tables/${id}/qr-token`),
 };
 
 // Reports API
@@ -183,6 +185,19 @@ export const inventoryReportsAPI = {
         api.get('/inventory-reports/movement-timeline', { params: { inventoryItemId, days } }),
     dashboardWidget: () => api.get('/inventory-reports/dashboard-widget'),
     inventorySalesTrend: (days?: number) => api.get('/inventory-reports/inventory-sales-trend', { params: { days } }),
+};
+
+// Addons API (Extras like cheese, toppings)
+export const addonsAPI = {
+    getAll: () => api.get('/addons'),
+    create: (data: { name: string; price: number; category?: string }) =>
+        api.post('/addons', data),
+    update: (id: string, data: any) => api.put(`/addons/${id}`, data),
+    delete: (id: string) => api.delete(`/addons/${id}`),
+    // Link addons to menu items
+    getForMenuItem: (menuItemId: string) => api.get(`/addons/menu-item/${menuItemId}`),
+    linkToMenuItem: (menuItemId: string, addonIds: string[]) =>
+        api.post(`/addons/menu-item/${menuItemId}`, { addonIds }),
 };
 
 export default api;

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Clock, Calendar, X, User, Phone, CreditCard,
     Banknote, Smartphone, Receipt, CheckCircle, XCircle, Edit,
-    Plus, FileText, Search, Minus
+    Plus, FileText, Search, Minus, CheckSquare, Square
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersAPI, menuAPI } from '../api';
@@ -69,12 +69,21 @@ export default function OrdersPage() {
     const [newItems, setNewItems] = useState<NewItem[]>([]);
     const [addingItems, setAddingItems] = useState(false);
 
+    // Bulk selection state
+    const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+    const [bulkClosing, setBulkClosing] = useState(false);
+
     const user = useAuthStore((state) => state.user);
 
     useEffect(() => {
         fetchOrders();
         fetchMenuItems();
     }, [selectedDate]);
+
+    // Clear selection when filter/date changes
+    useEffect(() => {
+        setSelectedOrderIds(new Set());
+    }, [filter, selectedDate]);
 
     const fetchOrders = async () => {
         try {
@@ -202,6 +211,58 @@ export default function OrdersPage() {
         setMenuSearch('');
     };
 
+    // Toggle order selection
+    const toggleOrderSelection = (orderId: string) => {
+        const newSet = new Set(selectedOrderIds);
+        if (newSet.has(orderId)) {
+            newSet.delete(orderId);
+        } else {
+            newSet.add(orderId);
+        }
+        setSelectedOrderIds(newSet);
+    };
+
+    // Select all pending orders
+    const selectAllPending = () => {
+        const pendingOrders = filteredOrders.filter(o =>
+            ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(o.status)
+        );
+        if (selectedOrderIds.size === pendingOrders.length) {
+            setSelectedOrderIds(new Set());
+        } else {
+            setSelectedOrderIds(new Set(pendingOrders.map(o => o.id)));
+        }
+    };
+
+    // Bulk close selected orders
+    const bulkCloseOrders = async () => {
+        if (selectedOrderIds.size === 0) {
+            toast.error('No orders selected');
+            return;
+        }
+
+        const confirmClose = window.confirm(
+            `Are you sure you want to close ${selectedOrderIds.size} order(s)?`
+        );
+        if (!confirmClose) return;
+
+        try {
+            setBulkClosing(true);
+            const promises = Array.from(selectedOrderIds).map(orderId =>
+                ordersAPI.updateStatus(orderId, 'COMPLETED')
+            );
+            await Promise.all(promises);
+            toast.success(`${selectedOrderIds.size} orders closed successfully!`);
+            setSelectedOrderIds(new Set());
+            fetchOrders();
+        } catch (error) {
+            toast.error('Failed to close some orders');
+        } finally {
+            setBulkClosing(false);
+        }
+    };
+
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'PENDING': return '#f59e0b';
@@ -280,6 +341,18 @@ export default function OrdersPage() {
                             </button>
                         ))}
                     </div>
+
+                    {/* Bulk Close Button */}
+                    {selectedOrderIds.size > 0 && (
+                        <button
+                            className="btn btn-success bulk-close-btn"
+                            onClick={bulkCloseOrders}
+                            disabled={bulkClosing}
+                        >
+                            <CheckCircle size={18} />
+                            {bulkClosing ? 'Closing...' : `Close ${selectedOrderIds.size} Selected`}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -297,6 +370,18 @@ export default function OrdersPage() {
                     <table className="orders-table">
                         <thead>
                             <tr>
+                                <th className="checkbox-col">
+                                    <button
+                                        className="select-all-btn"
+                                        onClick={selectAllPending}
+                                        title="Select all pending orders"
+                                    >
+                                        {selectedOrderIds.size > 0 ?
+                                            <CheckSquare size={18} /> :
+                                            <Square size={18} />
+                                        }
+                                    </button>
+                                </th>
                                 <th>Order #</th>
                                 <th>Type</th>
                                 <th>Customer</th>
@@ -313,13 +398,28 @@ export default function OrdersPage() {
                                 const { time } = formatDateTime(order.createdAt);
                                 const typeInfo = getOrderTypeLabel(order.orderType);
                                 const isEditable = canEditOrder(order.status);
+                                const isSelected = selectedOrderIds.has(order.id);
 
                                 return (
                                     <motion.tr
                                         key={order.id}
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
+                                        className={isSelected ? 'selected-row' : ''}
                                     >
+                                        <td className="checkbox-col">
+                                            {isEditable && (
+                                                <button
+                                                    className="row-checkbox"
+                                                    onClick={() => toggleOrderSelection(order.id)}
+                                                >
+                                                    {isSelected ?
+                                                        <CheckSquare size={18} className="checked" /> :
+                                                        <Square size={18} />
+                                                    }
+                                                </button>
+                                            )}
+                                        </td>
                                         <td className="order-num">#{order.orderNumber}</td>
                                         <td>
                                             <span className="order-type">
