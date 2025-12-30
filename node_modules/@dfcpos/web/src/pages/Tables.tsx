@@ -1,7 +1,7 @@
 // Tables Page - Dine-in table management
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Grid3X3, Users, Plus, Trash2, X } from 'lucide-react';
+import { Users, Plus, Trash2, X, QrCode, Copy, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tablesAPI } from '../api';
 import './Tables.css';
@@ -11,6 +11,7 @@ interface Table {
     name: string;
     capacity: number;
     status: string;
+    qrToken?: string;
     orders?: any[];
 }
 
@@ -21,6 +22,7 @@ export default function TablesPage() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [newTable, setNewTable] = useState({ name: '', capacity: 4 });
     const [saving, setSaving] = useState(false);
+    const [qrModal, setQrModal] = useState<{ tableId: string; tableName: string; qrUrl: string } | null>(null);
 
     useEffect(() => {
         fetchTables();
@@ -89,6 +91,21 @@ export default function TablesPage() {
         }
     };
 
+    const handleGenerateQR = async (tableId: string, tableName: string) => {
+        try {
+            const response = await tablesAPI.generateQRToken(tableId);
+            setQrModal({ tableId, tableName, qrUrl: response.data.qrUrl });
+            fetchTables();
+        } catch (error) {
+            toast.error('Failed to generate QR code');
+        }
+    };
+
+    const copyQRUrl = (url: string) => {
+        navigator.clipboard.writeText(url);
+        toast.success('URL copied to clipboard!');
+    };
+
     return (
         <div className="tables-page">
             <div className="page-header">
@@ -145,6 +162,13 @@ export default function TablesPage() {
                             )}
 
                             <div className="table-actions">
+                                <button
+                                    className="btn btn-sm btn-qr"
+                                    onClick={() => handleGenerateQR(table.id, table.name)}
+                                    title="Generate QR for Self-Order"
+                                >
+                                    <QrCode size={14} />
+                                </button>
                                 {table.status === 'EMPTY' && (
                                     <>
                                         <button className="btn btn-sm" onClick={() => handleStatusChange(table.id, 'OCCUPIED')}>
@@ -265,6 +289,59 @@ export default function TablesPage() {
                                 </button>
                                 <button className="btn btn-danger" onClick={() => handleDeleteTable(deleteConfirm)}>
                                     Delete Table
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* QR Code Modal */}
+            <AnimatePresence>
+                {qrModal && (
+                    <motion.div
+                        className="modal-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setQrModal(null)}
+                    >
+                        <motion.div
+                            className="modal qr-modal"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="modal-header">
+                                <h2>QR Code for {qrModal.tableName}</h2>
+                                <button className="modal-close" onClick={() => setQrModal(null)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="qr-content">
+                                <div className="qr-image">
+                                    <QrCode size={120} />
+                                </div>
+                                <p className="qr-instructions">
+                                    Scan this QR code or share the link below for customers to place orders directly from their phones.
+                                </p>
+                                <div className="qr-url-box">
+                                    <input type="text" value={qrModal.qrUrl} readOnly />
+                                    <button className="btn btn-sm" onClick={() => copyQRUrl(qrModal.qrUrl)}>
+                                        <Copy size={16} />
+                                    </button>
+                                    <button className="btn btn-sm" onClick={() => window.open(qrModal.qrUrl, '_blank')}>
+                                        <ExternalLink size={16} />
+                                    </button>
+                                </div>
+                                <p className="qr-tip">
+                                    💡 Print this QR code and place it on the table for contactless ordering!
+                                </p>
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-secondary" onClick={() => setQrModal(null)}>
+                                    Close
                                 </button>
                             </div>
                         </motion.div>

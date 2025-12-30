@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, ShoppingCart, Minus, Plus, Trash2, X,
     CreditCard, Banknote, Smartphone, Percent, Coffee,
-    UtensilsCrossed, Globe, User, Phone, Receipt, FileText
+    UtensilsCrossed, Globe, User, Phone, Receipt, FileText, MessageCircle, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCartStore, useUIStore, useAuthStore, MenuItem, Category } from '../store';
 import { menuAPI, categoriesAPI, ordersAPI } from '../api';
 import './POS.css';
+
 
 export default function POSPage() {
     const [categories, setCategories] = useState<Category[]>([]);
@@ -31,6 +32,19 @@ export default function POSPage() {
     // Online platform details
     const [onlinePlatform, setOnlinePlatform] = useState<'SWIGGY' | 'ZOMATO' | null>(null);
     const [onlineOrderId, setOnlineOrderId] = useState('');
+
+    // Order success state for WhatsApp sharing
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [completedOrder, setCompletedOrder] = useState<{
+        orderNumber: number;
+        items: typeof cartItems;
+        subtotal: number;
+        discount: number;
+        total: number;
+        customerPhone: string;
+        customerName: string;
+    } | null>(null);
+
 
     const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery } = useUIStore();
     const user = useAuthStore((state) => state.user);
@@ -158,9 +172,23 @@ export default function POSPage() {
                 amount: getTotal(),
             });
 
+            // Save order details for WhatsApp sharing
+            setCompletedOrder({
+                orderNumber: response.data.orderNumber || 0,
+                items: [...cartItems],
+                subtotal: getSubtotal(),
+                discount: getDiscountAmount(),
+                total: getTotal(),
+                customerPhone: customerPhone.trim(),
+                customerName: customerName.trim(),
+            });
+
             toast.success(`Order #${response.data.orderNumber || 'Created'} completed!`);
-            clearCart();
             setShowPayment(false);
+            setShowSuccess(true);
+
+            // Clear form data but keep completed order for WhatsApp
+            clearCart();
             setCustomerName('');
             setCustomerPhone('');
             setDiscountInput('');
@@ -175,6 +203,62 @@ export default function POSPage() {
             setSubmitting(false);
         }
     };
+
+    // Generate WhatsApp share message
+    const generateWhatsAppMessage = () => {
+        if (!completedOrder) return '';
+
+        const branchName = user?.branch?.name || 'Our Restaurant';
+        const date = new Date().toLocaleDateString('en-IN');
+        const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        let message = `🧾 *${branchName}*\n`;
+        message += `Order #${completedOrder.orderNumber}\n`;
+        message += `📅 ${date} | ⏰ ${time}\n`;
+        message += `─────────────────\n`;
+
+        completedOrder.items.forEach((item, idx) => {
+            const variantText = item.variant ? ` (${item.variant.name})` : '';
+            message += `${idx + 1}. ${item.menuItem.name}${variantText}\n`;
+            message += `   ${item.quantity} x ₹${item.unitPrice} = ₹${item.total.toFixed(2)}\n`;
+        });
+
+        message += `─────────────────\n`;
+        message += `Subtotal: ₹${completedOrder.subtotal.toFixed(2)}\n`;
+
+        if (completedOrder.discount > 0) {
+            message += `Discount: -₹${completedOrder.discount.toFixed(2)}\n`;
+        }
+
+        message += `*Total: ₹${completedOrder.total.toFixed(2)}*\n`;
+        message += `─────────────────\n`;
+        message += `✅ Payment Received\n`;
+        message += `Thank you for your order! 🙏`;
+
+        return message;
+    };
+
+    // Share via WhatsApp
+    const shareViaWhatsApp = () => {
+        const message = generateWhatsAppMessage();
+        const phone = completedOrder?.customerPhone?.replace(/\D/g, '') || '';
+
+        // Format phone number for India
+        const formattedPhone = phone.startsWith('91') ? phone : `91${phone}`;
+
+        const url = phone
+            ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+            : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+        window.open(url, '_blank');
+    };
+
+    // Close success modal
+    const closeSuccessModal = () => {
+        setShowSuccess(false);
+        setCompletedOrder(null);
+    };
+
 
     // Open payment modal
     const openPaymentModal = () => {
@@ -603,6 +687,51 @@ export default function POSPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Order Success Modal with WhatsApp Share */}
+            <AnimatePresence>
+                {showSuccess && completedOrder && (
+                    <motion.div
+                        className="modal-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={closeSuccessModal}
+                    >
+                        <motion.div
+                            className="success-modal"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="success-icon">
+                                <Check size={48} />
+                            </div>
+                            <h2>Order Complete!</h2>
+                            <p className="order-number">Order #{completedOrder.orderNumber}</p>
+                            <p className="order-total">Total: ₹{completedOrder.total.toFixed(2)}</p>
+
+                            <div className="success-actions">
+                                <button
+                                    className="btn whatsapp-btn"
+                                    onClick={shareViaWhatsApp}
+                                >
+                                    <MessageCircle size={20} />
+                                    Share Bill via WhatsApp
+                                </button>
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={closeSuccessModal}
+                                >
+                                    New Order
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
+
     );
 }

@@ -86,4 +86,52 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
     }
 });
 
+// Generate QR token for table
+router.post('/:id/qr-token', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const prisma = (req as any).prisma;
+        const { id } = req.params;
+
+        // Generate unique token
+        const qrToken = require('crypto').randomBytes(8).toString('hex');
+
+        const table = await prisma.table.update({
+            where: { id },
+            data: { qrToken }
+        });
+
+        // Build QR URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const qrUrl = `${frontendUrl}/order/${qrToken}`;
+
+        res.json({
+            qrToken,
+            qrUrl,
+            table: { id: table.id, name: table.name }
+        });
+    } catch (error) {
+        console.error('Generate QR token error:', error);
+        res.status(500).json({ error: 'Failed to generate QR token' });
+    }
+});
+
+// Remove QR token from table
+router.delete('/:id/qr-token', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const prisma = (req as any).prisma;
+        const { id } = req.params;
+
+        await prisma.table.update({
+            where: { id },
+            data: { qrToken: null }
+        });
+
+        res.json({ message: 'QR token removed' });
+    } catch (error) {
+        console.error('Remove QR token error:', error);
+        res.status(500).json({ error: 'Failed to remove QR token' });
+    }
+});
+
 export default router;
+

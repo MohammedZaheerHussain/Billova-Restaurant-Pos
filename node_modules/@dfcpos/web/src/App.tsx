@@ -17,6 +17,13 @@ import UsersPage from './pages/Users';
 import SettingsPage from './pages/Settings';
 import SuperAdminPage from './pages/SuperAdmin';
 import InventoryPage from './pages/Inventory';
+import CustomerOrderPage from './pages/CustomerOrder';
+import PublicMenuPage from './pages/PublicMenu';
+import OnlineOrderPage from './pages/OnlineOrder';
+import OrderTrackingPage from './pages/OrderTracking';
+import CaptainPage from './pages/Captain';
+import WarehousePage from './pages/Warehouse';
+import DeliveryPage from './pages/Delivery';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -67,9 +74,22 @@ function App() {
 
             return () => clearTimeout(timer);
         } else if (isAuthenticated) {
+            // Already shown - immediately mark as complete without showing splash
+            setShowSplash(false);
             setSplashComplete(true);
         }
     }, [isAuthenticated]);
+
+    // Failsafe: ensure splash is hidden after 3 seconds max
+    useEffect(() => {
+        if (showSplash) {
+            const failsafe = setTimeout(() => {
+                setShowSplash(false);
+                setSplashComplete(true);
+            }, 3000);
+            return () => clearTimeout(failsafe);
+        }
+    }, [showSplash]);
 
     // Clear splash flag when user logs out
     useEffect(() => {
@@ -134,7 +154,22 @@ function App() {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="super-admin" element={<SuperAdminPage />} />
                     <Route path="inventory" element={<InventoryPage />} />
+                    <Route path="captain" element={<CaptainPage />} />
+                    <Route path="warehouse" element={<WarehousePage />} />
+                    <Route path="delivery" element={<DeliveryPage />} />
                 </Route>
+
+                {/* Public Route - Customer Self Order (No Auth) */}
+                <Route path="/order/:token" element={<CustomerOrderPage />} />
+
+                {/* Public Route - Online Menu (No Auth) */}
+                <Route path="/m/:branchId" element={<PublicMenuPage />} />
+
+                {/* Public Route - Online Order (No Auth) */}
+                <Route path="/o/:branchId" element={<OnlineOrderPage />} />
+
+                {/* Public Route - Order Tracking (No Auth) */}
+                <Route path="/track/:orderId" element={<OrderTrackingPage />} />
 
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

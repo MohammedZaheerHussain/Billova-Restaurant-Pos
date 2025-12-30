@@ -18,6 +18,15 @@ import comboRoutes from './routes/combos';
 import superAdminRoutes from './routes/super-admin';
 import inventoryRoutes from './routes/inventory';
 import inventoryReportsRoutes from './routes/inventory-reports';
+import addonsRoutes from './routes/addons';
+import customerOrderRoutes from './routes/customer-order';
+import warehouseRoutes from './routes/warehouse';
+import purchaseRequestRoutes from './routes/purchase-requests';
+import deliveryRoutes from './routes/delivery';
+import supplierRoutes from './routes/supplier';
+import purchaseOrderRoutes from './routes/purchase-orders';
+import adjustmentsRoutes from './routes/adjustments';
+
 
 const app = express();
 const prisma = new PrismaClient();
@@ -53,6 +62,16 @@ app.use('/api/combos', comboRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/inventory-reports', inventoryReportsRoutes);
+app.use('/api/addons', addonsRoutes);
+app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/purchase-requests', purchaseRequestRoutes);
+app.use('/api/delivery', deliveryRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/adjustments', adjustmentsRoutes);
+
+// Public routes (no auth required)
+app.use('/api/public', customerOrderRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
