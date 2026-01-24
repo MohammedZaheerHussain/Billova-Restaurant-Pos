@@ -12,6 +12,9 @@ export interface MenuItem {
     isVeg: boolean;
     isAvailable: boolean;
     image?: string;
+    description?: string;
+    hasGST?: boolean;
+    gstPercent?: number;
     variants?: MenuItemVariant[];
 }
 

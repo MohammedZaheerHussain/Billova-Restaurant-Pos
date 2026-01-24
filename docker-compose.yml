@@ -1,0 +1,61 @@
+# Billova POS - Docker Compose Production Setup
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: billova-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Ayubsheik@1506}
+      MYSQL_DATABASE: dfcpos
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - billova-network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    image: ${DOCKER_USERNAME:-billova}/billova:api
+    container_name: billova-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql://root:${DB_PASSWORD:-Ayubsheik@1506}@db:3306/dfcpos
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      NODE_ENV: production
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - billova-network
+
+  # Frontend Web App
+  web:
+    image: ${DOCKER_USERNAME:-billova}/billova:web
+    container_name: billova-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - billova-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  billova-network:
+    driver: bridge

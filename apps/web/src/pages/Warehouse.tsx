@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Warehouse as WarehouseIcon, Plus, Package, ArrowRightLeft,
-    Building2, X, Check, Clock, Truck, ChevronRight, MapPin,
-    Users, AlertTriangle, FileText, Trash2, Grid3X3, Box
+    Building2, X, Check, Truck, ChevronRight, MapPin,
+    Users, AlertTriangle, Grid3X3
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import api from '../api';
