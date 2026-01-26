@@ -261,6 +261,10 @@ model Order {
   onlineOrderId String?     // Swiggy/Zomato order ID
   onlinePlatform String?    // "SWIGGY", "ZOMATO"
   
+  // Offline sync info
+  offlineCreatedAt      DateTime?  // Original creation time when offline
+  offlineTempBillNumber String?    // TEMP-XXXX format bill number
+  
   notes         String?     @db.Text
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -1000,3 +1004,19 @@ enum AdjustmentStatus {
   CANCELLED
 }
 
+// ==================== OFFLINE SYNC LOG ====================
+// Tracks synced offline orders for duplicate detection
+model OfflineSyncLog {
+  id          String   @id @default(uuid())
+  localId     String   // Client-side UUID
+  orderHash   String   @unique // Hash of order content for duplicate detection
+  serverId    String   // Server-generated order ID
+  billNumber  String   // Real bill number assigned
+  branchId    String
+  userId      String
+  syncedAt    DateTime @default(now())
+
+  @@index([localId])
+  @@index([branchId])
+  @@map("offline_sync_logs")
+}

@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Clock, Calendar, X, User, Phone, CreditCard,
     Banknote, Smartphone, Receipt, CheckCircle, XCircle, Edit,
-    Plus, FileText, Search, Minus, CheckSquare, Square
+    Plus, FileText, Search, Minus, CheckSquare, Square, Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersAPI, menuAPI } from '../api';
 import { useAuthStore, MenuItem } from '../store';
+import { reprintReceipt, ReceiptData } from '../printing';
 import './Orders.css';
 
 interface OrderItem {
@@ -61,7 +62,15 @@ export default function OrdersPage() {
     const [filter, setFilter] = useState('PENDING');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    // Use local date to avoid timezone issues (toISOString uses UTC)
+    const getLocalDateString = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
     // Edit modal state
@@ -259,6 +268,48 @@ export default function OrdersPage() {
             toast.error('Failed to close some orders');
         } finally {
             setBulkClosing(false);
+        }
+    };
+
+    // Print bill for an order
+    const handlePrintBill = async (order: Order) => {
+        const user = useAuthStore.getState().user;
+
+        const receiptData: ReceiptData = {
+            businessName: user?.branch?.name || 'Billova POS',
+            branchName: '',
+            address: '',
+            phone: '',
+            orderNumber: order.orderNumber,
+            billNumber: `ORD-${String(order.orderNumber).padStart(4, '0')}`,
+            orderType: order.orderType,
+            orderDate: new Date(order.createdAt),
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
+            items: order.items.map(item => ({
+                name: item.menuItem.name,
+                variant: item.variant?.name,
+                quantity: item.quantity,
+                price: Number(item.unitPrice),
+                total: Number(item.total),
+            })),
+            subtotal: Number(order.subtotal),
+            discountAmount: Number(order.discountAmount || 0),
+            gstAmount: Number(order.gstAmount || 0),
+            total: Number(order.total),
+            paymentMode: order.payments?.[0]?.mode || 'CASH',
+        };
+
+        try {
+            const success = await reprintReceipt(receiptData);
+            if (success) {
+                toast.success('Bill printed successfully!');
+            } else {
+                toast.error('Print failed - check printer settings');
+            }
+        } catch (error) {
+            console.error('Print error:', error);
+            toast.error('Failed to print bill');
         }
     };
 
@@ -638,6 +689,15 @@ export default function OrdersPage() {
                                         </button>
                                     </div>
                                 )}
+
+                                {/* Print Bill Button - Always visible */}
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={() => handlePrintBill(selectedOrder)}
+                                    style={{ marginTop: 12 }}
+                                >
+                                    <Printer size={18} /> Print Bill
+                                </button>
                             </div>
                         </motion.div>
                     </motion.div>

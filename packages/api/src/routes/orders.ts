@@ -1,6 +1,7 @@
 // Order Routes - Create, Update, Complete orders
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { shadowWriteOrder, createOrderEvent, syncInventoryItem, createInventoryLog } from '../lib/supabase';
 
 const router = Router();
 
@@ -141,13 +142,34 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         const total = subtotal - discountAmount + gstAmount;
 
+        // Check if daily order reset is enabled (passed from frontend)
+        const dailyReset = req.headers['x-daily-order-reset'] === 'true';
+
         // Get next order number for this branch
-        const lastOrder = await prisma.order.findFirst({
-            where: { branchId },
-            orderBy: { orderNumber: 'desc' },
-            select: { orderNumber: true },
-        });
+        let lastOrder;
+        if (dailyReset) {
+            // Only count orders from today
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            lastOrder = await prisma.order.findFirst({
+                where: {
+                    branchId,
+                    createdAt: { gte: startOfDay }
+                },
+                orderBy: { orderNumber: 'desc' },
+                select: { orderNumber: true },
+            });
+        } else {
+            // Count all orders (legacy behavior)
+            lastOrder = await prisma.order.findFirst({
+                where: { branchId },
+                orderBy: { orderNumber: 'desc' },
+                select: { orderNumber: true },
+            });
+        }
         const orderNumber = (lastOrder?.orderNumber || 0) + 1;
+
 
         // Create order
         const order = await prisma.order.create({
@@ -256,6 +278,39 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         }
         // ========== END INVENTORY CONSUMPTION ==========
 
+        // ========== SUPABASE SHADOW WRITE ==========
+        // Async, non-blocking - write order to cloud for realtime
+        setImmediate(async () => {
+            try {
+                await shadowWriteOrder({
+                    id: order.id,
+                    branchId: order.branchId,
+                    orderNumber: order.orderNumber,
+                    billNumber: order.billNumber,
+                    orderType: order.orderType,
+                    status: order.status,
+                    tableNumber: order.table?.number,
+                    customerName: order.customerName,
+                    customerPhone: order.customerPhone,
+                    items: order.items,
+                    subtotal: order.subtotal,
+                    discountAmount: order.discountAmount,
+                    gstAmount: order.gstAmount,
+                    total: order.total,
+                    createdBy: order.userId,
+                    createdAt: order.createdAt,
+                });
+                await createOrderEvent(order.id, 'CREATED', {
+                    orderType,
+                    itemCount: items.length,
+                    total: order.total
+                }, order.userId);
+            } catch (e) {
+                console.error('[Supabase] Shadow write failed:', e);
+            }
+        });
+        // ========== END SHADOW WRITE ==========
+
         res.status(201).json(order);
     } catch (error) {
         console.error('Create order error:', error);
@@ -301,6 +356,39 @@ router.post('/:id/payment', authMiddleware, async (req: AuthRequest, res: Respon
                 });
             }
         }
+
+        // Shadow write payment to Supabase
+        setImmediate(async () => {
+            try {
+                await shadowWriteOrder({
+                    id: order.id,
+                    branchId: order.branchId,
+                    orderNumber: order.orderNumber,
+                    billNumber: order.billNumber,
+                    orderType: order.orderType,
+                    status: order.status,
+                    tableNumber: null,
+                    customerName: order.customerName,
+                    customerPhone: order.customerPhone,
+                    items: [],
+                    subtotal: order.subtotal,
+                    discountAmount: order.discountAmount,
+                    gstAmount: order.gstAmount,
+                    total: order.total,
+                    createdBy: order.userId,
+                    createdAt: order.createdAt,
+                    updatedAt: new Date().toISOString(),
+                });
+                await createOrderEvent(order.id, 'PAID', {
+                    amount,
+                    method: mode,
+                    totalPaid,
+                    isComplete: totalPaid >= Number(order.total)
+                });
+            } catch (e) {
+                console.error('[Supabase] Payment shadow write failed:', e);
+            }
+        });
 
         res.json(payment);
     } catch (error) {
@@ -508,6 +596,243 @@ router.post('/:id/add-items', authMiddleware, async (req: AuthRequest, res: Resp
     } catch (error) {
         console.error('Add items to order error:', error);
         res.status(500).json({ error: 'Failed to add items to order' });
+    }
+});
+
+// ==================== OFFLINE SYNC ENDPOINT ====================
+// Sync orders created offline - idempotent with hash-based duplicate detection
+router.post('/offline-sync', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const prisma = (req as any).prisma;
+        const { localId, orderHash, order } = req.body;
+        const branchId = req.user!.branchId;
+        const userId = req.user!.id;
+
+        console.log(`[OfflineSync] Processing order localId=${localId}, hash=${orderHash?.substring(0, 20)}...`);
+
+        // Check for duplicate using hash
+        if (orderHash) {
+            const existingSync = await prisma.offlineSyncLog.findFirst({
+                where: { orderHash },
+            });
+
+            if (existingSync) {
+                console.log(`[OfflineSync] Duplicate detected, returning existing serverId=${existingSync.serverId}`);
+                return res.json({
+                    success: true,
+                    isDuplicate: true,
+                    serverId: existingSync.serverId,
+                    billNumber: existingSync.billNumber,
+                    message: 'Order already synced',
+                });
+            }
+        }
+
+        // Validate order data
+        if (!order || !order.items || order.items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid order data: items are required',
+            });
+        }
+
+        // Calculate totals (recalculate to ensure accuracy)
+        let subtotal = 0;
+        let gstAmount = 0;
+        const orderItems: any[] = [];
+
+        for (const item of order.items) {
+            const menuItem = await prisma.menuItem.findUnique({
+                where: { id: item.menuItemId },
+            });
+
+            if (!menuItem) {
+                console.warn(`[OfflineSync] Menu item not found: ${item.menuItemId}, using offline data`);
+                // Use offline data if menu item not found (deleted item)
+                const itemTotal = Number(item.unitPrice || item.total / item.quantity) * item.quantity;
+                subtotal += itemTotal;
+                orderItems.push({
+                    menuItemId: item.menuItemId,
+                    variantId: item.variantId || null,
+                    quantity: item.quantity,
+                    unitPrice: Number(item.unitPrice || item.total / item.quantity),
+                    total: itemTotal,
+                    notes: item.notes || null,
+                });
+                continue;
+            }
+
+            let unitPrice = Number(menuItem.price);
+
+            // Check for variant price
+            if (item.variantId) {
+                const variant = await prisma.menuItemVariant.findUnique({
+                    where: { id: item.variantId },
+                });
+                if (variant) {
+                    unitPrice = Number(variant.price);
+                }
+            }
+
+            const itemTotal = unitPrice * item.quantity;
+            subtotal += itemTotal;
+
+            if (menuItem.hasGST) {
+                gstAmount += itemTotal * (Number(menuItem.gstPercent) / 100);
+            }
+
+            orderItems.push({
+                menuItemId: item.menuItemId,
+                variantId: item.variantId || null,
+                quantity: item.quantity,
+                unitPrice,
+                total: itemTotal,
+                notes: item.notes || null,
+            });
+        }
+
+        // Calculate discount
+        let discountAmount = 0;
+        if (order.discountType === 'PERCENTAGE' && order.discountValue) {
+            discountAmount = subtotal * (Number(order.discountValue) / 100);
+        } else if (order.discountType === 'FIXED' && order.discountValue) {
+            discountAmount = Number(order.discountValue);
+        }
+
+        const total = subtotal - discountAmount + gstAmount;
+
+        // Get next order number
+        const lastOrder = await prisma.order.findFirst({
+            where: { branchId },
+            orderBy: { orderNumber: 'desc' },
+            select: { orderNumber: true },
+        });
+        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
+
+        // Create order
+        const createdOrder = await prisma.order.create({
+            data: {
+                orderNumber,
+                branchId,
+                userId,
+                tableId: order.tableId || null,
+                orderType: order.orderType || 'DINE_IN',
+                status: 'CONFIRMED',
+                customerName: order.customerName,
+                customerPhone: order.customerPhone,
+                subtotal,
+                discountType: order.discountType,
+                discountValue: order.discountValue,
+                discountAmount,
+                gstAmount,
+                total,
+                notes: order.notes,
+                // Mark as offline-created
+                offlineCreatedAt: order.createdAt ? new Date(order.createdAt) : undefined,
+                offlineTempBillNumber: order.tempBillNumber,
+                items: { create: orderItems },
+            },
+            include: {
+                items: { include: { menuItem: true, variant: true } },
+                table: true,
+            },
+        });
+
+        // Update table status if dine-in
+        if (order.tableId && order.orderType === 'DINE_IN') {
+            await prisma.table.update({
+                where: { id: order.tableId },
+                data: { status: 'OCCUPIED' },
+            }).catch(() => {
+                // Table might not exist anymore, ignore
+            });
+        }
+
+        // Log sync for duplicate detection
+        await prisma.offlineSyncLog.create({
+            data: {
+                localId,
+                orderHash: orderHash || '',
+                serverId: createdOrder.id,
+                billNumber: `ORD-${String(orderNumber).padStart(4, '0')}`,
+                branchId,
+                userId,
+                syncedAt: new Date(),
+            },
+        });
+
+        // ========== AUTO CONSUME INVENTORY (non-blocking) ==========
+        try {
+            for (const item of order.items) {
+                const ingredients = await prisma.itemIngredient.findMany({
+                    where: { menuItemId: item.menuItemId },
+                    include: { inventoryItem: true },
+                });
+
+                for (const ing of ingredients) {
+                    const consumeQty = Number(ing.quantityUsed) * item.quantity;
+                    const previousQty = Number(ing.inventoryItem.quantity);
+                    // Allow negative stock for offline orders, flag for review
+                    const newQty = previousQty - consumeQty;
+
+                    const minStock = Number(ing.inventoryItem.minStock);
+                    let stockStatus = 'SUFFICIENT';
+                    if (newQty <= 0) stockStatus = 'OUT_OF_STOCK';
+                    else if (newQty <= minStock * 0.5) stockStatus = 'CRITICAL';
+                    else if (newQty <= minStock) stockStatus = 'LOW_STOCK';
+
+                    await prisma.inventoryItem.update({
+                        where: { id: ing.inventoryItem.id },
+                        data: { quantity: Math.max(0, newQty), stockStatus },
+                    });
+
+                    await prisma.stockTransaction.create({
+                        data: {
+                            inventoryItemId: ing.inventoryItem.id,
+                            type: 'CONSUMPTION',
+                            quantity: -consumeQty,
+                            previousQty,
+                            newQty: Math.max(0, newQty),
+                            reason: `Offline Order #${orderNumber} (synced)`,
+                            orderId: createdOrder.id,
+                            performedById: userId,
+                        },
+                    });
+
+                    // Create alert if negative stock (needs admin attention)
+                    if (newQty < 0) {
+                        await prisma.stockAlert.create({
+                            data: {
+                                branchId,
+                                inventoryItemId: ing.inventoryItem.id,
+                                alertType: 'OUT_OF_STOCK',
+                                message: `OFFLINE SYNC: ${ing.inventoryItem.name} went negative. Actual: ${newQty}, shown: 0. Needs review.`,
+                            },
+                        });
+                    }
+                }
+            }
+        } catch (invError) {
+            console.error('[OfflineSync] Inventory consumption error (non-blocking):', invError);
+        }
+        // ========== END INVENTORY CONSUMPTION ==========
+
+        console.log(`[OfflineSync] Successfully synced order, serverId=${createdOrder.id}`);
+
+        res.json({
+            success: true,
+            isDuplicate: false,
+            serverId: createdOrder.id,
+            billNumber: `ORD-${String(orderNumber).padStart(4, '0')}`,
+            orderNumber,
+            message: 'Order synced successfully',
+        });
+    } catch (error) {
+        console.error('[OfflineSync] Sync error:', error);
+        res.status(500).json({
+            success: false,
+            message: error instanceof Error ? error.message : 'Failed to sync order',
+        });
     }
 });
 

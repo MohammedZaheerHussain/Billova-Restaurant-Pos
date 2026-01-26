@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     Truck, MapPin, Phone, Package, Clock, CheckCircle,
-    Navigation, ChevronRight, User, RefreshCw
+    Navigation, User, RefreshCw
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import api from '../api';

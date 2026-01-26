@@ -1,0 +1,271 @@
+/* Order Complete Modal Styles */
+
+.order-complete-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+}
+
+.order-complete-modal {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    background: linear-gradient(145deg, #1e1e2e 0%, #151521 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 40px 32px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+/* Success Icon */
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    color: white;
+    box-shadow: 0 8px 32px rgba(34, 197, 94, 0.4);
+}
+
+/* Title */
+.order-complete-modal h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 20px;
+}
+
+/* Order Badge */
+.order-badge {
+    display: inline-block;
+    padding: 12px 32px;
+    background: rgba(255, 234, 234, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 20px;
+}
+
+/* Total Amount */
+.total-amount {
+    font-size: 24px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 16px;
+}
+
+.total-amount .amount {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* Customer Info */
+.customer-info {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.action-buttons button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px 24px;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+/* Print Button */
+.btn-print {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.3);
+}
+
+.btn-print:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(220, 38, 38, 0.4);
+}
+
+.btn-print:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* WhatsApp Button */
+.btn-whatsapp {
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    color: white;
+    box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
+}
+
+.btn-whatsapp:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(37, 211, 102, 0.4);
+}
+
+/* Skip Button */
+.btn-skip {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-skip:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* New Order Button */
+.btn-new-order {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-new-order:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+}
+
+/* Complete Step Buttons - Side by Side */
+.complete-buttons {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+}
+
+.complete-buttons .btn-print {
+    flex: 1;
+}
+
+.btn-new-order-secondary {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.btn-new-order-secondary:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    transform: translateY(-2px);
+}
+
+/* Reprint Button (smaller) */
+.btn-reprint {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+    font-size: 14px !important;
+    padding: 12px 20px !important;
+}
+
+.btn-reprint:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Auto Print Status */
+.auto-print-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.auto-print-status span {
+    font-size: 16px;
+}
+
+/* Spin Animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .order-complete-modal {
+        padding: 32px 24px;
+        border-radius: 20px;
+    }
+
+    .success-icon {
+        width: 64px;
+        height: 64px;
+    }
+
+    .success-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .order-complete-modal h2 {
+        font-size: 24px;
+    }
+
+    .total-amount {
+        font-size: 20px;
+    }
+}

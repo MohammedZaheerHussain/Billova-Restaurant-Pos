@@ -3,12 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Package, Plus, Edit2, Trash2, X, AlertTriangle, Search,
-    TrendingDown, TrendingUp, Bell, Check, Upload, Link2, Unlink,
-    RefreshCw, Filter, BarChart3, AlertCircle, CheckCircle
+    TrendingDown, TrendingUp, Bell, Check, Upload, Link2,
+    RefreshCw, AlertCircle, CheckCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { inventoryAPI, menuAPI } from '../api';
-import { useAuthStore, MenuItem } from '../store';
+import { MenuItem } from '../store';
 import './Inventory.css';
 
 interface InventoryItem {
@@ -78,7 +78,6 @@ const categories = [
 const units = ['pcs', 'kg', 'g', 'ltr', 'ml', 'pack', 'box', 'dozen'];
 
 export default function InventoryPage() {
-    const user = useAuthStore((state) => state.user);
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [alerts, setAlerts] = useState<StockAlert[]>([]);
     const [summary, setSummary] = useState<DashboardSummary | null>(null);

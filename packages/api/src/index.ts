@@ -26,15 +26,16 @@ import deliveryRoutes from './routes/delivery';
 import supplierRoutes from './routes/supplier';
 import purchaseOrderRoutes from './routes/purchase-orders';
 import adjustmentsRoutes from './routes/adjustments';
+import printRoutes from './routes/print';
 
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5175',
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -69,6 +70,7 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/adjustments', adjustmentsRoutes);
+app.use('/api/print', printRoutes);
 
 // Public routes (no auth required)
 app.use('/api/public', customerOrderRoutes);

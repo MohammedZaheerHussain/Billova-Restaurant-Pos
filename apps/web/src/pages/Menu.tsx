@@ -98,13 +98,13 @@ export default function MenuPage() {
         setEditingItem(item);
         setForm({
             name: item.name,
-            description: item.description || '',
+            description: (item as any).description || '',
             price: String(item.price),
             categoryId: item.categoryId,
             isVeg: item.isVeg,
             image: item.image || '',
-            hasGST: item.hasGST !== false,
-            gstPercent: String(item.gstPercent || 5),
+            hasGST: (item as any).hasGST !== false,
+            gstPercent: String((item as any).gstPercent || 5),
         });
         setShowModal(true);
     };
