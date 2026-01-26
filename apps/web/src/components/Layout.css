@@ -29,6 +29,22 @@
     gap: 12px;
 }
 
+.logo.clickable {
+    cursor: pointer;
+    padding: 8px;
+    margin: -8px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.logo.clickable:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.logo.clickable:active {
+    transform: scale(0.97);
+}
+
 .logo-icon-img {
     width: 32px;
     height: 32px;
@@ -48,20 +64,51 @@
 }
 
 .toggle-btn {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
+    background: linear-gradient(135deg, var(--primary) 0%, #f97316 100%);
+    border-radius: 10px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.toggle-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
 }
 
 .toggle-btn:hover {
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
 }
+
+.toggle-btn:hover::before {
+    opacity: 1;
+}
+
+.toggle-btn:active {
+    transform: scale(0.95);
+}
+
+.toggle-btn svg {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed .toggle-btn svg {
+    transform: rotate(180deg);
+}
+
 
 /* Navigation */
 .sidebar-nav {
@@ -307,4 +354,76 @@
     .sidebar.collapsed {
         transform: translateX(-100%);
     }
+}
+
+/* Sync Controls */
+.sync-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px;
+    padding: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.sync-now-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.sync-now-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.sync-now-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.sync-now-btn .spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Offline Banner */
+.offline-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }

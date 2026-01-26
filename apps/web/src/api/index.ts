@@ -1,6 +1,8 @@
 // API Client
 import axios from 'axios';
 import { useAuthStore } from '../store';
+import { supabase } from '../lib/supabase';
+import { FeatureFlags, isDualAuthMode, isSupabaseAuthOnly } from '../lib/feature-flags';
 
 const api = axios.create({
     baseURL: '/api',
@@ -9,12 +11,35 @@ const api = axios.create({
     },
 });
 
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+// Add auth token to requests (supports dual-auth mode)
+api.interceptors.request.use(async (config) => {
+    // Node JWT token (existing auth)
+    const nodeToken = useAuthStore.getState().token;
+
+    // If Supabase auth only mode, use Supabase token
+    if (isSupabaseAuthOnly()) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+            config.headers.Authorization = `Bearer ${session.access_token}`;
+            config.headers['X-Auth-Provider'] = 'supabase';
+        }
     }
+    // Dual auth mode - send both tokens
+    else if (isDualAuthMode()) {
+        if (nodeToken) {
+            config.headers.Authorization = `Bearer ${nodeToken}`;
+        }
+        // Also send Supabase token as secondary header
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+            config.headers['X-Supabase-Token'] = session.access_token;
+        }
+    }
+    // Legacy mode - Node JWT only
+    else if (nodeToken) {
+        config.headers.Authorization = `Bearer ${nodeToken}`;
+    }
+
     return config;
 });
 
@@ -23,12 +48,17 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
+            // Sign out from both auth systems
             useAuthStore.getState().logout();
+            if (FeatureFlags.SUPABASE_CONFIGURED) {
+                supabase.auth.signOut();
+            }
             window.location.href = '/login';
         }
         return Promise.reject(error);
     }
 );
+
 
 // Auth API
 export const authAPI = {
@@ -69,12 +99,18 @@ export const categoriesAPI = {
 export const ordersAPI = {
     getAll: (params?: any) => api.get('/orders', { params }),
     getOne: (id: string) => api.get(`/orders/${id}`),
-    create: (data: any) => api.post('/orders', data),
+    create: (data: any, options?: { dailyReset?: boolean }) =>
+        api.post('/orders', data, {
+            headers: options?.dailyReset ? { 'X-Daily-Order-Reset': 'true' } : {}
+        }),
     addPayment: (id: string, data: any) => api.post(`/orders/${id}/payment`, data),
     updateStatus: (id: string, status: string) =>
         api.patch(`/orders/${id}/status`, { status }),
     cancel: (id: string) => api.post(`/orders/${id}/cancel`),
     addItems: (id: string, items: any[]) => api.post(`/orders/${id}/add-items`, { items }),
+    // Offline sync
+    offlineSync: (data: { localId: string; orderHash: string; order: any }) =>
+        api.post('/orders/offline-sync', data),
 };
 
 // Tables API

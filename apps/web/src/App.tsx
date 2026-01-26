@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store';
 import Layout from './components/Layout';
 import SplashScreen from './components/SplashScreen';
+import { PWAUpdatePrompt } from './components/pwa';
 import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
 import ForgotPasswordPage from './pages/ForgotPassword';
@@ -24,6 +25,7 @@ import OrderTrackingPage from './pages/OrderTracking';
 import CaptainPage from './pages/Captain';
 import WarehousePage from './pages/Warehouse';
 import DeliveryPage from './pages/Delivery';
+import PrinterSettingsPage from './pages/PrinterSettings';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -104,6 +106,9 @@ function App() {
             {/* Splash Screen */}
             <SplashScreen show={showSplash} />
 
+            {/* PWA Update Prompt */}
+            <PWAUpdatePrompt />
+
             {/* Main App Routes */}
             <Routes>
                 <Route
@@ -157,6 +162,7 @@ function App() {
                     <Route path="captain" element={<CaptainPage />} />
                     <Route path="warehouse" element={<WarehousePage />} />
                     <Route path="delivery" element={<DeliveryPage />} />
+                    <Route path="printer-settings" element={<PrinterSettingsPage />} />
                 </Route>
 
                 {/* Public Route - Customer Self Order (No Auth) */}

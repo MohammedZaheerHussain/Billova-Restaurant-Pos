@@ -8,7 +8,17 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@capacitor/android": "^8.0.0",
+        "@capacitor/app": "^8.0.0",
+        "@capacitor/cli": "^8.0.0",
+        "@capacitor/core": "^8.0.0",
+        "@capacitor/haptics": "^8.0.0",
+        "@capacitor/keyboard": "^8.0.0",
+        "@capacitor/splash-screen": "^8.0.0",
+        "@capacitor/status-bar": "^8.0.0",
         "axios": "^1.6.2",
+        "dexie": "^4.2.1",
+        "dexie-react-hooks": "^4.2.0",
         "framer-motion": "^10.16.16",
         "lucide-react": "^0.303.0",
         "react": "^18.2.0",
@@ -20,8 +30,12 @@
     "devDependencies": {
         "@types/react": "^18.2.43",
         "@types/react-dom": "^18.2.17",
+        "@types/w3c-web-usb": "^1.0.13",
+        "@types/web-bluetooth": "^0.0.21",
         "@vitejs/plugin-react": "^4.2.1",
         "typescript": "^5.3.3",
-        "vite": "^5.0.8"
+        "vite": "^5.0.8",
+        "vite-plugin-pwa": "^1.2.0",
+        "workbox-window": "^7.4.0"
     }
 }

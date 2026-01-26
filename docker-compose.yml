@@ -1,17 +1,14 @@
-# Billova POS - Docker Compose Production Setup
 version: '3.8'
 
 services:
   # MySQL Database
   db:
-    image: mysql:8.0
+    image: mysql:8
     container_name: billova-db
-    restart: unless-stopped
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Ayubsheik@1506}
-      MYSQL_DATABASE: dfcpos
-    ports:
-      - "3306:3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: billova
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -22,39 +19,82 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API
+  # API Server
   api:
-    image: ${DOCKER_USERNAME:-billova}/billova:api
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     container_name: billova-api
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: mysql://root:${DB_PASSWORD:-Ayubsheik@1506}@db:3306/dfcpos
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
-      NODE_ENV: production
-      PORT: 3001
-    ports:
-      - "3001:3001"
+    restart: always
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/billova
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      # Supabase Configuration
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_SHADOW_WRITE: ${SUPABASE_SHADOW_WRITE:-true}
+      DUAL_AUTH_ENABLED: ${DUAL_AUTH_ENABLED:-true}
+      SUPABASE_AUTH_ONLY: ${SUPABASE_AUTH_ONLY:-false}
     networks:
       - billova-network
+    expose:
+      - "3002"
 
-  # Frontend Web App
+  # Web Frontend
   web:
-    image: ${DOCKER_USERNAME:-billova}/billova:web
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_API_URL=${VITE_API_URL:-/api}
     container_name: billova-web
-    restart: unless-stopped
-    ports:
-      - "80:80"
+    restart: always
     depends_on:
       - api
     networks:
       - billova-network
+    expose:
+      - "80"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: billova-nginx
+    restart: always
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    networks:
+      - billova-network
+
+  # Certbot for SSL
+  certbot:
+    image: certbot/certbot
+    container_name: billova-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 volumes:
   mysql_data:
-    driver: local
+
 
 networks:
   billova-network:

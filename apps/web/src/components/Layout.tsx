@@ -4,11 +4,13 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
-    BarChart3, Users, Settings, LogOut, ChevronLeft, ChevronRight, Shield, Package, Lock, Bell, Warehouse
+    BarChart3, Users, Settings, LogOut, Menu, X, Shield, Package, Lock, Bell, Warehouse, RefreshCw
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscription, { FeatureKey } from '../hooks/useSubscription';
 import { ordersAPI } from '../api';
+import { useSync, useSyncInit } from '../hooks/useSync';
+import { SyncStatusBadge, OfflineIndicator } from './sync';
 import './Layout.css';
 
 interface NavItem {
@@ -16,6 +18,7 @@ interface NavItem {
     icon: typeof LayoutGrid;
     label: string;
     requiredFeature?: FeatureKey;
+    requiredRoles?: string[]; // New: restrict to specific roles
 }
 
 const navItems: NavItem[] = [
@@ -26,15 +29,20 @@ const navItems: NavItem[] = [
     { path: '/reports', icon: BarChart3, label: 'Reports', requiredFeature: 'reports' },
     { path: '/inventory', icon: Package, label: 'Inventory', requiredFeature: 'inventory' },
     { path: '/warehouse', icon: Warehouse, label: 'Warehouse', requiredFeature: 'inventory' },
-    { path: '/users', icon: Users, label: 'Users' },
+    { path: '/users', icon: Users, label: 'Users', requiredRoles: ['OWNER', 'ADMIN', 'SUPER_ADMIN'] },
     { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function Layout() {
+
     const navigate = useNavigate();
     const { user, logout } = useAuthStore();
     const { sidebarOpen, toggleSidebar } = useUIStore();
     const { hasFeature, currentPlan, getPlanColor } = useSubscription();
+
+    // Initialize offline sync
+    useSyncInit();
+    const { triggerSync, status: syncStatus, isOnline, pendingCount } = useSync();
 
     const handleLogout = () => {
         logout();
@@ -75,15 +83,17 @@ export default function Layout() {
                 animate={{ width: sidebarOpen ? 220 : 70 }}
                 transition={{ duration: 0.2 }}
             >
-                {/* Logo */}
+                {/* Logo - Click to toggle sidebar */}
                 <div className="sidebar-header">
-                    <div className="logo">
+                    <div
+                        className="logo clickable"
+                        onClick={toggleSidebar}
+                        title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                        style={{ cursor: 'pointer' }}
+                    >
                         <img src="/logo.png" alt="Billova POS" className="logo-icon-img" />
                         {sidebarOpen && <span className="logo-text">Billova</span>}
                     </div>
-                    <button className="toggle-btn" onClick={toggleSidebar}>
-                        {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-                    </button>
                 </div>
 
                 {/* Subscription Badge */}
@@ -108,6 +118,27 @@ export default function Layout() {
                     </button>
                 )}
 
+                {/* Sync Status & Controls */}
+                {!isSuperAdmin && (
+                    <div className="sync-controls">
+                        <SyncStatusBadge showLabel={sidebarOpen} onClick={triggerSync} />
+                        {sidebarOpen && !isOnline && (
+                            <OfflineIndicator variant="badge" />
+                        )}
+                        {sidebarOpen && pendingCount > 0 && isOnline && (
+                            <button
+                                className="sync-now-btn"
+                                onClick={triggerSync}
+                                disabled={syncStatus === 'SYNCING'}
+                                title="Sync pending orders now"
+                            >
+                                <RefreshCw size={16} className={syncStatus === 'SYNCING' ? 'spinning' : ''} />
+                                <span>Sync Now ({pendingCount})</span>
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* Navigation */}
                 <nav className="sidebar-nav">
                     {/* Super Admin sees ONLY Super Admin link */}
@@ -121,7 +152,12 @@ export default function Layout() {
                         </NavLink>
                     ) : (
                         /* Customers see regular POS navigation */
-                        navItems.map(({ path, icon: Icon, label, requiredFeature }) => {
+                        navItems.map(({ path, icon: Icon, label, requiredFeature, requiredRoles }) => {
+                            // Check role restriction first
+                            if (requiredRoles && user?.role && !requiredRoles.includes(user.role)) {
+                                return null; // Hide for unauthorized roles
+                            }
+
                             const locked = requiredFeature ? !hasFeature(requiredFeature) : false;
 
                             if (locked) {
@@ -175,6 +211,11 @@ export default function Layout() {
                     </button>
                 </div>
             </motion.aside>
+
+            {/* Offline Banner - shown when offline at top */}
+            {!isOnline && (
+                <OfflineIndicator variant="banner" />
+            )}
 
             {/* Main Content */}
             <main className="main-content">
