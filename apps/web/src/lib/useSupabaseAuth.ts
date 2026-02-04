@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthError, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { shouldUseSupabaseAuth } from './feature-flags';
 
@@ -38,7 +38,7 @@ export const useSupabaseAuth = (): UseSupabaseAuthReturn => {
         }
 
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session }, error }) => {
+        supabase.auth.getSession().then(({ data: { session }, error }: { data: { session: Session | null }, error: AuthError | null }) => {
             setState({
                 user: session?.user ?? null,
                 session,
@@ -49,7 +49,7 @@ export const useSupabaseAuth = (): UseSupabaseAuthReturn => {
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
+            (_event: AuthChangeEvent, session: Session | null) => {
                 setState({
                     user: session?.user ?? null,
                     session,
