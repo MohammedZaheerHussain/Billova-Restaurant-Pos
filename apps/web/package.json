@@ -16,6 +16,7 @@
         "@capacitor/keyboard": "^8.0.0",
         "@capacitor/splash-screen": "^8.0.0",
         "@capacitor/status-bar": "^8.0.0",
+        "@supabase/supabase-js": "^2.94.0",
         "axios": "^1.6.2",
         "dexie": "^4.2.1",
         "dexie-react-hooks": "^4.2.0",

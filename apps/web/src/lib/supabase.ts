@@ -54,7 +54,7 @@ export const subscribeChannel = (
             { event: '*', schema: 'public', table },
             handler
         )
-        .subscribe((status) => {
+        .subscribe((status: string) => {
             console.log(`[Supabase] Channel ${name} status: ${status}`);
         });
 
