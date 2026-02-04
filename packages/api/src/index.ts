@@ -4,6 +4,10 @@ dotenv.config(); // Load env vars BEFORE other imports
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 
 // Import routes (after dotenv is loaded)
@@ -33,18 +37,47 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3002;
 
-// Middleware
+// Rate limiting configuration
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per window
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 auth attempts per window
+    message: { error: 'Too many login attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Security Middleware
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow CORS assets
+}));
+app.use(compression()); // Gzip compression
+app.use(morgan('combined')); // Request logging
+
+// CORS Configuration
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5175',
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 
+// Apply rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/auth', authLimiter);
+
 // Make Prisma available to routes
 app.use((req, res, next) => {
     (req as any).prisma = prisma;
     next();
 });
+
 
 // Health check
 app.get('/api/health', (req, res) => {
