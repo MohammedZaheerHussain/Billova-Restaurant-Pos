@@ -41,7 +41,7 @@
   **Fix:** Refactor into smaller components using composition patterns (use installed `vercel-composition-patterns` skill).
 
 ### PWA & Offline
-- [ ] **PWA icons — only `logo.png` for both 192×192 and 512×512** — Should have separate resolution icons. **Fix:** Generate proper icon set using a PWA icon generator.
+- [x] **PWA icons** — Generated `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` from logo. Updated `vite.config.ts` manifest and `index.html` apple-touch-icon.
 - [ ] **Service Worker dev mode disabled** — `devOptions.enabled: false` in `vite.config.ts`, which is correct for dev, but ensure production build is tested with SW enabled.
 - [ ] **Offline order sync reliability** — Sync engine exists but needs stress testing:
   - What happens with 100+ pending offline orders?
@@ -51,7 +51,7 @@
 ### UI/UX Issues
 - [x] **Loading skeletons** — Added contextual skeleton loaders for POS menu grid, Orders table, and Reports dashboard (`Skeleton.tsx` + `Skeleton.css`).
 - [x] **Empty states** — Added professional empty states with icons + helper text for Tables, Menu, Users pages. Orders already had one.
-- [ ] **Mobile responsiveness** — POS page uses fixed `calc(100vh - 70px)` height. Test on actual tablets/phones. Many pages may not be responsive.
+- [x] **Mobile responsiveness** — Added collapsible sidebar with hamburger toggle for screens ≤768px, backdrop overlay, and content padding adjustments in `Layout.css` + `Layout.tsx`.
 - [ ] **Accessibility (a11y)** — No ARIA labels, no keyboard navigation support, no focus management. Run Lighthouse audit.
 - [ ] **No dark/light theme toggle** — App is dark-only. Some users may prefer light mode.
 
