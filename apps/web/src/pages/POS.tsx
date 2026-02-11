@@ -14,6 +14,14 @@ import { ReceiptData } from '../printing';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import './POS.css';
 
+// Helper function to format product names with proper title case
+function formatProductName(name: string): string {
+    return name
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
 
 export default function POSPage() {
     const [categories, setCategories] = useState<Category[]>([]);
@@ -307,7 +315,7 @@ export default function POSPage() {
                 </div>
 
                 {/* Menu Grid */}
-                <div className="menu-grid">
+                <div className={`menu-grid ${filteredItems.length > 0 && filteredItems.length <= 6 ? 'menu-grid-sparse' : ''}`}>
                     {loading ? (
                         <div className="loading-state">
                             <div className="spinner" />
@@ -315,7 +323,9 @@ export default function POSPage() {
                         </div>
                     ) : filteredItems.length === 0 ? (
                         <div className="empty-state">
-                            <p>No items found</p>
+                            <Search size={32} strokeWidth={1.5} />
+                            <p>No items in this category</p>
+                            <span className="empty-hint">Try selecting a different category or add items from the Menu page</span>
                         </div>
                     ) : (
                         <AnimatePresence mode="popLayout">
@@ -323,10 +333,10 @@ export default function POSPage() {
                                 <motion.div
                                     key={item.id}
                                     layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    initial={{ opacity: 0, scale: 0.97 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ duration: 0.2 }}
+                                    exit={{ opacity: 0, scale: 0.97 }}
+                                    transition={{ duration: 0.15 }}
                                     className="menu-item-card"
                                     onClick={() => handleAddItem(item)}
                                 >
@@ -367,7 +377,7 @@ export default function POSPage() {
                         </div>
                     ) : (
                         <AnimatePresence>
-                            {cartItems.map((item) => (
+                            {cartItems.map((item, index) => (
                                 <motion.div
                                     key={item.id}
                                     initial={{ opacity: 0, x: 20 }}
@@ -375,8 +385,9 @@ export default function POSPage() {
                                     exit={{ opacity: 0, x: -20 }}
                                     className="cart-item"
                                 >
+                                    <span className="item-sno">{index + 1}.</span>
                                     <div className="cart-item-info">
-                                        <h4>{item.menuItem.name}</h4>
+                                        <h4>{formatProductName(item.menuItem.name)}</h4>
                                         {item.variant && (
                                             <span className="variant-name">{item.variant.name}</span>
                                         )}
@@ -402,6 +413,32 @@ export default function POSPage() {
                         </AnimatePresence>
                     )}
                 </div>
+
+                {/* Customer Info Section (Optional) */}
+                {cartItems.length > 0 && (
+                    <div className="customer-info-section">
+                        <div className="customer-input-row">
+                            <div className="customer-input-group">
+                                <User size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Customer Name (optional)"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                />
+                            </div>
+                            <div className="customer-input-group">
+                                <Phone size={16} />
+                                <input
+                                    type="tel"
+                                    placeholder="Phone (optional)"
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Order Notes Section */}
                 {cartItems.length > 0 && (
@@ -576,10 +613,10 @@ export default function POSPage() {
                                     <span>Total</span>
                                 </div>
                                 <div className="bill-items-list">
-                                    {cartItems.map((item, index) => (
+                                    {cartItems.map((item) => (
                                         <div key={item.id} className="bill-item-row">
                                             <span className="bill-item-name">
-                                                {index + 1}. {item.menuItem.name}
+                                                {formatProductName(item.menuItem.name)}
                                                 {item.variant && <small> ({item.variant.name})</small>}
                                             </span>
                                             <span className="bill-item-qty">x{item.quantity}</span>
