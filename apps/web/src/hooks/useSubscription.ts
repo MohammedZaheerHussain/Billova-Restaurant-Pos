@@ -3,13 +3,13 @@ import { useAuthStore } from '../store';
 
 export type SubscriptionPlan = 'BASIC' | 'PLUS' | 'PREMIUM';
 
-// Feature limits per plan - All have unlimited items, but limited users
+// Feature limits per plan - Staff creation is Premium only
 export const PLAN_LIMITS = {
     BASIC: {
         name: 'Basic',
         menuItems: Infinity,
         orderHistoryDays: Infinity,
-        maxUsers: 2,  // 2 employees max
+        maxUsers: 1,  // Owner only - upgrade to Premium for staff
         features: {
             pos: true,
             menuManagement: true,
@@ -19,13 +19,14 @@ export const PLAN_LIMITS = {
             tables: true,
             aiExtraction: false,
             exportPdf: false,
+            staffManagement: false, // Premium only
         },
     },
     PLUS: {
         name: 'Plus',
         menuItems: Infinity,
         orderHistoryDays: Infinity,
-        maxUsers: 5,  // 5 employees max
+        maxUsers: 1,  // Owner only - upgrade to Premium for staff
         features: {
             pos: true,
             menuManagement: true,
@@ -35,6 +36,7 @@ export const PLAN_LIMITS = {
             tables: true,
             aiExtraction: false,
             exportPdf: false,
+            staffManagement: false, // Premium only
         },
     },
     PREMIUM: {
@@ -51,6 +53,7 @@ export const PLAN_LIMITS = {
             tables: true,
             aiExtraction: true,
             exportPdf: true,
+            staffManagement: true, // Can add staff
         },
     },
 };
@@ -61,12 +64,14 @@ export function useSubscription() {
     const user = useAuthStore((state) => state.user);
 
     // Get current plan from user's branch (default to BASIC)
-    const currentPlan: SubscriptionPlan = (user?.branch?.subscriptionPlan as SubscriptionPlan) || 'BASIC';
+    const rawPlan = user?.branch?.subscriptionPlan as SubscriptionPlan;
+    // Validate plan exists in PLAN_LIMITS, fallback to BASIC if invalid
+    const currentPlan: SubscriptionPlan = (rawPlan && PLAN_LIMITS[rawPlan]) ? rawPlan : 'BASIC';
     const planConfig = PLAN_LIMITS[currentPlan];
 
     // Check if a feature is available
     const hasFeature = (feature: FeatureKey): boolean => {
-        return planConfig.features[feature] === true;
+        return planConfig?.features?.[feature] === true;
     };
 
     // Check if user can add more items (for menu limits)
@@ -100,8 +105,10 @@ export function useSubscription() {
             tables: 'Table Management',
             aiExtraction: 'AI Menu Extraction',
             exportPdf: 'PDF Export',
+            staffManagement: 'Staff Management',
         };
-        return `Upgrade to ${feature === 'aiExtraction' || feature === 'exportPdf' ? 'Premium' : 'Plus'} to access ${featureNames[feature]}`;
+        const premiumFeatures: FeatureKey[] = ['aiExtraction', 'exportPdf', 'staffManagement'];
+        return `Upgrade to ${premiumFeatures.includes(feature) ? 'Premium' : 'Plus'} to access ${featureNames[feature]}`;
     };
 
     return {

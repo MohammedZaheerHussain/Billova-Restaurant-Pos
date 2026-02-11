@@ -168,31 +168,66 @@
     text-decoration: underline;
 }
 
-.login-footer {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
+/* Forgot Hint */
+.forgot-hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+/* License Panel - Like Billova Medical */
+.license-panel {
+    margin-top: 28px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: var(--radius-lg);
     text-align: center;
 }
 
-.login-footer p {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-bottom: 8px;
+.license-panel h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
 }
 
-.create-account-link {
-    display: inline-block;
-    padding: 10px 24px;
-    background: var(--bg-secondary);
+.license-panel>p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(139, 92, 246, 0.15);
     border-radius: var(--radius-md);
-    font-size: 14px;
+    color: #8b5cf6;
+    font-size: 13px;
     font-weight: 500;
-    color: var(--text-primary);
     transition: all 0.2s;
 }
 
-.create-account-link:hover {
-    background: var(--bg-card-hover);
-    color: var(--primary);
+.contact-item:hover {
+    background: rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+}
+
+/* Powered By */
+.powered-by {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 20px;
 }

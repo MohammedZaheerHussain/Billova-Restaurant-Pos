@@ -1,39 +1,60 @@
-// Menu Routes - CRUD for menu items
+// Menu Routes - CRUD for menu items (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 import Groq from 'groq-sdk';
 
 const router = Router();
 
-// Initialize Groq AI (you'll need to set GROQ_API_KEY in your .env)
+// Initialize Groq AI
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
 
 // Get all menu items (with categories and variants)
 router.get('/', async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { branchId, categoryId, isAvailable } = req.query;
 
-        const where: any = {};
-        if (branchId) where.branchId = branchId;
-        if (categoryId) where.categoryId = categoryId;
-        if (isAvailable !== undefined) where.isAvailable = isAvailable === 'true';
+        let query = sb
+            .from('menu_items')
+            .select(`
+                *,
+                categories (*),
+                menu_item_variants (*)
+            `)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
 
-        const items = await prisma.menuItem.findMany({
-            where,
-            include: {
-                category: true,
-                variants: true,
-            },
-            orderBy: [
-                { category: { sortOrder: 'asc' } },
-                { sortOrder: 'asc' },
-                { name: 'asc' },
-            ],
-        });
+        if (branchId) query = query.eq('branch_id', branchId);
+        if (categoryId) query = query.eq('category_id', categoryId);
+        if (isAvailable !== undefined) query = query.eq('is_available', isAvailable === 'true');
 
-        res.json(items);
+        const { data: items, error } = await query;
+
+        if (error) throw error;
+
+        // Transform to camelCase for frontend compatibility
+        const transformed = items.map((item: any) => ({
+            id: item.id,
+            branchId: item.branch_id,
+            categoryId: item.category_id,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image: item.image,
+            isVeg: item.is_veg,
+            isAvailable: item.is_available,
+            hasGST: item.has_gst,
+            gstPercent: item.gst_percent,
+            sortOrder: item.sort_order,
+            category: item.categories,
+            variants: item.menu_item_variants,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at,
+        }));
+
+        res.json(transformed);
     } catch (error) {
         console.error('Get menu error:', error);
         res.status(500).json({ error: 'Failed to get menu' });
@@ -43,25 +64,41 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 // Get single menu item
 router.get('/:id', async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        const item = await prisma.menuItem.findUnique({
-            where: { id },
-            include: {
-                category: true,
-                variants: true,
-                ingredients: {
-                    include: { inventoryItem: true },
-                },
-            },
-        });
+        const { data: item, error } = await sb
+            .from('menu_items')
+            .select(`
+                *,
+                categories (*),
+                menu_item_variants (*)
+            `)
+            .eq('id', id)
+            .single();
 
-        if (!item) {
+        if (error || !item) {
             return res.status(404).json({ error: 'Menu item not found' });
         }
 
-        res.json(item);
+        // Transform to camelCase
+        const transformed = {
+            id: item.id,
+            branchId: item.branch_id,
+            categoryId: item.category_id,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image: item.image,
+            isVeg: item.is_veg,
+            isAvailable: item.is_available,
+            hasGST: item.has_gst,
+            gstPercent: item.gst_percent,
+            category: item.categories,
+            variants: item.menu_item_variants,
+        };
+
+        res.json(transformed);
     } catch (error) {
         console.error('Get menu item error:', error);
         res.status(500).json({ error: 'Failed to get menu item' });
@@ -71,30 +108,70 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 // Create menu item
 router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { name, description, price, categoryId, isVeg, image, variants, hasGST, gstPercent } = req.body;
         const branchId = req.user!.branchId;
 
-        const item = await prisma.menuItem.create({
-            data: {
-                branchId,
-                categoryId,
+        // Create menu item
+        const { data: item, error } = await sb
+            .from('menu_items')
+            .insert({
+                branch_id: branchId,
+                category_id: categoryId,
                 name,
                 description,
                 price,
-                isVeg: isVeg || false,
+                is_veg: isVeg || false,
                 image,
-                hasGST: hasGST !== false,
-                gstPercent: gstPercent || 5,
-                variants: variants ? { create: variants } : undefined,
-            },
-            include: {
-                category: true,
-                variants: true,
-            },
-        });
+                has_gst: hasGST !== false,
+                gst_percent: gstPercent || 5,
+            })
+            .select(`
+                *,
+                categories (*)
+            `)
+            .single();
 
-        res.status(201).json(item);
+        if (error) throw error;
+
+        // Create variants if provided
+        if (variants && variants.length > 0) {
+            const variantData = variants.map((v: any) => ({
+                menu_item_id: item.id,
+                name: v.name,
+                price: v.price,
+                is_default: v.isDefault || false,
+            }));
+
+            await sb.from('menu_item_variants').insert(variantData);
+        }
+
+        // Fetch complete item with variants
+        const { data: completeItem } = await sb
+            .from('menu_items')
+            .select(`
+                *,
+                categories (*),
+                menu_item_variants (*)
+            `)
+            .eq('id', item.id)
+            .single();
+
+        res.status(201).json({
+            id: completeItem.id,
+            branchId: completeItem.branch_id,
+            categoryId: completeItem.category_id,
+            name: completeItem.name,
+            description: completeItem.description,
+            price: completeItem.price,
+            image: completeItem.image,
+            isVeg: completeItem.is_veg,
+            isAvailable: completeItem.is_available,
+            hasGST: completeItem.has_gst,
+            gstPercent: completeItem.gst_percent,
+            category: completeItem.categories,
+            variants: completeItem.menu_item_variants,
+        });
     } catch (error) {
         console.error('Create menu item error:', error);
         res.status(500).json({ error: 'Failed to create menu item' });
@@ -104,30 +181,48 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
 // Update menu item
 router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { name, description, price, categoryId, isVeg, isAvailable, image, hasGST, gstPercent } = req.body;
 
-        const item = await prisma.menuItem.update({
-            where: { id },
-            data: {
+        const { data: item, error } = await sb
+            .from('menu_items')
+            .update({
                 name,
                 description,
                 price,
-                categoryId,
-                isVeg,
-                isAvailable,
+                category_id: categoryId,
+                is_veg: isVeg,
+                is_available: isAvailable,
                 image,
-                hasGST,
-                gstPercent,
-            },
-            include: {
-                category: true,
-                variants: true,
-            },
-        });
+                has_gst: hasGST,
+                gst_percent: gstPercent,
+            })
+            .eq('id', id)
+            .select(`
+                *,
+                categories (*),
+                menu_item_variants (*)
+            `)
+            .single();
 
-        res.json(item);
+        if (error) throw error;
+
+        res.json({
+            id: item.id,
+            branchId: item.branch_id,
+            categoryId: item.category_id,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image: item.image,
+            isVeg: item.is_veg,
+            isAvailable: item.is_available,
+            hasGST: item.has_gst,
+            gstPercent: item.gst_percent,
+            category: item.categories,
+            variants: item.menu_item_variants,
+        });
     } catch (error) {
         console.error('Update menu item error:', error);
         res.status(500).json({ error: 'Failed to update menu item' });
@@ -137,20 +232,34 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
 // Toggle availability
 router.patch('/:id/toggle-availability', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        const item = await prisma.menuItem.findUnique({ where: { id } });
-        if (!item) {
+        // Get current state
+        const { data: current, error: fetchError } = await sb
+            .from('menu_items')
+            .select('is_available')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !current) {
             return res.status(404).json({ error: 'Menu item not found' });
         }
 
-        const updated = await prisma.menuItem.update({
-            where: { id },
-            data: { isAvailable: !item.isAvailable },
-        });
+        // Toggle
+        const { data: updated, error } = await sb
+            .from('menu_items')
+            .update({ is_available: !current.is_available })
+            .eq('id', id)
+            .select()
+            .single();
 
-        res.json(updated);
+        if (error) throw error;
+
+        res.json({
+            id: updated.id,
+            isAvailable: updated.is_available,
+        });
     } catch (error) {
         console.error('Toggle availability error:', error);
         res.status(500).json({ error: 'Failed to toggle availability' });
@@ -160,26 +269,38 @@ router.patch('/:id/toggle-availability', authMiddleware, async (req: AuthRequest
 // Delete menu item
 router.delete('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
         // Check if item exists
-        const item = await prisma.menuItem.findUnique({ where: { id } });
-        if (!item) {
+        const { data: item, error: fetchError } = await sb
+            .from('menu_items')
+            .select('id')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !item) {
             return res.status(404).json({ error: 'Menu item not found' });
         }
 
-        // Delete related order items first (if any exist)
-        await prisma.orderItem.deleteMany({ where: { menuItemId: id } });
+        // Delete related order items first (cascade should handle this, but just in case)
+        await sb.from('order_items').delete().eq('menu_item_id', id);
+
+        // Delete variants
+        await sb.from('menu_item_variants').delete().eq('menu_item_id', id);
 
         // Delete the menu item
-        await prisma.menuItem.delete({ where: { id } });
+        const { error } = await sb
+            .from('menu_items')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
 
         res.json({ message: 'Menu item deleted' });
     } catch (error: any) {
         console.error('Delete menu item error:', error);
-        // Check for foreign key constraint error
-        if (error.code === 'P2003') {
+        if (error.code === '23503') { // Foreign key violation
             res.status(400).json({ error: 'Cannot delete item - it is used in existing orders' });
         } else {
             res.status(500).json({ error: 'Failed to delete menu item' });
@@ -190,7 +311,7 @@ router.delete('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (re
 // Extract items from menu card image using AI Vision
 router.post('/extract-menu-card', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { imageData } = req.body;
         const branchId = req.user!.branchId;
 
@@ -199,19 +320,20 @@ router.post('/extract-menu-card', authMiddleware, requireRole('OWNER', 'MANAGER'
         }
 
         // Get existing categories for this branch
-        let existingCategories = await prisma.category.findMany({
-            where: { branchId },
-        });
+        const { data: existingCategories } = await sb
+            .from('categories')
+            .select('*')
+            .eq('branch_id', branchId);
+
+        let categoriesList = existingCategories || [];
 
         let extractedData: { categories: Array<{ name: string, icon: string }>, items: Array<{ name: string, price: number, isVeg: boolean, categoryName: string }> };
 
         // Use Groq AI Vision if available
         if (groq && GROQ_API_KEY) {
             try {
-                // Check image size (Groq has 4MB limit)
                 const imageSizeBytes = Buffer.byteLength(imageData, 'utf8');
                 const imageSizeMB = imageSizeBytes / (1024 * 1024);
-                console.log(`Image size: ${imageSizeMB.toFixed(2)} MB`);
 
                 if (imageSizeMB > 4) {
                     return res.status(400).json({
@@ -242,24 +364,14 @@ Rules:
 7. Include ALL sections: main items, sides, drinks, combos, addons, etc.
 8. Be thorough - don't miss any items visible in the image`;
 
-                console.log('Calling Groq API with model: meta-llama/llama-4-scout-17b-16e-instruct');
-
                 const response = await groq.chat.completions.create({
                     model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                     messages: [
                         {
                             role: 'user',
                             content: [
-                                {
-                                    type: 'text',
-                                    text: prompt,
-                                },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: imageData,
-                                    },
-                                },
+                                { type: 'text', text: prompt },
+                                { type: 'image_url', image_url: { url: imageData } },
                             ],
                         },
                     ],
@@ -267,39 +379,25 @@ Rules:
                     max_tokens: 4096,
                 });
 
-                console.log('Groq API response received');
                 const responseText = response.choices[0]?.message?.content || '';
-                console.log('Response text length:', responseText.length);
 
-                // Clean up the response - remove markdown code blocks if present
                 let cleanJson = responseText.trim();
-                if (cleanJson.startsWith('```json')) {
-                    cleanJson = cleanJson.slice(7);
-                }
-                if (cleanJson.startsWith('```')) {
-                    cleanJson = cleanJson.slice(3);
-                }
-                if (cleanJson.endsWith('```')) {
-                    cleanJson = cleanJson.slice(0, -3);
-                }
+                if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+                if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+                if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
                 cleanJson = cleanJson.trim();
 
                 extractedData = JSON.parse(cleanJson);
-                console.log('AI extracted:', extractedData.items.length, 'items in', extractedData.categories.length, 'categories');
 
             } catch (aiError: any) {
                 console.error('AI extraction failed:', aiError);
-                console.error('Error details:', JSON.stringify(aiError, null, 2));
                 return res.status(500).json({
                     error: 'AI extraction failed. ' + (aiError.message || 'Please try again.'),
-                    details: aiError.error?.message || String(aiError)
                 });
             }
         } else {
-            // No AI API key - return error
             return res.status(400).json({
-                error: 'AI Menu Extraction requires a Groq API key. Please add GROQ_API_KEY to your .env file.',
-                setupInstructions: 'Get your free API key from https://console.groq.com/keys'
+                error: 'AI Menu Extraction requires a Groq API key.',
             });
         }
 
@@ -307,21 +405,27 @@ Rules:
         const categoryMap: Record<string, string> = {};
 
         for (const cat of extractedData.categories) {
-            let existing = existingCategories.find((c: any) =>
+            let existing = categoriesList.find((c: any) =>
                 c.name.toLowerCase() === cat.name.toLowerCase()
             );
 
             if (!existing) {
-                existing = await prisma.category.create({
-                    data: {
-                        branchId,
+                const { data: newCat } = await sb
+                    .from('categories')
+                    .insert({
+                        branch_id: branchId,
                         name: cat.name,
                         icon: cat.icon || '🍽️',
-                    },
-                });
-                existingCategories.push(existing);
+                    })
+                    .select()
+                    .single();
+
+                if (newCat) {
+                    categoriesList.push(newCat);
+                    existing = newCat;
+                }
             }
-            categoryMap[cat.name] = existing.id;
+            if (existing) categoryMap[cat.name] = existing.id;
         }
 
         // Map items with category IDs
@@ -329,7 +433,7 @@ Rules:
             name: item.name,
             price: String(item.price),
             isVeg: item.isVeg,
-            categoryId: categoryMap[item.categoryName] || existingCategories[0]?.id || '',
+            categoryId: categoryMap[item.categoryName] || categoriesList[0]?.id || '',
             categoryName: item.categoryName,
         }));
 
@@ -346,4 +450,3 @@ Rules:
 });
 
 export default router;
-

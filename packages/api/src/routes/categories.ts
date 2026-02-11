@@ -1,24 +1,47 @@
-// Category Routes
+// Category Routes (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
 
 // Get all categories
 router.get('/', async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { branchId } = req.query;
 
-        const categories = await prisma.category.findMany({
-            where: branchId ? { branchId: branchId as string } : undefined,
-            include: {
-                _count: { select: { menuItems: true } },
-            },
-            orderBy: { sortOrder: 'asc' },
-        });
+        let query = sb
+            .from('categories')
+            .select(`
+                *,
+                menu_items (id)
+            `)
+            .order('sort_order', { ascending: true });
 
-        res.json(categories);
+        if (branchId) query = query.eq('branch_id', branchId);
+
+        const { data: categories, error } = await query;
+
+        if (error) throw error;
+
+        // Transform with item count
+        const transformed = (categories || []).map((cat: any) => ({
+            id: cat.id,
+            branchId: cat.branch_id,
+            name: cat.name,
+            icon: cat.icon,
+            color: cat.color,
+            sortOrder: cat.sort_order,
+            isActive: cat.is_active,
+            createdAt: cat.created_at,
+            updatedAt: cat.updated_at,
+            _count: {
+                menuItems: cat.menu_items?.length || 0,
+            },
+        }));
+
+        res.json(transformed);
     } catch (error) {
         console.error('Get categories error:', error);
         res.status(500).json({ error: 'Failed to get categories' });
@@ -28,21 +51,33 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 // Create category
 router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { name, icon, color, sortOrder } = req.body;
         const branchId = req.user!.branchId;
 
-        const category = await prisma.category.create({
-            data: {
-                branchId,
+        const { data: category, error } = await sb
+            .from('categories')
+            .insert({
+                branch_id: branchId,
                 name,
                 icon,
                 color,
-                sortOrder: sortOrder || 0,
-            },
-        });
+                sort_order: sortOrder || 0,
+            })
+            .select()
+            .single();
 
-        res.status(201).json(category);
+        if (error) throw error;
+
+        res.status(201).json({
+            id: category.id,
+            branchId: category.branch_id,
+            name: category.name,
+            icon: category.icon,
+            color: category.color,
+            sortOrder: category.sort_order,
+            isActive: category.is_active,
+        });
     } catch (error) {
         console.error('Create category error:', error);
         res.status(500).json({ error: 'Failed to create category' });
@@ -52,16 +87,34 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
 // Update category
 router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { name, icon, color, sortOrder, isActive } = req.body;
 
-        const category = await prisma.category.update({
-            where: { id },
-            data: { name, icon, color, sortOrder, isActive },
-        });
+        const { data: category, error } = await sb
+            .from('categories')
+            .update({
+                name,
+                icon,
+                color,
+                sort_order: sortOrder,
+                is_active: isActive,
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        res.json(category);
+        if (error) throw error;
+
+        res.json({
+            id: category.id,
+            branchId: category.branch_id,
+            name: category.name,
+            icon: category.icon,
+            color: category.color,
+            sortOrder: category.sort_order,
+            isActive: category.is_active,
+        });
     } catch (error) {
         console.error('Update category error:', error);
         res.status(500).json({ error: 'Failed to update category' });
@@ -71,16 +124,25 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
 // Delete category
 router.delete('/:id', authMiddleware, requireRole('OWNER'), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
         // Check if category has menu items
-        const count = await prisma.menuItem.count({ where: { categoryId: id } });
-        if (count > 0) {
+        const { count } = await sb
+            .from('menu_items')
+            .select('*', { count: 'exact', head: true })
+            .eq('category_id', id);
+
+        if (count && count > 0) {
             return res.status(400).json({ error: 'Cannot delete category with menu items' });
         }
 
-        await prisma.category.delete({ where: { id } });
+        const { error } = await sb
+            .from('categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
 
         res.json({ message: 'Category deleted' });
     } catch (error) {

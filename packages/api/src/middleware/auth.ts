@@ -1,6 +1,7 @@
 // Authentication Middleware
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { supabase } from '../lib/supabase';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -13,6 +14,7 @@ export interface AuthRequest extends Request {
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
+    const authProvider = req.headers['x-auth-provider'];
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'No token provided' });
@@ -21,34 +23,66 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     const token = authHeader.split(' ')[1];
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+        const sb = (req as any).supabase || supabase;
+        let userId: string;
 
-        // Fetch fresh user data from database to get current role
-        const prisma = (req as any).prisma;
-        if (prisma) {
-            const freshUser = await prisma.user.findUnique({
-                where: { id: decoded.id },
-                select: { id: true, email: true, role: true, branchId: true, isActive: true }
-            });
+        // Check if it's a Supabase token (signaled by header or try Supabase first)
+        if (authProvider === 'supabase') {
+            // Validate Supabase token
+            const { data: { user: supabaseUser }, error: supabaseError } = await sb.auth.getUser(token);
 
-            if (!freshUser || !freshUser.isActive) {
-                return res.status(401).json({ error: 'User not found or inactive' });
+            if (supabaseError || !supabaseUser) {
+                console.log('[Auth] Supabase token invalid:', supabaseError?.message);
+                return res.status(401).json({ error: 'Invalid token' });
             }
 
-            // Use fresh role from database instead of JWT token
-            req.user = {
-                id: freshUser.id,
-                email: freshUser.email,
-                role: freshUser.role,
-                branchId: freshUser.branchId,
-            };
+            userId = supabaseUser.id;
         } else {
-            // Fallback to token data if prisma not available
-            req.user = decoded;
+            // Try Supabase first, fallback to JWT
+            const { data: { user: supabaseUser }, error: supabaseError } = await sb.auth.getUser(token);
+
+            if (!supabaseError && supabaseUser) {
+                userId = supabaseUser.id;
+            } else {
+                // Fallback to legacy JWT verification
+                try {
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+                    userId = decoded.id;
+                } catch (jwtError) {
+                    console.log('[Auth] Both Supabase and JWT validation failed');
+                    return res.status(401).json({ error: 'Invalid token' });
+                }
+            }
         }
+
+        // Fetch fresh user data from Supabase profiles table
+        const { data: freshUser, error } = await sb
+            .from('profiles')
+            .select('id, email, role, branch_id, is_active')
+            .eq('id', userId)
+            .single();
+
+        if (error || !freshUser) {
+            console.log('[Auth] User not found in profiles:', userId, error?.message);
+            return res.status(401).json({ error: 'User not found or inactive' });
+        }
+
+        // Skip is_active check for super admins (they may not have branch)
+        if (!freshUser.is_active && freshUser.role !== 'SUPER_ADMIN' && freshUser.role !== 'super_admin') {
+            return res.status(401).json({ error: 'User not found or inactive' });
+        }
+
+        // Use fresh role from database
+        req.user = {
+            id: freshUser.id,
+            email: freshUser.email,
+            role: freshUser.role,
+            branchId: freshUser.branch_id,
+        };
 
         next();
     } catch (error) {
+        console.error('[Auth] Middleware error:', error);
         return res.status(401).json({ error: 'Invalid token' });
     }
 };
@@ -60,7 +94,11 @@ export const requireRole = (...roles: string[]) => {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
-        if (!roles.includes(req.user.role)) {
+        // Normalize roles for comparison (handle case sensitivity)
+        const normalizedUserRole = req.user.role.toLowerCase();
+        const normalizedRoles = roles.map(r => r.toLowerCase());
+
+        if (!normalizedRoles.includes(normalizedUserRole)) {
             return res.status(403).json({ error: 'Insufficient permissions' });
         }
 

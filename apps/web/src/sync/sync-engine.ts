@@ -1,6 +1,6 @@
 // Sync Engine - Core sync logic for offline-first architecture
 import { db, OfflineOrder, SyncLog, generateOrderHash } from '../db/indexed-db';
-import { useSyncStore } from '../store/syncStore';
+import { useSyncStore } from '../store/sync-store';
 import api from '../api';
 
 // Configuration
@@ -60,25 +60,11 @@ class SyncEngine {
             .anyOf(['PENDING', 'FAILED'])
             .count();
 
-        const failedSyncs = await db.syncFailures
-            .where('flaggedForAdmin')
-            .equals(1)
-            .count();
-
-        useSyncStore.getState().updatePendingCounts(
-            pendingOrders,
-            pendingPayments,
-            failedSyncs
-        );
-
-        // Update admin flags
-        const adminFlags = await db.syncFailures
-            .where('flaggedForAdmin')
-            .equals(1)
-            .filter((f) => !f.resolvedAt)
-            .count();
-
-        useSyncStore.getState().setAdminFlags(adminFlags);
+        // Use sync-store API (object-based)
+        useSyncStore.getState().updatePendingCounts({
+            orders: pendingOrders,
+            payments: pendingPayments,
+        });
     }
 
     // Log sync attempt
@@ -256,11 +242,8 @@ class SyncEngine {
                 break;
             }
 
-            // Update progress
-            useSyncStore.getState().setSyncProgress(
-                Math.round((processed / totalOrders) * 100),
-                `Order ${order.tempBillNumber}`
-            );
+            // Log progress (sync-store doesn't have setSyncProgress, just log it)
+            console.log(`[SyncEngine] Processing order ${processed + 1}/${totalOrders}: ${order.tempBillNumber}`);
 
             // Apply retry delay if this is a retry
             if (order.syncAttempts > 0) {
@@ -293,7 +276,7 @@ class SyncEngine {
         }
 
         if (!this.isOnline()) {
-            useSyncStore.getState().setOnlineStatus(false);
+            useSyncStore.getState().setOnline(false);
             return { totalSynced: 0, totalFailed: 0, totalSkipped: 0, errors: ['Device is offline'] };
         }
 
@@ -301,8 +284,7 @@ class SyncEngine {
         this.syncAbortController = new AbortController();
 
         const store = useSyncStore.getState();
-        store.setSyncStatus('SYNCING');
-        store.setSyncProgress(0, 'Starting sync...');
+        store.setSyncing(true);
 
         console.log('[SyncEngine] Starting sync...');
 
@@ -317,11 +299,11 @@ class SyncEngine {
             const totalFailed = ordersSummary.totalFailed;
 
             if (totalFailed > 0) {
-                store.setSyncError(`${totalFailed} items failed to sync`);
+                store.setLastSync(new Date().toISOString(), `${totalFailed} items failed to sync`);
             } else if (totalSynced > 0) {
-                store.setSyncSuccess();
+                store.setLastSync(new Date().toISOString(), null);
             } else {
-                store.resetSync();
+                store.setSyncing(false);
             }
 
             console.log(`[SyncEngine] Sync complete: ${totalSynced} synced, ${totalFailed} failed`);
@@ -329,7 +311,7 @@ class SyncEngine {
             return ordersSummary;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Sync failed';
-            store.setSyncError(errorMessage);
+            store.setLastSync(new Date().toISOString(), errorMessage);
             console.error('[SyncEngine] Sync error:', error);
             return { totalSynced: 0, totalFailed: 0, totalSkipped: 0, errors: [errorMessage] };
         } finally {
@@ -344,7 +326,7 @@ class SyncEngine {
             this.syncAbortController.abort();
         }
         this.isSyncing = false;
-        useSyncStore.getState().resetSync();
+        useSyncStore.getState().reset();
     }
 
     // Manual sync trigger

@@ -1,41 +1,51 @@
-// Auth Routes - Login, Register, Profile
+// Auth Routes - Supabase Auth Integration
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
 
 // Check if initial setup is needed
 router.get('/check-setup', async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
 
-        // Check if any SUPER_ADMIN exists
-        const superAdmin = await prisma.user.findFirst({
-            where: { role: 'SUPER_ADMIN' },
-        });
+        // Check if any super_admin or owner exists in profiles
+        const { data: adminProfile, error } = await sb
+            .from('profiles')
+            .select('id, role')
+            .or('role.eq.SUPER_ADMIN,role.eq.super_admin,role.eq.owner,role.eq.OWNER')
+            .limit(1)
+            .maybeSingle();
 
-        res.json({ isSetupComplete: !!superAdmin });
+        const isSetupComplete = !!adminProfile && !error;
+        console.log('[check-setup] Admin found:', adminProfile?.role, 'Setup complete:', isSetupComplete);
+
+        res.json({ isSetupComplete });
     } catch (error) {
         console.error('Check setup error:', error);
         res.status(500).json({ error: 'Failed to check setup status' });
     }
 });
 
-// First-time setup - Create Super Admin
+// First-time setup - Create Super Admin via Supabase Auth
 router.post('/setup', async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { adminName, adminEmail, adminPassword, adminPhone, companyName } = req.body;
 
-        // Check if setup already done
-        const existingAdmin = await prisma.user.findFirst({
-            where: { role: 'SUPER_ADMIN' },
-        });
+        // Check if setup already done (check for SUPER_ADMIN or owner)
+        const { data: existingAdmin } = await sb
+            .from('profiles')
+            .select('id, role')
+            .or('role.eq.SUPER_ADMIN,role.eq.super_admin,role.eq.owner,role.eq.OWNER')
+            .limit(1)
+            .maybeSingle();
 
         if (existingAdmin) {
-            return res.status(400).json({ error: 'Setup already completed' });
+            return res.status(400).json({ error: 'Setup already completed. Please login with your admin account.' });
         }
 
         // Validate required fields
@@ -43,36 +53,64 @@ router.post('/setup', async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ error: 'Name, email, and password are required' });
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        // Create organization first
+        const { data: org, error: orgError } = await sb
+            .from('organizations')
+            .insert({
+                name: companyName || 'Billova',
+            })
+            .select()
+            .single();
 
-        // Create admin branch (required for branch relation)
-        const adminBranch = await prisma.branch.create({
-            data: {
+        if (orgError) throw orgError;
+
+        // Create admin branch
+        const { data: branch, error: branchError } = await sb
+            .from('branches')
+            .insert({
+                org_id: org.id,
                 name: companyName || 'Billova Admin',
                 address: 'Admin Office',
-                isActive: true,
+                is_active: true,
+            })
+            .select()
+            .single();
+
+        if (branchError) throw branchError;
+
+        // Create user via Supabase Auth
+        const { data: authData, error: authError } = await sb.auth.admin.createUser({
+            email: adminEmail,
+            password: adminPassword,
+            email_confirm: true,
+            user_metadata: {
+                name: adminName,
+                role: 'owner',
+                org_id: org.id,
+                branch_id: branch.id,
             },
         });
 
-        // Create Super Admin user
-        const superAdmin = await prisma.user.create({
-            data: {
-                branchId: adminBranch.id,
-                name: adminName,
-                email: adminEmail,
-                password: hashedPassword,
-                phone: adminPhone || null,
-                role: 'SUPER_ADMIN',
-                isActive: true,
-            },
-        });
+        if (authError) throw authError;
+
+        // Profile is auto-created via trigger, but update it with org/branch
+        const { error: profileError } = await sb
+            .from('profiles')
+            .update({
+                org_id: org.id,
+                branch_id: branch.id,
+                role: 'owner',
+                phone: adminPhone,
+            })
+            .eq('id', authData.user.id);
+
+        if (profileError) console.warn('Profile update warning:', profileError);
 
         res.status(201).json({
             message: 'Setup completed successfully!',
             admin: {
-                name: superAdmin.name,
-                email: superAdmin.email,
+                name: adminName,
+                email: adminEmail,
             },
         });
     } catch (error) {
@@ -81,51 +119,62 @@ router.post('/setup', async (req: AuthRequest, res: Response) => {
     }
 });
 
-// Login
+// Login via Supabase Auth
 router.post('/login', async (req: AuthRequest, res: Response) => {
     try {
         const { email, password } = req.body;
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
 
-        const user = await prisma.user.findUnique({
-            where: { email },
-            include: { branch: true },
+        // Sign in with Supabase
+        const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+            email,
+            password,
         });
 
-        if (!user || !user.isActive) {
+        if (authError) {
+            console.log('Supabase auth error:', authError.message);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+        // Get profile with branch info
+        const { data: profile, error: profileError } = await sb
+            .from('profiles')
+            .select(`
+                *,
+                branches (*)
+            `)
+            .eq('id', authData.user.id)
+            .single();
+
+        if (profileError || !profile) {
+            return res.status(401).json({ error: 'Profile not found' });
         }
 
-        // Update last login time
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
-        });
+        if (!profile.is_active) {
+            return res.status(401).json({ error: 'Account is inactive' });
+        }
 
+        // Also create a JWT for backward compatibility during migration
         const token = jwt.sign(
             {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                branchId: user.branchId,
+                id: authData.user.id,
+                email: authData.user.email,
+                role: profile.role,
+                branchId: profile.branch_id,
             },
             process.env.JWT_SECRET || 'secret',
             { expiresIn: '24h' }
         );
 
         res.json({
-            token,
+            token, // Legacy JWT token
+            supabase_token: authData.session?.access_token, // Supabase token
             user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                branch: user.branch,
+                id: authData.user.id,
+                name: profile.name,
+                email: authData.user.email,
+                role: profile.role,
+                branch: profile.branches,
             },
         });
     } catch (error) {
@@ -137,24 +186,28 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 // Get current user profile
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
 
-        const user = await prisma.user.findUnique({
-            where: { id: req.user!.id },
-            include: { branch: true },
-        });
+        const { data: profile, error } = await sb
+            .from('profiles')
+            .select(`
+                *,
+                branches (*)
+            `)
+            .eq('id', req.user!.id)
+            .single();
 
-        if (!user) {
+        if (error || !profile) {
             return res.status(404).json({ error: 'User not found' });
         }
 
         res.json({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            phone: user.phone,
-            branch: user.branch,
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            phone: profile.phone,
+            branch: profile.branches,
         });
     } catch (error) {
         console.error('Profile error:', error);
@@ -162,30 +215,40 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     }
 });
 
-// Change password
+// Change password via Supabase Auth
 router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
 
-        const user = await prisma.user.findUnique({
-            where: { id: req.user!.id },
-        });
+        // Get user email
+        const { data: profile } = await sb
+            .from('profiles')
+            .select('email')
+            .eq('id', req.user!.id)
+            .single();
 
-        if (!user) {
+        if (!profile?.email) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const validPassword = await bcrypt.compare(currentPassword, user.password);
-        if (!validPassword) {
+        // Verify current password by trying to sign in
+        const { error: verifyError } = await sb.auth.signInWithPassword({
+            email: profile.email,
+            password: currentPassword,
+        });
+
+        if (verifyError) {
             return res.status(401).json({ error: 'Invalid current password' });
         }
 
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { password: hashedPassword },
-        });
+        // Update password via admin API
+        const { error: updateError } = await sb.auth.admin.updateUserById(
+            req.user!.id,
+            { password: newPassword }
+        );
+
+        if (updateError) throw updateError;
 
         res.json({ message: 'Password changed successfully' });
     } catch (error) {
@@ -194,53 +257,73 @@ router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Re
     }
 });
 
-// Register new user
+// Register new user via Supabase Auth
 router.post('/register', async (req: AuthRequest, res: Response) => {
     try {
-        const { name, email, password, phone } = req.body;
-        const prisma = (req as any).prisma;
+        const { name, email, password, phone, branchId, role } = req.body;
+        const sb = (req as any).supabase || supabase;
 
         // Validate required fields
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: 'Name, email, and password are required' });
+        if (!name || !email || !password || !branchId) {
+            return res.status(400).json({ error: 'Name, email, password, and branch are required' });
         }
 
-        // Check if email already exists
-        const existingUser = await prisma.user.findUnique({
-            where: { email },
-        });
+        // Check if email exists
+        const { data: existing } = await sb
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .limit(1)
+            .single();
 
-        if (existingUser) {
+        if (existing) {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
-        // Get default branch (first branch)
-        const defaultBranch = await prisma.branch.findFirst({
-            where: { isActive: true },
-        });
+        // Get branch org_id
+        const { data: branch } = await sb
+            .from('branches')
+            .select('org_id')
+            .eq('id', branchId)
+            .single();
 
-        if (!defaultBranch) {
-            return res.status(500).json({ error: 'No active branch found. Please contact admin.' });
-        }
-
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create user (active by default)
-        await prisma.user.create({
-            data: {
+        // Create user via Supabase Auth
+        const { data: authData, error: authError } = await sb.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
                 name,
-                email,
-                password: hashedPassword,
-                phone: phone || null,
-                role: 'CASHIER',
-                isActive: true, // Auto-active so user can login immediately
-                branchId: defaultBranch.id,
+                role: role || 'cashier',
+                org_id: branch?.org_id,
+                branch_id: branchId,
             },
         });
 
+        if (authError) throw authError;
+
+        // Update profile with additional info
+        const { error: profileError } = await sb
+            .from('profiles')
+            .update({
+                org_id: branch?.org_id,
+                branch_id: branchId,
+                role: role || 'cashier',
+                phone,
+                email,
+            })
+            .eq('id', authData.user.id);
+
+        if (profileError) console.warn('Profile update warning:', profileError);
+
         res.status(201).json({
-            message: 'Account created successfully! You can now login.'
+            message: 'User registered successfully',
+            user: {
+                id: authData.user.id,
+                name,
+                email,
+                role: role || 'cashier',
+            },
         });
     } catch (error) {
         console.error('Register error:', error);
@@ -248,140 +331,81 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
     }
 });
 
-// Forgot password - Send request to admin (no email system)
-router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
+// Logout (client-side handles Supabase signOut)
+router.post('/logout', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const { email } = req.body;
-        const prisma = (req as any).prisma;
+        // Supabase signout is handled client-side
+        // This endpoint is for any server-side cleanup if needed
+        res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ error: 'Logout failed' });
+    }
+});
 
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
+// Refresh token
+router.post('/refresh', async (req: AuthRequest, res: Response) => {
+    try {
+        const { refresh_token } = req.body;
+        const sb = (req as any).supabase || supabase;
+
+        if (!refresh_token) {
+            return res.status(400).json({ error: 'Refresh token required' });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email },
-        });
+        const { data, error } = await sb.auth.refreshSession({ refresh_token });
 
-        if (!user) {
-            // Still return success to prevent email enumeration
-            return res.json({
-                message: 'If your account exists, a password reset request has been sent to the administrator. Please contact support.',
-            });
+        if (error) {
+            return res.status(401).json({ error: 'Invalid refresh token' });
         }
-
-        // Check if pending request already exists
-        const existingRequest = await prisma.passwordResetRequest.findFirst({
-            where: { userId: user.id, status: 'PENDING' },
-        });
-
-        if (existingRequest) {
-            return res.json({
-                message: 'A password reset request is already pending. Please contact the administrator.',
-            });
-        }
-
-        // Create password reset request for admin to handle
-        await prisma.passwordResetRequest.create({
-            data: {
-                userId: user.id,
-                status: 'PENDING',
-            },
-        });
 
         res.json({
-            message: 'Password reset request sent to administrator. Please contact support to receive your new password.',
+            access_token: data.session?.access_token,
+            refresh_token: data.session?.refresh_token,
+            expires_at: data.session?.expires_at,
         });
     } catch (error) {
-        console.error('Forgot password error:', error);
-        res.status(500).json({ error: 'Failed to process request' });
+        console.error('Refresh error:', error);
+        res.status(500).json({ error: 'Token refresh failed' });
     }
 });
 
-// Reset password with token
-router.post('/reset-password', async (req: AuthRequest, res: Response) => {
+// Verify Supabase token
+router.post('/verify-supabase', async (req: AuthRequest, res: Response) => {
     try {
-        const { token, newPassword } = req.body;
-        const prisma = (req as any).prisma;
+        const { access_token } = req.body;
+        const sb = (req as any).supabase || supabase;
 
-        if (!token || !newPassword) {
-            return res.status(400).json({ error: 'Token and new password are required' });
+        if (!access_token) {
+            return res.status(400).json({ error: 'Access token required' });
         }
 
-        // Verify token
-        let decoded: any;
-        try {
-            decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-        } catch (err) {
-            return res.status(400).json({ error: 'Invalid or expired reset link' });
+        const { data: { user }, error } = await sb.auth.getUser(access_token);
+
+        if (error || !user) {
+            return res.status(401).json({ error: 'Invalid token' });
         }
 
-        if (decoded.type !== 'password-reset') {
-            return res.status(400).json({ error: 'Invalid reset token' });
-        }
+        // Get profile
+        const { data: profile } = await sb
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-        // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Update user password
-        await prisma.user.update({
-            where: { id: decoded.id },
-            data: { password: hashedPassword },
-        });
-
-        res.json({ message: 'Password reset successfully! You can now login with your new password.' });
-    } catch (error) {
-        console.error('Reset password error:', error);
-        res.status(500).json({ error: 'Failed to reset password' });
-    }
-});
-
-// Submit support ticket (customer-facing)
-router.post('/support-ticket', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-        const { subject, message, priority } = req.body;
-        const prisma = (req as any).prisma;
-
-        if (!subject || !message) {
-            return res.status(400).json({ error: 'Subject and message are required' });
-        }
-
-        const ticket = await prisma.supportTicket.create({
-            data: {
-                userId: req.user!.id,
-                branchId: req.user!.branchId,
-                subject,
-                message,
-                priority: priority || 'NORMAL',
-                status: 'OPEN',
+        res.json({
+            valid: true,
+            user: {
+                id: user.id,
+                email: user.email,
+                role: profile?.role,
+                branchId: profile?.branch_id,
             },
         });
-
-        res.status(201).json({
-            message: 'Support ticket submitted successfully. Our team will respond soon.',
-            ticketId: ticket.id,
-        });
     } catch (error) {
-        console.error('Support ticket error:', error);
-        res.status(500).json({ error: 'Failed to submit ticket' });
-    }
-});
-
-// Get my support tickets (customer-facing)
-router.get('/my-tickets', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-        const prisma = (req as any).prisma;
-
-        const tickets = await prisma.supportTicket.findMany({
-            where: { userId: req.user!.id },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        res.json(tickets);
-    } catch (error) {
-        console.error('Get tickets error:', error);
-        res.status(500).json({ error: 'Failed to get tickets' });
+        console.error('Verify error:', error);
+        res.status(500).json({ error: 'Verification failed' });
     }
 });
 
 export default router;
-

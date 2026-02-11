@@ -1,0 +1,82 @@
+/* Sync Indicator Styles */
+
+.sync-indicator {
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.sync-indicator:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sync-indicator:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.sync-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.sync-icon.syncing {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.sync-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+/* Status-based colors */
+.sync-indicator.synced .sync-icon {
+    color: #22c55e;
+}
+
+.sync-indicator.pending .sync-icon {
+    color: #eab308;
+}
+
+.sync-indicator.syncing .sync-icon {
+    color: #3b82f6;
+}
+
+.sync-indicator.blocked .sync-icon {
+    color: #ef4444;
+}
+
+.sync-indicator.offline .sync-icon {
+    color: #6b7280;
+}

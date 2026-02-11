@@ -1,10 +1,9 @@
-// Purchase Orders & GRN API Routes
+// Purchase Orders & GRN API Routes (Supabase)
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Apply auth to all routes
 router.use(authMiddleware);
@@ -12,24 +11,23 @@ router.use(authMiddleware);
 // Get all purchase orders
 router.get('/', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = (req as any).user.branchId;
 
-        const orders = await prisma.supplierPurchaseOrder.findMany({
-            where: { branchId },
-            include: {
-                supplier: { select: { id: true, name: true, code: true } },
-                items: {
-                    include: {
-                        inventoryItem: { select: { id: true, name: true, unit: true } }
-                    }
-                },
-                _count: { select: { receipts: true } }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100
-        });
+        const { data: orders, error } = await sb
+            .from('supplier_purchase_orders')
+            .select(`
+                *,
+                suppliers (id, name, code),
+                supplier_po_items (*, inventory_items (id, name, unit))
+            `)
+            .eq('branch_id', branchId)
+            .order('created_at', { ascending: false })
+            .limit(100);
 
-        res.json(orders);
+        if (error) throw error;
+
+        res.json(orders || []);
     } catch (error) {
         console.error('Error fetching purchase orders:', error);
         res.status(500).json({ error: 'Failed to fetch purchase orders' });
@@ -39,30 +37,21 @@ router.get('/', async (req: Request, res: Response) => {
 // Get single purchase order
 router.get('/:id', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        const order = await prisma.supplierPurchaseOrder.findUnique({
-            where: { id },
-            include: {
-                supplier: true,
-                items: {
-                    include: {
-                        inventoryItem: { select: { id: true, name: true, unit: true, sku: true } }
-                    }
-                },
-                receipts: {
-                    include: {
-                        items: {
-                            include: {
-                                inventoryItem: { select: { name: true } }
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        const { data: order, error } = await sb
+            .from('supplier_purchase_orders')
+            .select(`
+                *,
+                suppliers (*),
+                supplier_po_items (*, inventory_items (id, name, unit, sku)),
+                goods_receipts (*, goods_receipt_items (*, inventory_items (name)))
+            `)
+            .eq('id', id)
+            .single();
 
-        if (!order) {
+        if (error || !order) {
             return res.status(404).json({ error: 'Purchase order not found' });
         }
 
@@ -76,44 +65,53 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Create purchase order
 router.post('/', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = (req as any).user.branchId;
         const userId = (req as any).user.id;
         const { supplierId, expectedDate, notes, items } = req.body;
 
         // Get next PO number
-        const lastPO = await prisma.supplierPurchaseOrder.findFirst({
-            where: { branchId },
-            orderBy: { poNumber: 'desc' }
-        });
-        const poNumber = (lastPO?.poNumber || 0) + 1;
+        const { data: lastPOs } = await sb
+            .from('supplier_purchase_orders')
+            .select('po_number')
+            .eq('branch_id', branchId)
+            .order('po_number', { ascending: false })
+            .limit(1);
+
+        const poNumber = (lastPOs?.[0]?.po_number || 0) + 1;
 
         // Calculate total amount
         const totalAmount = items.reduce((sum: number, item: any) =>
             sum + (item.orderedQty * item.unitPrice), 0);
 
-        const order = await prisma.supplierPurchaseOrder.create({
-            data: {
-                branchId,
-                supplierId,
-                poNumber,
-                expectedDate: expectedDate ? new Date(expectedDate) : null,
+        const { data: order, error } = await sb
+            .from('supplier_purchase_orders')
+            .insert({
+                branch_id: branchId,
+                supplier_id: supplierId,
+                po_number: poNumber,
+                expected_date: expectedDate || null,
                 notes,
-                totalAmount,
-                createdBy: userId,
-                items: {
-                    create: items.map((item: any) => ({
-                        inventoryItemId: item.inventoryItemId,
-                        orderedQty: item.orderedQty,
-                        unitPrice: item.unitPrice,
-                        notes: item.notes
-                    }))
-                }
-            },
-            include: {
-                supplier: { select: { name: true } },
-                items: true
-            }
-        });
+                total_amount: totalAmount,
+                created_by: userId,
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Create PO items
+        if (items && items.length > 0) {
+            await sb.from('supplier_po_items').insert(
+                items.map((item: any) => ({
+                    purchase_order_id: order.id,
+                    inventory_item_id: item.inventoryItemId,
+                    ordered_qty: item.orderedQty,
+                    unit_price: item.unitPrice,
+                    notes: item.notes,
+                }))
+            );
+        }
 
         res.status(201).json(order);
     } catch (error) {
@@ -125,6 +123,7 @@ router.post('/', async (req: Request, res: Response) => {
 // Update purchase order status
 router.put('/:id/status', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const userId = (req as any).user.id;
         const { status } = req.body;
@@ -132,14 +131,18 @@ router.put('/:id/status', async (req: Request, res: Response) => {
         const updateData: any = { status };
 
         if (status === 'APPROVED') {
-            updateData.approvedBy = userId;
-            updateData.approvedAt = new Date();
+            updateData.approved_by = userId;
+            updateData.approved_at = new Date().toISOString();
         }
 
-        const order = await prisma.supplierPurchaseOrder.update({
-            where: { id },
-            data: updateData
-        });
+        const { data: order, error } = await sb
+            .from('supplier_purchase_orders')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
 
         res.json(order);
     } catch (error) {
@@ -151,133 +154,146 @@ router.put('/:id/status', async (req: Request, res: Response) => {
 // Receive goods (Create GRN)
 router.post('/:id/receive', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id: purchaseOrderId } = req.params;
         const userId = (req as any).user.id;
         const { warehouseId, binId, batchNumber, notes, items } = req.body;
 
         // Get PO details
-        const po = await prisma.supplierPurchaseOrder.findUnique({
-            where: { id: purchaseOrderId },
-            include: { items: true }
-        });
+        const { data: po, error: poError } = await sb
+            .from('supplier_purchase_orders')
+            .select('*, supplier_po_items (*)')
+            .eq('id', purchaseOrderId)
+            .single();
 
-        if (!po) {
+        if (poError || !po) {
             return res.status(404).json({ error: 'Purchase order not found' });
         }
 
         // Get next GRN number
-        const lastGRN = await prisma.goodsReceipt.findFirst({
-            where: { purchaseOrderId },
-            orderBy: { grnNumber: 'desc' }
-        });
-        const grnNumber = (lastGRN?.grnNumber || 0) + 1;
+        const { data: lastGRNs } = await sb
+            .from('goods_receipts')
+            .select('grn_number')
+            .eq('purchase_order_id', purchaseOrderId)
+            .order('grn_number', { ascending: false })
+            .limit(1);
 
-        // Create GRN with transaction
-        const result = await prisma.$transaction(async (tx) => {
-            // Create GRN
-            const grn = await tx.goodsReceipt.create({
-                data: {
-                    purchaseOrderId,
-                    grnNumber,
-                    warehouseId,
-                    binId,
-                    batchNumber,
-                    receivedBy: userId,
-                    notes,
-                    items: {
-                        create: items.map((item: any) => ({
-                            inventoryItemId: item.inventoryItemId,
-                            quantity: item.quantity,
-                            acceptedQty: item.acceptedQty || item.quantity,
-                            rejectedQty: item.rejectedQty || 0,
-                            rejectionReason: item.rejectionReason
-                        }))
-                    }
-                }
-            });
+        const grnNumber = (lastGRNs?.[0]?.grn_number || 0) + 1;
 
-            // Update PO item received quantities
-            for (const item of items) {
-                const poItem = po.items.find(pi => pi.inventoryItemId === item.inventoryItemId);
-                if (poItem) {
-                    await tx.supplierPOItem.update({
-                        where: { id: poItem.id },
-                        data: {
-                            receivedQty: {
-                                increment: item.acceptedQty || item.quantity
-                            }
-                        }
-                    });
-                }
+        // Create GRN
+        const { data: grn, error: grnError } = await sb
+            .from('goods_receipts')
+            .insert({
+                purchase_order_id: purchaseOrderId,
+                grn_number: grnNumber,
+                warehouse_id: warehouseId,
+                bin_id: binId,
+                batch_number: batchNumber,
+                received_by: userId,
+                notes,
+            })
+            .select()
+            .single();
 
-                // Update warehouse stock
-                const acceptedQty = item.acceptedQty || item.quantity;
-                await tx.warehouseStock.upsert({
-                    where: {
-                        warehouseId_inventoryItemId: {
-                            warehouseId,
-                            inventoryItemId: item.inventoryItemId
-                        }
-                    },
-                    update: {
-                        quantity: { increment: acceptedQty },
-                        batchNumber,
-                        binId
-                    },
-                    create: {
-                        warehouseId,
-                        inventoryItemId: item.inventoryItemId,
-                        quantity: acceptedQty,
-                        batchNumber,
-                        binId
-                    }
-                });
+        if (grnError) throw grnError;
 
-                // Update main inventory quantity
-                await tx.inventoryItem.update({
-                    where: { id: item.inventoryItemId },
-                    data: {
-                        quantity: { increment: acceptedQty }
-                    }
-                });
+        // Create GRN items
+        await sb.from('goods_receipt_items').insert(
+            items.map((item: any) => ({
+                grn_id: grn.id,
+                inventory_item_id: item.inventoryItemId,
+                quantity: item.quantity,
+                accepted_qty: item.acceptedQty || item.quantity,
+                rejected_qty: item.rejectedQty || 0,
+                rejection_reason: item.rejectionReason,
+            }))
+        );
 
-                // Create stock transaction
-                await tx.stockTransaction.create({
-                    data: {
-                        inventoryItemId: item.inventoryItemId,
-                        type: 'GRN_RECEIPT',
-                        quantity: acceptedQty,
-                        reason: `GRN #${grnNumber} from PO #${po.poNumber}`,
-                        batchId: grn.id,
-                        performedById: userId
-                    }
+        // Update PO item received quantities and inventory
+        for (const item of items) {
+            const poItem = po.supplier_po_items?.find((pi: any) => pi.inventory_item_id === item.inventoryItemId);
+            if (poItem) {
+                await sb
+                    .from('supplier_po_items')
+                    .update({ received_qty: (Number(poItem.received_qty) || 0) + (item.acceptedQty || item.quantity) })
+                    .eq('id', poItem.id);
+            }
+
+            const acceptedQty = item.acceptedQty || item.quantity;
+
+            // Update warehouse stock
+            const { data: stock } = await sb
+                .from('warehouse_stocks')
+                .select('quantity')
+                .eq('warehouse_id', warehouseId)
+                .eq('inventory_item_id', item.inventoryItemId)
+                .single();
+
+            if (stock) {
+                await sb
+                    .from('warehouse_stocks')
+                    .update({
+                        quantity: Number(stock.quantity) + acceptedQty,
+                        batch_number: batchNumber,
+                        bin_id: binId,
+                    })
+                    .eq('warehouse_id', warehouseId)
+                    .eq('inventory_item_id', item.inventoryItemId);
+            } else {
+                await sb.from('warehouse_stocks').insert({
+                    warehouse_id: warehouseId,
+                    inventory_item_id: item.inventoryItemId,
+                    quantity: acceptedQty,
+                    batch_number: batchNumber,
+                    bin_id: binId,
                 });
             }
 
-            // Check if all items received - update PO status
-            const updatedPO = await tx.supplierPurchaseOrder.findUnique({
-                where: { id: purchaseOrderId },
-                include: { items: true }
+            // Update main inventory
+            const { data: invItem } = await sb
+                .from('inventory_items')
+                .select('quantity')
+                .eq('id', item.inventoryItemId)
+                .single();
+
+            if (invItem) {
+                await sb
+                    .from('inventory_items')
+                    .update({ quantity: Number(invItem.quantity) + acceptedQty })
+                    .eq('id', item.inventoryItemId);
+            }
+
+            // Create stock transaction
+            await sb.from('stock_transactions').insert({
+                inventory_item_id: item.inventoryItemId,
+                type: 'GRN_RECEIPT',
+                quantity: acceptedQty,
+                reason: `GRN #${grnNumber} from PO #${po.po_number}`,
+                batch_id: grn.id,
+                performed_by_id: userId,
             });
+        }
 
-            const allReceived = updatedPO?.items.every(
-                item => Number(item.receivedQty) >= Number(item.orderedQty)
-            );
-            const someReceived = updatedPO?.items.some(
-                item => Number(item.receivedQty) > 0
-            );
+        // Check if all items received - update PO status
+        const { data: updatedPO } = await sb
+            .from('supplier_purchase_orders')
+            .select('*, supplier_po_items (*)')
+            .eq('id', purchaseOrderId)
+            .single();
 
-            await tx.supplierPurchaseOrder.update({
-                where: { id: purchaseOrderId },
-                data: {
-                    status: allReceived ? 'RECEIVED' : someReceived ? 'PARTIAL_RECEIVED' : 'ORDERED'
-                }
-            });
+        const allReceived = updatedPO?.supplier_po_items?.every(
+            (item: any) => Number(item.received_qty) >= Number(item.ordered_qty)
+        );
+        const someReceived = updatedPO?.supplier_po_items?.some(
+            (item: any) => Number(item.received_qty) > 0
+        );
 
-            return grn;
-        });
+        await sb
+            .from('supplier_purchase_orders')
+            .update({ status: allReceived ? 'RECEIVED' : someReceived ? 'PARTIAL_RECEIVED' : 'ORDERED' })
+            .eq('id', purchaseOrderId);
 
-        res.status(201).json(result);
+        res.status(201).json(grn);
     } catch (error) {
         console.error('Error receiving goods:', error);
         res.status(500).json({ error: 'Failed to receive goods' });

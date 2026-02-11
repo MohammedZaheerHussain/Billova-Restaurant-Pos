@@ -7,7 +7,11 @@ const router = Router();
 // Default ESC/POS port
 const DEFAULT_ESCPOS_PORT = 9100;
 
-// ==================== TEST PRINTER CONNECTION ====================
+// Timeout configuration - 3 seconds max (fail fast, never block POS)
+const CONNECTION_TIMEOUT_MS = 3000;
+const PRINT_TIMEOUT_MS = 3000;
+
+// ==================== TEST PRINTER CONNECTION ======================================
 router.post('/test', async (req: Request, res: Response) => {
     const { host, port = DEFAULT_ESCPOS_PORT } = req.body;
 
@@ -64,7 +68,6 @@ router.get('/discover', async (_req: Request, res: Response) => {
     const printers: { host: string; port: number; name: string }[] = [];
 
     // You could add known printers from database here
-    // const dbPrinters = await prisma.printer.findMany({ where: { type: 'network' } });
 
     res.json(printers);
 });
@@ -93,12 +96,13 @@ router.post('/raw', async (req: Request, res: Response) => {
 
 /**
  * Test TCP connection to printer
+ * Uses short timeout (3s) to fail fast
  */
-function testConnection(host: string, port: number, timeout = 5000): Promise<boolean> {
+function testConnection(host: string, port: number): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = new net.Socket();
 
-        socket.setTimeout(timeout);
+        socket.setTimeout(CONNECTION_TIMEOUT_MS);
 
         socket.on('connect', () => {
             socket.destroy();
@@ -121,12 +125,13 @@ function testConnection(host: string, port: number, timeout = 5000): Promise<boo
 
 /**
  * Send data to network printer via TCP
+ * Uses 3s timeout to fail fast and not block POS flow
  */
-function sendToPrinter(host: string, port: number, data: Buffer, timeout = 10000): Promise<void> {
+function sendToPrinter(host: string, port: number, data: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
 
-        socket.setTimeout(timeout);
+        socket.setTimeout(PRINT_TIMEOUT_MS);
 
         socket.on('connect', () => {
             socket.write(data, (err) => {

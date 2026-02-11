@@ -1,7 +1,7 @@
 {
-  "name": "dfcpos",
+  "name": "billova",
   "version": "1.0.0",
-  "description": "DFC POS Pro - Universal, Industry-Level Billing System",
+  "description": "Billova POS - Universal, Industry-Level Billing System",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -11,11 +11,7 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=packages/api",
-    "build": "npm run build --workspaces",
-    "db:generate": "npm run generate --workspace=packages/database",
-    "db:push": "npm run push --workspace=packages/database",
-    "db:seed": "npm run seed --workspace=packages/database",
-    "db:studio": "npm run studio --workspace=packages/database"
+    "build": "npm run build --workspaces"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -24,6 +20,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "DFC",
+  "author": "Billova",
   "license": "MIT"
 }

@@ -1,24 +1,33 @@
-// Addons API Routes
-import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+// Addons API Routes (Supabase)
+import { Router, Response, NextFunction } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
-const prisma = new PrismaClient();
-
-// ==================== ADDON MANAGEMENT ====================
 
 // Get all addons for the branch
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = req.user?.branchId;
 
-        const addons = await prisma.menuItemAddon.findMany({
-            where: { branchId },
-            orderBy: [{ category: 'asc' }, { name: 'asc' }],
-        });
+        const { data: addons, error } = await sb
+            .from('menu_item_addons')
+            .select('*')
+            .eq('branch_id', branchId)
+            .order('category', { ascending: true })
+            .order('name', { ascending: true });
 
-        res.json(addons);
+        if (error) throw error;
+
+        res.json((addons || []).map((a: any) => ({
+            id: a.id,
+            branchId: a.branch_id,
+            name: a.name,
+            price: a.price,
+            category: a.category,
+            isActive: a.is_active,
+        })));
     } catch (error) {
         next(error);
     }
@@ -27,6 +36,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response, next: Ne
 // Create new addon
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = req.user?.branchId;
         const { name, price, category } = req.body;
 
@@ -34,16 +44,27 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response, next: N
             return res.status(400).json({ error: 'Addon name is required' });
         }
 
-        const addon = await prisma.menuItemAddon.create({
-            data: {
-                branchId: branchId!,
+        const { data: addon, error } = await sb
+            .from('menu_item_addons')
+            .insert({
+                branch_id: branchId,
                 name,
                 price: parseFloat(price) || 0,
                 category: category || 'Extras',
-            },
-        });
+            })
+            .select()
+            .single();
 
-        res.status(201).json(addon);
+        if (error) throw error;
+
+        res.status(201).json({
+            id: addon.id,
+            branchId: addon.branch_id,
+            name: addon.name,
+            price: addon.price,
+            category: addon.category,
+            isActive: addon.is_active,
+        });
     } catch (error) {
         next(error);
     }
@@ -52,20 +73,32 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response, next: N
 // Update addon
 router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { name, price, category, isActive } = req.body;
 
-        const addon = await prisma.menuItemAddon.update({
-            where: { id },
-            data: {
+        const { data: addon, error } = await sb
+            .from('menu_item_addons')
+            .update({
                 name,
                 price: parseFloat(price) || 0,
                 category,
-                isActive,
-            },
-        });
+                is_active: isActive,
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        res.json(addon);
+        if (error) throw error;
+
+        res.json({
+            id: addon.id,
+            branchId: addon.branch_id,
+            name: addon.name,
+            price: addon.price,
+            category: addon.category,
+            isActive: addon.is_active,
+        });
     } catch (error) {
         next(error);
     }
@@ -74,11 +107,11 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response, next:
 // Delete addon
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        await prisma.menuItemAddon.delete({
-            where: { id },
-        });
+        const { error } = await sb.from('menu_item_addons').delete().eq('id', id);
+        if (error) throw error;
 
         res.json({ success: true });
     } catch (error) {
@@ -86,19 +119,20 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response, ne
     }
 });
 
-// ==================== LINK ADDONS TO MENU ITEMS ====================
-
 // Get addons linked to a menu item
 router.get('/menu-item/:menuItemId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { menuItemId } = req.params;
 
-        const links = await prisma.menuItemAddonLink.findMany({
-            where: { menuItemId },
-            include: { addon: true },
-        });
+        const { data: links, error } = await sb
+            .from('menu_item_addon_links')
+            .select('*, menu_item_addons (*)')
+            .eq('menu_item_id', menuItemId);
 
-        res.json(links.map(l => l.addon));
+        if (error) throw error;
+
+        res.json((links || []).map((l: any) => l.menu_item_addons));
     } catch (error) {
         next(error);
     }
@@ -107,35 +141,34 @@ router.get('/menu-item/:menuItemId', authMiddleware, async (req: AuthRequest, re
 // Link addons to a menu item
 router.post('/menu-item/:menuItemId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { menuItemId } = req.params;
-        const { addonIds } = req.body; // Array of addon IDs
+        const { addonIds } = req.body;
 
         if (!Array.isArray(addonIds)) {
             return res.status(400).json({ error: 'addonIds must be an array' });
         }
 
         // Delete existing links
-        await prisma.menuItemAddonLink.deleteMany({
-            where: { menuItemId },
-        });
+        await sb.from('menu_item_addon_links').delete().eq('menu_item_id', menuItemId);
 
         // Create new links
         if (addonIds.length > 0) {
-            await prisma.menuItemAddonLink.createMany({
-                data: addonIds.map((addonId: string) => ({
-                    menuItemId,
-                    addonId,
-                })),
-            });
+            await sb.from('menu_item_addon_links').insert(
+                addonIds.map((addonId: string) => ({
+                    menu_item_id: menuItemId,
+                    addon_id: addonId,
+                }))
+            );
         }
 
         // Fetch updated links
-        const links = await prisma.menuItemAddonLink.findMany({
-            where: { menuItemId },
-            include: { addon: true },
-        });
+        const { data: links } = await sb
+            .from('menu_item_addon_links')
+            .select('*, menu_item_addons (*)')
+            .eq('menu_item_id', menuItemId);
 
-        res.json(links.map(l => l.addon));
+        res.json((links || []).map((l: any) => l.menu_item_addons));
     } catch (error) {
         next(error);
     }

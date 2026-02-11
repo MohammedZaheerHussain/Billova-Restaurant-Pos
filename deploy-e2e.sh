@@ -1,10 +1,10 @@
 #!/bin/bash
-# Billova POS - E2E Server Deployment Script
-# Run this on your Ubuntu server
+# Billova POS - E2E Server Deployment Script (Supabase-only)
+# Run this on your Ubuntu server for initial setup
 
 set -e
 
-echo "🚀 Starting Billova POS Deployment..."
+echo "🚀 Starting Billova POS Deployment (Supabase Edition)..."
 
 # Update system
 echo "📦 Updating system packages..."
@@ -19,10 +19,10 @@ if ! command -v docker &> /dev/null; then
     exit 0
 fi
 
-# Install Docker Compose if not present
-if ! command -v docker-compose &> /dev/null; then
+# Install Docker Compose plugin if not present
+if ! docker compose version &> /dev/null; then
     echo "🐳 Installing Docker Compose..."
-    sudo apt install -y docker-compose
+    sudo apt install -y docker-compose-plugin
 fi
 
 # Create app directory
@@ -32,117 +32,121 @@ cd ~/billova
 
 # Create .env file
 echo "⚙️ Creating environment configuration..."
-cat > .env << 'EOF'
-# Billova POS Production Environment
-DOCKER_USERNAME=fahadfx
+echo "Please enter your Supabase credentials:"
+read -p "SUPABASE_URL: " SUPABASE_URL
+read -p "SUPABASE_SERVICE_ROLE_KEY: " SUPABASE_SERVICE_ROLE_KEY
+read -p "JWT_SECRET (or press Enter for default): " JWT_SECRET
+JWT_SECRET=${JWT_SECRET:-$(openssl rand -base64 32)}
+read -p "GROQ_API_KEY (optional): " GROQ_API_KEY
 
-# Database
-DB_PASSWORD=Ayubsheik@1506
+cat > .env << EOF
+# Billova POS - Supabase-only Configuration
+SUPABASE_URL=${SUPABASE_URL}
+SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+SUPABASE_AUTH_ONLY=true
+JWT_SECRET=${JWT_SECRET}
+FRONTEND_URL=https://billova.com
+GROQ_API_KEY=${GROQ_API_KEY}
 
-# JWT Secret (CHANGE THIS IN PRODUCTION!)
-JWT_SECRET=billova-super-secret-jwt-key-2024
-
-# API URL
-VITE_API_URL=http://164.52.213.134:3001
+# Frontend Build Variables
+VITE_SUPABASE_URL=${SUPABASE_URL}
+VITE_SUPABASE_ANON_KEY=${SUPABASE_SERVICE_ROLE_KEY%_*}_anon
+VITE_API_URL=/api
+VITE_SUPABASE_AUTH_ONLY=true
 EOF
 
-# Create docker-compose.yml
+# Create docker-compose.yml (Supabase-only - no MySQL)
 echo "📄 Creating Docker Compose configuration..."
 cat > docker-compose.yml << 'EOF'
-version: '3.8'
-
 services:
-  # MySQL Database
-  db:
-    image: mysql:8.0
-    container_name: billova-db
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Ayubsheik@1506}
-      MYSQL_DATABASE: dfcpos
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - billova-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Backend API
+  # Backend API (Supabase-only)
   api:
     image: fahadfx/billova:api
     container_name: billova-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: mysql://root:${DB_PASSWORD:-Ayubsheik@1506}@db:3306/dfcpos
-      JWT_SECRET: ${JWT_SECRET:-billova-super-secret-jwt-key-2024}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_AUTH_ONLY: true
+      JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
-      PORT: 3001
-    ports:
-      - "3001:3001"
-    depends_on:
-      db:
-        condition: service_healthy
+      PORT: 3002
+    expose:
+      - "3002"
     networks:
       - billova-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # Frontend Web App
   web:
     image: fahadfx/billova:web
     container_name: billova-web
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - api
     networks:
       - billova-network
 
-volumes:
-  mysql_data:
-    driver: local
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: billova-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - billova-network
 
 networks:
   billova-network:
     driver: bridge
 EOF
 
-# Login to Docker Hub (for private repos)
+# Login to Docker Hub
 echo "🔐 Logging into Docker Hub..."
 docker login -u fahadfx
 
 # Pull images
 echo "📥 Pulling Docker images..."
-docker-compose pull
+docker compose pull
 
 # Start the application
 echo "🚀 Starting Billova POS..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
-sleep 30
+sleep 15
 
 # Check status
 echo "✅ Deployment complete! Checking status..."
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "=========================================="
 echo "🎉 Billova POS is now running!"
 echo "=========================================="
 echo ""
-echo "📱 Web App: http://164.52.213.134"
-echo "🔌 API: http://164.52.213.134:3001"
+echo "📱 Web App: https://billova.com"
+echo "🔌 API: https://billova.com/api"
 echo ""
-echo "Default login credentials:"
-echo "  Email: admin@billova.com"
-echo "  Password: admin123"
+echo "🔐 Super Admin login:"
+echo "   Email: mohammedzaheerhussain2002@gmail.com"
 echo ""
-echo "To view logs: docker-compose logs -f"
-echo "To stop: docker-compose down"
+echo "To view logs: docker compose logs -f"
+echo "To stop: docker compose down"
 echo "=========================================="

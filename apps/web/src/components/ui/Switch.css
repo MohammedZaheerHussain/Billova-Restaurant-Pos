@@ -1,0 +1,61 @@
+/* Switch Component - Flex-based Perfect Alignment */
+
+.switch-track {
+    /* Flex-based centering - NO absolute positioning needed */
+    display: flex;
+    align-items: center;
+
+    /* Dimensions */
+    width: 48px;
+    height: 24px;
+
+    /* Styling */
+    background: #3f3f46;
+    border: none;
+    border-radius: 999px;
+    padding: 2px;
+    cursor: pointer;
+
+    /* Smooth transition */
+    transition: background-color 0.2s ease;
+
+    /* Prevent shrinking */
+    flex-shrink: 0;
+}
+
+/* ON State */
+.switch-track.on {
+    background: #22c55e;
+}
+
+/* Disabled State */
+.switch-track.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* The Knob */
+.switch-knob {
+    /* Size - slightly smaller than track height for padding */
+    width: 20px;
+    height: 20px;
+
+    /* Styling */
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+    /* Smooth slide animation */
+    transition: transform 0.2s ease;
+}
+
+/* ON State - Slide knob to right */
+.switch-track.on .switch-knob {
+    transform: translateX(24px);
+}
+
+/* Focus ring for accessibility */
+.switch-track:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+}

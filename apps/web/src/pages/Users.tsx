@@ -119,6 +119,12 @@ export default function UsersPage() {
 
             {loading ? (
                 <div className="loading-state"><div className="spinner" /></div>
+            ) : users.length === 0 ? (
+                <div className="empty-state" style={{ textAlign: 'center', padding: '60px 20px', opacity: 0.6 }}>
+                    <UsersIcon size={48} strokeWidth={1} />
+                    <p style={{ marginTop: 12, fontSize: 15, color: 'var(--text-secondary)' }}>No team members yet</p>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add your first employee to get started</span>
+                </div>
             ) : (
                 <div className="users-grid">
                     {users.map((user) => (

@@ -210,7 +210,7 @@ export const useCartStore = create<CartStore>()(
             },
         }),
         {
-            name: 'dfc-pos-cart',
+            name: 'billova-cart',
         }
     )
 );
@@ -218,25 +218,47 @@ export const useCartStore = create<CartStore>()(
 // Auth Store
 interface AuthStore {
     token: string | null;
+    tokenExpiry: number | null; // Unix timestamp (ms) when token expires
     user: User | null;
     isAuthenticated: boolean;
 
     login: (token: string, user: User) => void;
     logout: () => void;
+    isTokenExpired: () => boolean;
+    checkAuth: () => boolean; // Returns true if still valid, false if expired (auto-logouts)
 }
 
 export const useAuthStore = create<AuthStore>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             token: null,
+            tokenExpiry: null,
             user: null,
             isAuthenticated: false,
 
-            login: (token, user) => set({ token, user, isAuthenticated: true }),
-            logout: () => set({ token: null, user: null, isAuthenticated: false }),
+            login: (token, user) => set({
+                token,
+                user,
+                isAuthenticated: true,
+                tokenExpiry: Date.now() + 24 * 60 * 60 * 1000, // 24h from now
+            }),
+            logout: () => set({ token: null, tokenExpiry: null, user: null, isAuthenticated: false }),
+            isTokenExpired: () => {
+                const { tokenExpiry } = get();
+                if (!tokenExpiry) return true;
+                return Date.now() > tokenExpiry;
+            },
+            checkAuth: () => {
+                const { isAuthenticated, isTokenExpired, logout } = get();
+                if (isAuthenticated && isTokenExpired()) {
+                    logout();
+                    return false;
+                }
+                return isAuthenticated;
+            },
         }),
         {
-            name: 'dfc-pos-auth',
+            name: 'billova-auth',
         }
     )
 );

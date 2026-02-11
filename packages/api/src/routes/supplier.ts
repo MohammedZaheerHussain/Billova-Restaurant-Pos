@@ -1,25 +1,45 @@
-// Supplier Management API Routes
+// Supplier Management API Routes (Supabase)
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Apply auth to all routes
 router.use(authMiddleware);
 
+// Transform supplier for frontend
+const transformSupplier = (s: any) => ({
+    id: s.id,
+    branchId: s.branch_id,
+    name: s.name,
+    code: s.code,
+    phone: s.phone,
+    email: s.email,
+    address: s.address,
+    gstNumber: s.gst_number,
+    paymentTerms: s.payment_terms,
+    rating: s.rating,
+    isActive: s.is_active,
+    createdAt: s.created_at,
+});
+
 // Get all suppliers
 router.get('/', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = (req as any).user.branchId;
 
-        const suppliers = await prisma.supplier.findMany({
-            where: { branchId, isActive: true },
-            orderBy: { name: 'asc' }
-        });
+        const { data: suppliers, error } = await sb
+            .from('suppliers')
+            .select('*')
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
 
-        res.json(suppliers);
+        if (error) throw error;
+
+        res.json((suppliers || []).map(transformSupplier));
     } catch (error) {
         console.error('Error fetching suppliers:', error);
         res.status(500).json({ error: 'Failed to fetch suppliers' });
@@ -29,23 +49,28 @@ router.get('/', async (req: Request, res: Response) => {
 // Get single supplier
 router.get('/:id', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        const supplier = await prisma.supplier.findUnique({
-            where: { id },
-            include: {
-                purchaseOrders: {
-                    take: 10,
-                    orderBy: { createdAt: 'desc' }
-                }
-            }
-        });
+        const { data: supplier, error } = await sb
+            .from('suppliers')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (!supplier) {
+        if (error || !supplier) {
             return res.status(404).json({ error: 'Supplier not found' });
         }
 
-        res.json(supplier);
+        // Get recent purchase orders
+        const { data: purchaseOrders } = await sb
+            .from('purchase_orders')
+            .select('*')
+            .eq('supplier_id', id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        res.json({ ...transformSupplier(supplier), purchaseOrders: purchaseOrders || [] });
     } catch (error) {
         console.error('Error fetching supplier:', error);
         res.status(500).json({ error: 'Failed to fetch supplier' });
@@ -55,23 +80,28 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Create supplier
 router.post('/', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = (req as any).user.branchId;
         const { name, code, phone, email, address, gstNumber, paymentTerms } = req.body;
 
-        const supplier = await prisma.supplier.create({
-            data: {
-                branchId,
+        const { data: supplier, error } = await sb
+            .from('suppliers')
+            .insert({
+                branch_id: branchId,
                 name,
                 code,
                 phone,
                 email,
                 address,
-                gstNumber,
-                paymentTerms
-            }
-        });
+                gst_number: gstNumber,
+                payment_terms: paymentTerms,
+            })
+            .select()
+            .single();
 
-        res.status(201).json(supplier);
+        if (error) throw error;
+
+        res.status(201).json(transformSupplier(supplier));
     } catch (error) {
         console.error('Error creating supplier:', error);
         res.status(500).json({ error: 'Failed to create supplier' });
@@ -81,25 +111,30 @@ router.post('/', async (req: Request, res: Response) => {
 // Update supplier
 router.put('/:id', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { name, code, phone, email, address, gstNumber, paymentTerms, rating, isActive } = req.body;
 
-        const supplier = await prisma.supplier.update({
-            where: { id },
-            data: {
+        const { data: supplier, error } = await sb
+            .from('suppliers')
+            .update({
                 name,
                 code,
                 phone,
                 email,
                 address,
-                gstNumber,
-                paymentTerms,
+                gst_number: gstNumber,
+                payment_terms: paymentTerms,
                 rating,
-                isActive
-            }
-        });
+                is_active: isActive,
+            })
+            .eq('id', id)
+            .select()
+            .single();
 
-        res.json(supplier);
+        if (error) throw error;
+
+        res.json(transformSupplier(supplier));
     } catch (error) {
         console.error('Error updating supplier:', error);
         res.status(500).json({ error: 'Failed to update supplier' });
@@ -109,12 +144,10 @@ router.put('/:id', async (req: Request, res: Response) => {
 // Delete supplier (soft delete)
 router.delete('/:id', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        await prisma.supplier.update({
-            where: { id },
-            data: { isActive: false }
-        });
+        await sb.from('suppliers').update({ is_active: false }).eq('id', id);
 
         res.json({ message: 'Supplier deleted successfully' });
     } catch (error) {

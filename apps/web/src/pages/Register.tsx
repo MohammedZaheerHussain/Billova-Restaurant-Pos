@@ -75,9 +75,9 @@ export default function RegisterPage() {
                 transition={{ duration: 0.4 }}
             >
                 <div className="register-header">
-                    <span className="register-logo">🍗</span>
+                    <img src="/billova-logo.png" alt="Billova" className="register-logo" style={{ width: '64px', height: '64px' }} />
                     <h1>Create Account</h1>
-                    <p>Join DFC POS Pro</p>
+                    <p>Join Billova POS</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="register-form">

@@ -137,7 +137,7 @@
 
 /* Table Modal */
 .table-modal {
-    max-width: 420px;
+    max-width: 480px;
 }
 
 .table-form {
@@ -147,7 +147,36 @@
     gap: 20px;
 }
 
-/* Capacity Selector */
+.table-form .form-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.table-form input {
+    width: 100%;
+    padding: 10px 14px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1f2937;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.table-form input::placeholder {
+    color: #9ca3af;
+}
+
+.table-form input:focus {
+    outline: none;
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Capacity Selector - Light Theme */
 .capacity-selector {
     display: flex;
     gap: 8px;
@@ -160,23 +189,25 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
     font-size: 16px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: #6b7280;
+    cursor: pointer;
     transition: all 0.2s;
 }
 
 .capacity-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
+    border-color: #dc2626;
+    color: #dc2626;
+    background: #fef2f2;
 }
 
 .capacity-btn.active {
-    background: var(--primary);
-    border-color: var(--primary);
+    background: #dc2626;
+    border-color: #dc2626;
     color: white;
 }
 
@@ -184,7 +215,7 @@
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -192,12 +223,16 @@
     padding: 20px;
 }
 
+/* LIGHT THEME MODAL */
 .modal {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
     width: 100%;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    color: #1f2937 !important;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .modal-header {
@@ -205,34 +240,100 @@
     align-items: center;
     justify-content: space-between;
     padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #e5e7eb !important;
+    background: #ffffff !important;
 }
 
 .modal-header h2 {
     font-size: 18px;
     font-weight: 600;
+    color: #111827 !important;
 }
 
 .modal-close {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    background: transparent !important;
+    border-radius: 6px;
+    color: #6b7280 !important;
+    border: none !important;
+    cursor: pointer;
 }
 
 .modal-close:hover {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: #f3f4f6 !important;
+    color: #111827 !important;
 }
 
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff !important;
+}
+
+/* Modal Buttons - LIGHT THEME */
+.modal-actions .btn-secondary,
+.modal .btn-secondary {
+    background: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    color: #374151 !important;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.modal-actions .btn-secondary:hover,
+.modal .btn-secondary:hover {
+    background: #e5e7eb !important;
+}
+
+.modal-actions .btn-primary,
+.modal .btn-primary {
+    background: #dc2626 !important;
+    border: none !important;
+    color: white !important;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.modal-actions .btn-primary:hover,
+.modal .btn-primary:hover {
+    background: #b91c1c !important;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-actions .btn-secondary {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    color: #374151;
+}
+
+.modal-actions .btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+.modal-actions .btn-primary {
+    background: #dc2626;
+    border: none;
+    color: white;
+}
+
+.modal-actions .btn-primary:hover {
+    background: #b91c1c;
 }
 
 /* Delete Modal */

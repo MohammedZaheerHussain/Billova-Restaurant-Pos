@@ -1,7 +1,7 @@
 // Menu Management Page
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, Upload, Image as ImageIcon, FileImage, FolderPlus, Sparkles, Loader } from 'lucide-react';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, Upload, Image as ImageIcon, FileImage, FolderPlus, Sparkles, Loader, UtensilsCrossed } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuAPI, categoriesAPI } from '../api';
 import { useAuthStore, MenuItem, Category } from '../store';
@@ -352,6 +352,12 @@ export default function MenuPage() {
 
             {loading ? (
                 <div className="loading-state"><div className="spinner" /></div>
+            ) : filteredItems.length === 0 ? (
+                <div className="empty-state" style={{ textAlign: 'center', padding: '60px 20px', opacity: 0.6 }}>
+                    <UtensilsCrossed size={48} strokeWidth={1} />
+                    <p style={{ marginTop: 12, fontSize: 15, color: 'var(--text-secondary)' }}>No menu items found</p>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add your first item or try a different category</span>
+                </div>
             ) : (
                 <div className="menu-table-container">
                     <table className="menu-table">

@@ -1,6 +1,7 @@
 // Super Admin Dashboard - Multi-tenant Management
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
     Building2, Users, Shield, Plus, X,
     Check, Key, MessageSquare, Clock, Send
@@ -48,6 +49,7 @@ interface SupportTicket {
 type TabType = 'customers' | 'password-resets' | 'support';
 
 export default function SuperAdminPage() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('customers');
     const [stats, setStats] = useState({
@@ -66,7 +68,7 @@ export default function SuperAdminPage() {
     const [newCustomer, setNewCustomer] = useState({
         restaurantName: '', address: '', phone: '', gstNumber: '',
         ownerName: '', ownerEmail: '', ownerPassword: '',
-        plan: 'BASIC', licenseDuration: 12,
+        plan: 'BASIC', licenseDuration: 12, isDemo: false,
     });
 
     useEffect(() => { fetchData(); }, []);
@@ -105,7 +107,7 @@ export default function SuperAdminPage() {
             setNewCustomer({
                 restaurantName: '', address: '', phone: '', gstNumber: '',
                 ownerName: '', ownerEmail: '', ownerPassword: '',
-                plan: 'BASIC', licenseDuration: 12,
+                plan: 'BASIC', licenseDuration: 12, isDemo: false,
             });
             fetchData();
             if (res.data.restaurant?.license?.key) {
@@ -115,16 +117,6 @@ export default function SuperAdminPage() {
             toast.error(error.response?.data?.error || 'Failed to create customer');
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleToggleStatus = async (id: string, isActive: boolean) => {
-        try {
-            await superAdminAPI.updateRestaurant(id, { isActive: !isActive });
-            toast.success(isActive ? 'Customer deactivated' : 'Customer activated');
-            fetchData();
-        } catch (error) {
-            toast.error('Failed to update status');
         }
     };
 
@@ -185,7 +177,7 @@ export default function SuperAdminPage() {
                     <h1>🔐 Super Admin</h1>
                     <p>Manage customers, passwords & support</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                <button className="btn btn-primary" onClick={() => navigate('/super-admin/add-client')}>
                     <Plus size={18} /> Add Customer
                 </button>
             </div>
@@ -293,10 +285,10 @@ export default function SuperAdminPage() {
                                                             <Key size={14} />
                                                         </button>
                                                         <button
-                                                            className={`btn btn-sm ${rest.isActive ? 'btn-danger' : 'btn-success'}`}
-                                                            onClick={() => handleToggleStatus(rest.id, rest.isActive)}
+                                                            className="btn btn-sm btn-primary"
+                                                            onClick={() => navigate(`/super-admin/client/${rest.id}`)}
                                                         >
-                                                            {rest.isActive ? 'Deactivate' : 'Activate'}
+                                                            👁️ View
                                                         </button>
                                                     </div>
                                                 </td>
@@ -472,12 +464,33 @@ export default function SuperAdminPage() {
                                         </div>
                                         <div className="form-group">
                                             <label>Duration</label>
-                                            <select value={newCustomer.licenseDuration} onChange={(e) => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}>
+                                            <select
+                                                value={newCustomer.licenseDuration}
+                                                onChange={(e) => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}
+                                                disabled={newCustomer.isDemo}
+                                            >
                                                 <option value={1}>1 Month</option>
                                                 <option value={3}>3 Months</option>
                                                 <option value={6}>6 Months</option>
                                                 <option value={12}>12 Months</option>
                                             </select>
+                                            {newCustomer.isDemo && <span className="hint">Demo = 3 days (server-enforced)</span>}
+                                        </div>
+                                        <div className="form-group demo-toggle">
+                                            <label className="toggle-label">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newCustomer.isDemo}
+                                                    onChange={(e) => setNewCustomer({ ...newCustomer, isDemo: e.target.checked })}
+                                                />
+                                                <span className="toggle-switch" />
+                                                Demo Account
+                                            </label>
+                                            {newCustomer.isDemo && (
+                                                <p className="demo-warning">
+                                                    ⚠️ Demo: 3 days, auto-verified email, no extensions
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

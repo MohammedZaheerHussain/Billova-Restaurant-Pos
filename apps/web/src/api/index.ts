@@ -1,8 +1,7 @@
-// API Client
+// API Client - Supabase Auth Only
 import axios from 'axios';
 import { useAuthStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { FeatureFlags, isDualAuthMode, isSupabaseAuthOnly } from '../lib/feature-flags';
 
 const api = axios.create({
     baseURL: '/api',
@@ -11,33 +10,14 @@ const api = axios.create({
     },
 });
 
-// Add auth token to requests (supports dual-auth mode)
+// Add Supabase auth token to requests
 api.interceptors.request.use(async (config) => {
-    // Node JWT token (existing auth)
-    const nodeToken = useAuthStore.getState().token;
+    // Get Supabase session
+    const { data: { session } } = await supabase.auth.getSession();
 
-    // If Supabase auth only mode, use Supabase token
-    if (isSupabaseAuthOnly()) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-            config.headers.Authorization = `Bearer ${session.access_token}`;
-            config.headers['X-Auth-Provider'] = 'supabase';
-        }
-    }
-    // Dual auth mode - send both tokens
-    else if (isDualAuthMode()) {
-        if (nodeToken) {
-            config.headers.Authorization = `Bearer ${nodeToken}`;
-        }
-        // Also send Supabase token as secondary header
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-            config.headers['X-Supabase-Token'] = session.access_token;
-        }
-    }
-    // Legacy mode - Node JWT only
-    else if (nodeToken) {
-        config.headers.Authorization = `Bearer ${nodeToken}`;
+    if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+        config.headers['X-Auth-Provider'] = 'supabase';
     }
 
     return config;
@@ -46,13 +26,11 @@ api.interceptors.request.use(async (config) => {
 // Handle auth errors
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
         if (error.response?.status === 401) {
-            // Sign out from both auth systems
+            // Sign out from Supabase
+            await supabase.auth.signOut();
             useAuthStore.getState().logout();
-            if (FeatureFlags.SUPABASE_CONFIGURED) {
-                supabase.auth.signOut();
-            }
             window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -159,9 +137,16 @@ export const combosAPI = {
 export const superAdminAPI = {
     dashboard: () => api.get('/super-admin/dashboard'),
     getRestaurants: () => api.get('/super-admin/restaurants'),
+    getRestaurant: (id: string) => api.get(`/super-admin/restaurants/${id}`),
     createRestaurant: (data: any) => api.post('/super-admin/restaurants', data),
     updateRestaurant: (id: string, data: any) => api.patch(`/super-admin/restaurants/${id}`, data),
     deleteRestaurant: (id: string) => api.delete(`/super-admin/restaurants/${id}`),
+    // Client actions
+    forceDeactivate: (id: string) => api.post(`/super-admin/restaurants/${id}/force-deactivate`),
+    upgradePlan: (id: string, data: { plan: string; durationMonths?: number; isLifetime?: boolean }) =>
+        api.post(`/super-admin/restaurants/${id}/upgrade-plan`, data),
+    reactivate: (id: string) => api.post(`/super-admin/restaurants/${id}/reactivate`),
+    // License management
     updateLicense: (branchId: string, data: any) => api.patch(`/super-admin/licenses/${branchId}`, data),
     // Password reset requests
     getPasswordResets: () => api.get('/super-admin/password-resets'),
@@ -236,5 +221,9 @@ export const addonsAPI = {
         api.post(`/addons/menu-item/${menuItemId}`, { addonIds }),
 };
 
-export default api;
+// Dashboard API (Owner Intelligence)
+export const dashboardAPI = {
+    ownerSummary: () => api.get('/dashboard/owner-summary'),
+};
 
+export default api;

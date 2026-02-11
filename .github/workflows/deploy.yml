@@ -3,7 +3,7 @@ name: Deploy Billova POS
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 env:
   DOCKER_USERNAME: fahadfx
@@ -30,7 +30,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./packages/api/Dockerfile
+          file: ./Dockerfile.api
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/billova:api
           cache-from: type=gha
@@ -39,10 +39,15 @@ jobs:
       - name: Build and push Web image
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/web
-          file: ./apps/web/Dockerfile
+          context: .
+          file: ./Dockerfile.web
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/billova:web
+          build-args: |
+            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_SUPABASE_AUTH_ONLY=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -54,7 +59,22 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/billova
-            docker-compose pull
-            docker-compose up -d
+            
+            # Update environment file
+            cat > .env << 'EOF'
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+            SUPABASE_AUTH_ONLY=true
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            FRONTEND_URL=https://billova.com
+            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+            EOF
+            
+            # Pull latest images and restart
+            docker compose pull
+            docker compose up -d
             docker system prune -f
-            echo "✅ Deployment complete!"
+            
+            echo "✅ Billova POS deployed successfully!"
+            echo "🌐 Web: https://billova.com"
+            echo "🔌 API: https://billova.com/api"

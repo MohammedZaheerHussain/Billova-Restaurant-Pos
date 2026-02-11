@@ -25,7 +25,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
             };
         }
 
-        if (status === 'SYNCING') {
+        if (status === 'syncing') {
             return {
                 icon: RefreshCw,
                 color: 'text-blue-500',
@@ -46,7 +46,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
             };
         }
 
-        if (status === 'SUCCESS') {
+        if (status === 'synced') {
             return {
                 icon: Check,
                 color: 'text-green-500',

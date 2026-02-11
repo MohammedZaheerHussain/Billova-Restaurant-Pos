@@ -1,15 +1,12 @@
-// Customer Self-Order API Routes (Public - No Auth Required)
+// Customer Self-Order API Routes (Supabase - No Auth Required)
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Generate unique session token
 const generateToken = () => crypto.randomBytes(16).toString('hex');
-
-// ==================== PUBLIC ENDPOINTS (No Auth) ====================
 
 // Get menu for QR session
 router.get('/menu/:token', async (req: Request, res: Response) => {
@@ -17,39 +14,37 @@ router.get('/menu/:token', async (req: Request, res: Response) => {
         const { token } = req.params;
 
         // Find table by QR token
-        const table = await prisma.table.findFirst({
-            where: { qrToken: token },
-            include: {
-                branch: {
-                    select: { id: true, name: true, phone: true }
-                }
-            }
-        });
+        const { data: table, error } = await supabase
+            .from('tables')
+            .select('*, branches (id, name, phone)')
+            .eq('qr_token', token)
+            .single();
 
-        if (!table) {
+        if (error || !table) {
             return res.status(404).json({ error: 'Invalid QR code' });
         }
 
-        // Fetch menu items for this branch
-        const categories = await prisma.category.findMany({
-            where: { branchId: table.branchId, isActive: true },
-            orderBy: { sortOrder: 'asc' }
-        });
+        // Fetch categories
+        const { data: categories } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('branch_id', table.branch_id)
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
 
-        const menuItems = await prisma.menuItem.findMany({
-            where: { branchId: table.branchId, isAvailable: true },
-            include: {
-                variants: true,
-                category: { select: { name: true } }
-            },
-            orderBy: { sortOrder: 'asc' }
-        });
+        // Fetch menu items
+        const { data: menuItems } = await supabase
+            .from('menu_items')
+            .select('*, menu_item_variants (*), categories (name)')
+            .eq('branch_id', table.branch_id)
+            .eq('is_available', true)
+            .order('sort_order', { ascending: true });
 
         res.json({
             table: { id: table.id, name: table.name },
-            branch: table.branch,
-            categories,
-            menuItems
+            branch: table.branches,
+            categories: categories || [],
+            menuItems: menuItems || [],
         });
     } catch (error) {
         console.error('Error fetching menu:', error);
@@ -57,29 +52,28 @@ router.get('/menu/:token', async (req: Request, res: Response) => {
     }
 });
 
-// ==================== PUBLIC MENU (Online Menu Feature) ====================
-
 // Get branch info by ID (for public menu)
 router.get('/branch/:branchId', async (req: Request, res: Response) => {
     try {
         const { branchId } = req.params;
 
-        const branch = await prisma.branch.findUnique({
-            where: { id: branchId },
-            select: {
-                id: true,
-                name: true,
-                phone: true,
-                address: true,
-                gstNumber: true
-            }
-        });
+        const { data: branch, error } = await supabase
+            .from('branches')
+            .select('id, name, phone, address, gst_number')
+            .eq('id', branchId)
+            .single();
 
-        if (!branch) {
+        if (error || !branch) {
             return res.status(404).json({ error: 'Restaurant not found' });
         }
 
-        res.json(branch);
+        res.json({
+            id: branch.id,
+            name: branch.name,
+            phone: branch.phone,
+            address: branch.address,
+            gstNumber: branch.gst_number,
+        });
     } catch (error) {
         console.error('Error fetching branch:', error);
         res.status(500).json({ error: 'Failed to load restaurant info' });
@@ -91,79 +85,63 @@ router.get('/menu-full/:branchId', async (req: Request, res: Response) => {
     try {
         const { branchId } = req.params;
 
-        // Verify branch exists
-        const branch = await prisma.branch.findUnique({
-            where: { id: branchId },
-            select: { id: true, name: true, phone: true, address: true }
-        });
+        const { data: branch, error: branchError } = await supabase
+            .from('branches')
+            .select('id, name, phone, address')
+            .eq('id', branchId)
+            .single();
 
-        if (!branch) {
+        if (branchError || !branch) {
             return res.status(404).json({ error: 'Restaurant not found' });
         }
 
-        // Fetch categories
-        const categories = await prisma.category.findMany({
-            where: { branchId, isActive: true },
-            orderBy: { sortOrder: 'asc' }
-        });
+        const { data: categories } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('branch_id', branchId)
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
 
-        // Fetch menu items
-        const menuItems = await prisma.menuItem.findMany({
-            where: { branchId, isAvailable: true },
-            include: {
-                variants: true,
-                category: { select: { id: true, name: true, icon: true } }
-            },
-            orderBy: [
-                { category: { sortOrder: 'asc' } },
-                { sortOrder: 'asc' }
-            ]
-        });
+        const { data: menuItems } = await supabase
+            .from('menu_items')
+            .select('*, menu_item_variants (*), categories (id, name, icon)')
+            .eq('branch_id', branchId)
+            .eq('is_available', true)
+            .order('sort_order', { ascending: true });
 
-        res.json({
-            branch,
-            categories,
-            menuItems
-        });
+        res.json({ branch, categories: categories || [], menuItems: menuItems || [] });
     } catch (error) {
         console.error('Error fetching full menu:', error);
         res.status(500).json({ error: 'Failed to load menu' });
     }
 });
 
-// ==================== ORDER TRACKING ====================
-
 // Get order status for tracking
 router.get('/order-status/:orderId', async (req: Request, res: Response) => {
     try {
         const { orderId } = req.params;
 
-        const order = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: {
-                items: {
-                    include: {
-                        menuItem: { select: { name: true } }
-                    }
-                }
-            }
-        });
+        const { data: order, error } = await supabase
+            .from('orders')
+            .select('*, order_items (*, menu_items (name))')
+            .eq('id', orderId)
+            .single();
 
-        if (!order) {
+        if (error || !order) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
         res.json({
-            orderNumber: order.orderNumber,
+            orderNumber: order.order_number,
             status: order.status,
-            orderType: order.orderType,
-            customerName: order.customerName || 'Guest',
+            orderType: order.order_type,
+            customerName: order.customer_name || 'Guest',
             total: Number(order.total),
-            createdAt: order.createdAt,
-            items: order.items.map(item => ({
-                name: item.menuItem.name,
-                quantity: item.quantity
-            }))
+            createdAt: order.created_at,
+            items: (order.order_items || []).map((item: any) => ({
+                name: item.menu_items?.name || 'Unknown',
+                quantity: item.quantity,
+            })),
         });
     } catch (error) {
         console.error('Error fetching order status:', error);
@@ -181,12 +159,13 @@ router.post('/order', async (req: Request, res: Response) => {
         }
 
         // Find table by QR token
-        const table = await prisma.table.findFirst({
-            where: { qrToken: token },
-            include: { branch: true }
-        });
+        const { data: table, error: tableError } = await supabase
+            .from('tables')
+            .select('*, branches (*)')
+            .eq('qr_token', token)
+            .single();
 
-        if (!table) {
+        if (tableError || !table) {
             return res.status(404).json({ error: 'Invalid QR code' });
         }
 
@@ -195,118 +174,82 @@ router.post('/order', async (req: Request, res: Response) => {
         const orderItems: any[] = [];
 
         for (const item of items) {
-            const menuItem = await prisma.menuItem.findUnique({
-                where: { id: item.menuItemId },
-                include: { variants: true }
-            });
+            const { data: menuItem } = await supabase
+                .from('menu_items')
+                .select('*, menu_item_variants (*)')
+                .eq('id', item.menuItemId)
+                .single();
 
             if (!menuItem) continue;
 
             const price = item.variantId
-                ? menuItem.variants.find(v => v.id === item.variantId)?.price || menuItem.price
+                ? menuItem.menu_item_variants?.find((v: any) => v.id === item.variantId)?.price || menuItem.price
                 : menuItem.price;
 
             const itemTotal = Number(price) * item.quantity;
             subtotal += itemTotal;
 
             orderItems.push({
-                menuItemId: item.menuItemId,
-                variantId: item.variantId || null,
+                menu_item_id: item.menuItemId,
+                variant_id: item.variantId || null,
                 quantity: item.quantity,
-                unitPrice: price,
+                unit_price: price,
                 total: itemTotal,
-                notes: item.notes || null
-            });
-        }
-
-        // Get or create a system user for customer orders
-        let systemUser = await prisma.user.findFirst({
-            where: { branchId: table.branchId, email: 'self-order@system.local' }
-        });
-
-        if (!systemUser) {
-            systemUser = await prisma.user.create({
-                data: {
-                    branchId: table.branchId,
-                    name: 'Self Order',
-                    email: 'self-order@system.local',
-                    password: 'SYSTEM_USER_NO_LOGIN',
-                    role: 'CASHIER'
-                }
+                notes: item.notes || null,
             });
         }
 
         // Get next order number
-        const lastOrder = await prisma.order.findFirst({
-            where: { branchId: table.branchId },
-            orderBy: { orderNumber: 'desc' }
-        });
-        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
+        const { data: lastOrders } = await supabase
+            .from('orders')
+            .select('order_number')
+            .eq('branch_id', table.branch_id)
+            .order('order_number', { ascending: false })
+            .limit(1);
 
-        // Create order
-        const order = await prisma.order.create({
-            data: {
-                branchId: table.branchId,
-                tableId: table.id,
-                userId: systemUser.id,
-                orderNumber,
-                orderType: 'DINE_IN',
+        const orderNumber = (lastOrders?.[0]?.order_number || 0) + 1;
+
+        // Create order (using a dummy system user ID)
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+                branch_id: table.branch_id,
+                table_id: table.id,
+                order_number: orderNumber,
+                order_type: 'DINE_IN',
                 status: 'PENDING',
-                customerName: customerName || 'Guest',
+                customer_name: customerName || 'Guest',
                 notes: 'Self-order via QR',
                 subtotal,
-                discountAmount: 0,
-                gstAmount: 0,
-                total: subtotal, // No discount for self-order
-                items: {
-                    create: orderItems
-                }
-            },
-            include: { items: true }
-        });
+                discount_amount: 0,
+                gst_amount: 0,
+                total: subtotal,
+            })
+            .select()
+            .single();
 
-        // Create QR session record
-        await prisma.qRSession.create({
-            data: {
-                tableId: table.id,
-                sessionToken: generateToken(),
-                customerName: customerName || 'Guest',
-                status: 'ORDERED',
-                orderId: order.id,
-                expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 hours
-            }
-        });
+        if (orderError) throw orderError;
+
+        // Create order items
+        const itemsWithOrderId = orderItems.map(item => ({ ...item, order_id: order.id }));
+        await supabase.from('order_items').insert(itemsWithOrderId);
 
         // Update table status
-        await prisma.table.update({
-            where: { id: table.id },
-            data: { status: 'OCCUPIED' }
-        });
-
-        // Create KOT items for kitchen
-        await prisma.kOTItem.createMany({
-            data: order.items.map((item: any, index: number) => ({
-                orderId: order.id,
-                kotNumber: orderNumber,
-                itemName: `Item ${index + 1}`,
-                quantity: item.quantity,
-                notes: item.notes,
-                status: 'PENDING'
-            }))
-        });
+        await supabase
+            .from('tables')
+            .update({ status: 'OCCUPIED' })
+            .eq('id', table.id);
 
         res.status(201).json({
             success: true,
             orderNumber,
-            message: 'Order placed successfully! Your order will be prepared shortly.'
+            message: 'Order placed successfully! Your order will be prepared shortly.',
         });
     } catch (error) {
         console.error('Error creating order:', error);
         res.status(500).json({ error: 'Failed to place order' });
     }
 });
-
-// ==================== ONLINE ORDERING (Delivery/Takeaway) ====================
 
 // Submit online order (delivery/takeaway)
 router.post('/online-order', async (req: Request, res: Response) => {
@@ -322,8 +265,13 @@ router.post('/online-order', async (req: Request, res: Response) => {
         }
 
         // Verify branch exists
-        const branch = await prisma.branch.findUnique({ where: { id: branchId } });
-        if (!branch) {
+        const { data: branch, error: branchError } = await supabase
+            .from('branches')
+            .select('id')
+            .eq('id', branchId)
+            .single();
+
+        if (branchError || !branch) {
             return res.status(404).json({ error: 'Restaurant not found' });
         }
 
@@ -332,73 +280,65 @@ router.post('/online-order', async (req: Request, res: Response) => {
         const orderItems: any[] = [];
 
         for (const item of items) {
-            const menuItem = await prisma.menuItem.findUnique({
-                where: { id: item.menuItemId },
-                include: { variants: true }
-            });
+            const { data: menuItem } = await supabase
+                .from('menu_items')
+                .select('*, menu_item_variants (*)')
+                .eq('id', item.menuItemId)
+                .single();
 
             if (!menuItem) continue;
 
             const price = item.variantId
-                ? menuItem.variants.find(v => v.id === item.variantId)?.price || menuItem.price
+                ? menuItem.menu_item_variants?.find((v: any) => v.id === item.variantId)?.price || menuItem.price
                 : menuItem.price;
 
             const itemTotal = Number(price) * item.quantity;
             subtotal += itemTotal;
 
             orderItems.push({
-                menuItemId: item.menuItemId,
-                variantId: item.variantId || null,
+                menu_item_id: item.menuItemId,
+                variant_id: item.variantId || null,
                 quantity: item.quantity,
-                unitPrice: price,
+                unit_price: price,
                 total: itemTotal,
-                notes: item.notes || null
-            });
-        }
-
-        // Get or create a system user for online orders
-        let systemUser = await prisma.user.findFirst({
-            where: { branchId, email: 'online-order@system.local' }
-        });
-
-        if (!systemUser) {
-            systemUser = await prisma.user.create({
-                data: {
-                    branchId,
-                    name: 'Online Order',
-                    email: 'online-order@system.local',
-                    password: 'SYSTEM_USER_NO_LOGIN',
-                    role: 'CASHIER'
-                }
+                notes: item.notes || null,
             });
         }
 
         // Get next order number
-        const lastOrder = await prisma.order.findFirst({
-            where: { branchId },
-            orderBy: { orderNumber: 'desc' }
-        });
-        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
+        const { data: lastOrders } = await supabase
+            .from('orders')
+            .select('order_number')
+            .eq('branch_id', branchId)
+            .order('order_number', { ascending: false })
+            .limit(1);
+
+        const orderNumber = (lastOrders?.[0]?.order_number || 0) + 1;
 
         // Create the order
-        const order = await prisma.order.create({
-            data: {
-                branchId,
-                userId: systemUser.id,
-                orderNumber,
-                orderType: orderType || 'DELIVERY',
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+                branch_id: branchId,
+                order_number: orderNumber,
+                order_type: orderType || 'DELIVERY',
                 status: 'PENDING',
                 subtotal,
-                discountAmount: 0,
-                gstAmount: 0,
+                discount_amount: 0,
+                gst_amount: 0,
                 total: subtotal,
-                customerName,
-                customerPhone,
+                customer_name: customerName,
+                customer_phone: customerPhone,
                 notes: customerAddress ? `Delivery: ${customerAddress}` : null,
-                items: { create: orderItems }
-            },
-            include: { items: true }
-        });
+            })
+            .select()
+            .single();
+
+        if (orderError) throw orderError;
+
+        // Create order items
+        const itemsWithOrderId = orderItems.map(item => ({ ...item, order_id: order.id }));
+        await supabase.from('order_items').insert(itemsWithOrderId);
 
         res.status(201).json({
             success: true,
@@ -406,7 +346,7 @@ router.post('/online-order', async (req: Request, res: Response) => {
             orderNumber,
             message: orderType === 'DELIVERY'
                 ? 'Order placed! We will call you for delivery updates.'
-                : 'Order placed! We will call you when ready for pickup.'
+                : 'Order placed! We will call you when ready for pickup.',
         });
     } catch (error) {
         console.error('Error creating online order:', error);

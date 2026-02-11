@@ -1,7 +1,7 @@
 // useSync Hook - Hook for managing sync operations
 import { useEffect, useCallback, useRef } from 'react';
 import { useNetworkStatus } from './useNetworkStatus';
-import { useSyncStore, useSyncStatusInfo } from '../store/syncStore';
+import { useSyncStore } from '../store/sync-store';
 import syncEngine from '../sync/sync-engine';
 
 export interface UseSyncOptions {
@@ -16,14 +16,13 @@ const DEFAULT_OPTIONS: UseSyncOptions = {
 
 export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
     const { isOnline, wasOffline } = useNetworkStatus();
-    const syncInfo = useSyncStatusInfo();
-    const { setOnlineStatus } = useSyncStore();
+    const { status, pendingOrders, pendingPayments, lastSyncAt, setOnline } = useSyncStore();
     const intervalRef = useRef<number | null>(null);
 
     // Update online status in store
     useEffect(() => {
-        setOnlineStatus(isOnline);
-    }, [isOnline, setOnlineStatus]);
+        setOnline(isOnline);
+    }, [isOnline, setOnline]);
 
     // Auto-sync on reconnect
     useEffect(() => {
@@ -52,7 +51,9 @@ export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
 
     // Update pending counts on mount
     useEffect(() => {
-        syncEngine.updatePendingCounts();
+        syncEngine.updatePendingCounts().catch((e) => {
+            console.warn('[useSync] Failed to update pending counts on mount:', e);
+        });
     }, []);
 
     // Manual sync trigger
@@ -69,9 +70,15 @@ export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
         syncEngine.cancelSync();
     }, []);
 
+    // Construct sync info from store state
+    const pendingCount = pendingOrders + pendingPayments;
+
     return {
-        ...syncInfo,
+        status,
         isOnline,
+        pendingCount,
+        lastSyncTime: lastSyncAt ? new Date(lastSyncAt) : null,
+        hasErrors: status === 'blocked',
         triggerSync,
         cancelSync,
         updatePendingCounts: syncEngine.updatePendingCounts.bind(syncEngine),
@@ -80,12 +87,16 @@ export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
 
 // Simple hook for just the sync status badge
 export function useSyncStatus() {
-    const syncInfo = useSyncStatusInfo();
+    const { status, pendingOrders, pendingPayments, lastSyncAt } = useSyncStore();
     const { isOnline } = useNetworkStatus();
+    const pendingCount = pendingOrders + pendingPayments;
 
     return {
-        ...syncInfo,
+        status,
         isOnline,
+        pendingCount,
+        lastSyncTime: lastSyncAt ? new Date(lastSyncAt) : null,
+        hasErrors: status === 'blocked',
     };
 }
 
@@ -94,14 +105,25 @@ export function useSyncInit() {
     const { isOnline } = useNetworkStatus();
 
     useEffect(() => {
-        // Update pending counts on init
-        syncEngine.updatePendingCounts();
+        // Update pending counts on init (wrapped in try-catch to prevent crash)
+        const initSync = async () => {
+            try {
+                await syncEngine.updatePendingCounts();
+            } catch (e) {
+                console.warn('[useSyncInit] Failed to update pending counts:', e);
+            }
+        };
+        initSync();
 
         // Trigger initial sync if online
         if (isOnline) {
             // Delay initial sync slightly to let app load
             const timeout = setTimeout(() => {
-                syncEngine.syncAll();
+                try {
+                    syncEngine.syncAll();
+                } catch (e) {
+                    console.warn('[useSyncInit] Failed to trigger initial sync:', e);
+                }
             }, 2000);
 
             return () => clearTimeout(timeout);

@@ -6,18 +6,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY packages/api/package*.json ./packages/api/
-COPY packages/database/package*.json ./packages/database/
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --workspace=@dfcpos/api
 
-# Copy source
+# Copy API source
 COPY packages/api ./packages/api
-COPY packages/database ./packages/database
-
-# Generate Prisma client
-WORKDIR /app/packages/database
-RUN npx prisma generate
 
 # Build API
 WORKDIR /app/packages/api
@@ -31,7 +25,6 @@ WORKDIR /app
 # Copy built files
 COPY --from=builder /app/packages/api/dist ./dist
 COPY --from=builder /app/packages/api/package*.json ./
-COPY --from=builder /app/packages/database ./packages/database
 COPY --from=builder /app/node_modules ./node_modules
 
 # Environment
