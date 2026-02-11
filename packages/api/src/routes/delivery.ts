@@ -1,57 +1,48 @@
-// Delivery API Routes
+// Delivery API Routes (Supabase)
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authMiddleware);
 
 // Get delivery orders for driver
 router.get('/orders', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const userId = (req as any).user.id;
         const branchId = (req as any).user.branchId;
         const { status } = req.query;
 
-        const where: any = {};
+        let query = sb
+            .from('delivery_assignments')
+            .select(`
+                *,
+                orders (id, order_number, customer_name, customer_phone, notes, total, created_at, status),
+                users!driver_id (id, name, phone)
+            `)
+            .order('created_at', { ascending: false });
 
         // If driver, show only assigned orders
-        if ((req as any).user.role === 'DRIVER') {
-            where.driverId = userId;
-        } else {
-            // Managers can see all
-            where.order = { branchId };
+        if ((req as any).user.role === 'DRIVER' || (req as any).user.role === 'driver') {
+            query = query.eq('driver_id', userId);
         }
 
-        if (status) {
-            where.status = status;
+        if (status) query = query.eq('status', status);
+
+        const { data: assignments, error } = await query;
+
+        // Gracefully handle missing table (table may not exist yet in some deployments)
+        if (error) {
+            if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+                console.warn('[Delivery] delivery_assignments table not found — returning empty array');
+                return res.json([]);
+            }
+            throw error;
         }
 
-        const assignments = await prisma.deliveryAssignment.findMany({
-            where,
-            include: {
-                order: {
-                    select: {
-                        id: true,
-                        orderNumber: true,
-                        customerName: true,
-                        customerPhone: true,
-                        notes: true,
-                        total: true,
-                        createdAt: true,
-                        status: true
-                    }
-                },
-                driver: {
-                    select: { id: true, name: true, phone: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        res.json(assignments);
+        res.json(assignments || []);
     } catch (error) {
         console.error('Error fetching delivery orders:', error);
         res.status(500).json({ error: 'Failed to fetch orders' });
@@ -61,13 +52,35 @@ router.get('/orders', async (req: Request, res: Response) => {
 // Assign driver to order
 router.post('/assign', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { orderId, driverId } = req.body;
 
-        const assignment = await prisma.deliveryAssignment.upsert({
-            where: { orderId },
-            update: { driverId },
-            create: { orderId, driverId, status: 'ASSIGNED' }
-        });
+        // Check if assignment exists
+        const { data: existing } = await sb
+            .from('delivery_assignments')
+            .select('id')
+            .eq('order_id', orderId)
+            .single();
+
+        let assignment;
+        if (existing) {
+            const { data, error } = await sb
+                .from('delivery_assignments')
+                .update({ driver_id: driverId })
+                .eq('order_id', orderId)
+                .select()
+                .single();
+            if (error) throw error;
+            assignment = data;
+        } else {
+            const { data, error } = await sb
+                .from('delivery_assignments')
+                .insert({ order_id: orderId, driver_id: driverId, status: 'ASSIGNED' })
+                .select()
+                .single();
+            if (error) throw error;
+            assignment = data;
+        }
 
         res.json(assignment);
     } catch (error) {
@@ -79,39 +92,44 @@ router.post('/assign', async (req: Request, res: Response) => {
 // Update delivery status (for driver app)
 router.put('/orders/:id/status', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { status, notes } = req.body;
 
         const updateData: any = { status };
 
         if (status === 'PICKED_UP') {
-            updateData.pickedUpAt = new Date();
+            updateData.picked_up_at = new Date().toISOString();
         } else if (status === 'DELIVERED') {
-            updateData.deliveredAt = new Date();
+            updateData.delivered_at = new Date().toISOString();
 
-            // Also mark order as completed
-            const assignment = await prisma.deliveryAssignment.findUnique({
-                where: { id }
-            });
+            // Get assignment to update order
+            const { data: assignment } = await sb
+                .from('delivery_assignments')
+                .select('order_id')
+                .eq('id', id)
+                .single();
+
             if (assignment) {
-                await prisma.order.update({
-                    where: { id: assignment.orderId },
-                    data: { status: 'COMPLETED', completedAt: new Date() }
-                });
+                await sb
+                    .from('orders')
+                    .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+                    .eq('id', assignment.order_id);
             }
         }
 
         if (notes) updateData.notes = notes;
 
-        const assignment = await prisma.deliveryAssignment.update({
-            where: { id },
-            data: updateData,
-            include: {
-                order: { select: { orderNumber: true, customerName: true } }
-            }
-        });
+        const { data: updated, error } = await sb
+            .from('delivery_assignments')
+            .update(updateData)
+            .eq('id', id)
+            .select('*, orders (order_number, customer_name)')
+            .single();
 
-        res.json(assignment);
+        if (error) throw error;
+
+        res.json(updated);
     } catch (error) {
         console.error('Error updating delivery:', error);
         res.status(500).json({ error: 'Failed to update delivery' });
@@ -121,14 +139,19 @@ router.put('/orders/:id/status', async (req: Request, res: Response) => {
 // Get available drivers
 router.get('/drivers', async (req: Request, res: Response) => {
     try {
+        const sb = (req as any).supabase || supabase;
         const branchId = (req as any).user.branchId;
 
-        const drivers = await prisma.user.findMany({
-            where: { branchId, role: 'DRIVER', isActive: true },
-            select: { id: true, name: true, phone: true }
-        });
+        const { data: drivers, error } = await sb
+            .from('profiles')
+            .select('id, name, phone')
+            .eq('branch_id', branchId)
+            .eq('role', 'driver')
+            .eq('is_active', true);
 
-        res.json(drivers);
+        if (error) throw error;
+
+        res.json(drivers || []);
     } catch (error) {
         console.error('Error fetching drivers:', error);
         res.status(500).json({ error: 'Failed to fetch drivers' });
