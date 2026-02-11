@@ -1,4 +1,4 @@
-// DFC POS Pro - API Server Entry Point
+// Billova POS - API Server Entry Point
 import dotenv from 'dotenv';
 dotenv.config(); // Load env vars BEFORE other imports
 
@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from './lib/supabase';
 
 // Import routes (after dotenv is loaded)
 import authRoutes from './routes/auth';
@@ -31,16 +31,16 @@ import supplierRoutes from './routes/supplier';
 import purchaseOrderRoutes from './routes/purchase-orders';
 import adjustmentsRoutes from './routes/adjustments';
 import printRoutes from './routes/print';
+import dashboardRoutes from './routes/dashboard';
 
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3002;
 
-// Rate limiting configuration
+// Rate limiting configuration - adjusted for POS application usage
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
+    max: 500, // 500 requests per window (increased from 100 for POS usage)
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -48,7 +48,7 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 auth attempts per window
+    max: 20, // 20 auth attempts per window (increased from 5)
     message: { error: 'Too many login attempts, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -61,9 +61,20 @@ app.use(helmet({
 app.use(compression()); // Gzip compression
 app.use(morgan('combined')); // Request logging
 
-// CORS Configuration
+// CORS Configuration - support multiple origins
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5175')
+    .split(',')
+    .map(origin => origin.trim());
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5175',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error(`CORS: Origin ${origin} not allowed`));
+    },
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -72,9 +83,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/', generalLimiter);
 app.use('/api/auth', authLimiter);
 
-// Make Prisma available to routes
+// Make Supabase available to routes
 app.use((req, res, next) => {
-    (req as any).prisma = prisma;
+    (req as any).supabase = supabase;
     next();
 });
 
@@ -104,6 +115,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/adjustments', adjustmentsRoutes);
 app.use('/api/print', printRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Public routes (no auth required)
 app.use('/api/public', customerOrderRoutes);
@@ -117,7 +129,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Start server
 app.listen(PORT, () => {
     console.log(`
-  🚀 DFC POS Pro API Server
+  🚀 Billova POS API Server
   ========================
   🌐 Server: http://localhost:${PORT}
   📊 Health: http://localhost:${PORT}/api/health
@@ -127,6 +139,6 @@ app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    await prisma.$disconnect();
+    console.log('Shutting down gracefully...');
     process.exit(0);
 });

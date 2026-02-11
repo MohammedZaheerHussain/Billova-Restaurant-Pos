@@ -1,41 +1,87 @@
-// Order Routes - Create, Update, Complete orders
+// Order Routes - Create, Update, Complete orders (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { shadowWriteOrder, createOrderEvent, syncInventoryItem, createInventoryLog } from '../lib/supabase';
+import { validate } from '../middleware/validate';
+import { createOrderSchema, orderPaymentSchema } from '../middleware/schemas';
+import { supabase } from '../lib/supabase';
 
 const router = Router();
+
+// Helper to transform order for frontend compatibility
+function transformOrder(order: any) {
+    return {
+        id: order.id,
+        orderNumber: order.order_number,
+        branchId: order.branch_id,
+        tableId: order.table_id,
+        userId: order.user_id,
+        orderType: order.order_type,
+        status: order.status,
+        customerName: order.customer_name,
+        customerPhone: order.customer_phone,
+        subtotal: order.subtotal,
+        discountType: order.discount_type,
+        discountValue: order.discount_value,
+        discountAmount: order.discount_amount,
+        gstAmount: order.gst_amount,
+        total: order.total,
+        notes: order.notes,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        completedAt: order.completed_at,
+        items: order.order_items?.map((item: any) => ({
+            id: item.id,
+            menuItemId: item.menu_item_id,
+            variantId: item.variant_id,
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
+            total: item.total,
+            notes: item.notes,
+            status: item.status,
+            menuItem: item.menu_items,
+            variant: item.menu_item_variants,
+        })) || [],
+        payments: order.payments || [],
+    };
+}
 
 // Get all orders
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { status, orderType, date, tableId } = req.query;
 
-        const where: any = { branchId: req.user!.branchId };
-        if (status) where.status = status;
-        if (orderType) where.orderType = orderType;
-        if (tableId) where.tableId = tableId;
+        let query = sb
+            .from('orders')
+            .select(`
+                *,
+                order_items (
+                    *,
+                    menu_items (id, name, price),
+                    menu_item_variants (id, name, price)
+                ),
+                payments (*)
+            `)
+            .eq('branch_id', req.user!.branchId)
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+        if (status) query = query.eq('status', status);
+        if (orderType) query = query.eq('order_type', orderType);
+        if (tableId) query = query.eq('table_id', tableId);
         if (date) {
             const startOfDay = new Date(date as string);
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(date as string);
             endOfDay.setHours(23, 59, 59, 999);
-            where.createdAt = { gte: startOfDay, lte: endOfDay };
+            query = query.gte('created_at', startOfDay.toISOString()).lte('created_at', endOfDay.toISOString());
         }
 
-        const orders = await prisma.order.findMany({
-            where,
-            include: {
-                items: { include: { menuItem: true, variant: true } },
-                payments: true,
-                table: true,
-                user: { select: { name: true } },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-        });
+        const { data: orders, error } = await query;
 
-        res.json(orders);
+        if (error) throw error;
+
+        res.json((orders || []).map(transformOrder));
     } catch (error) {
         console.error('Get orders error:', error);
         res.status(500).json({ error: 'Failed to get orders' });
@@ -45,25 +91,29 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 // Get single order
 router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
 
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: {
-                items: { include: { menuItem: true, variant: true } },
-                payments: true,
-                table: true,
-                user: { select: { name: true } },
-                kotItems: true,
-            },
-        });
+        const { data: order, error } = await sb
+            .from('orders')
+            .select(`
+                *,
+                order_items (
+                    *,
+                    menu_items (id, name, price),
+                    menu_item_variants (id, name, price)
+                ),
+                payments (*),
+                kot_items (*)
+            `)
+            .eq('id', id)
+            .single();
 
-        if (!order) {
+        if (error || !order) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        res.json(order);
+        res.json(transformOrder(order));
     } catch (error) {
         console.error('Get order error:', error);
         res.status(500).json({ error: 'Failed to get order' });
@@ -71,9 +121,9 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 });
 
 // Create new order
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, validate(createOrderSchema), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const {
             orderType,
             tableId,
@@ -93,13 +143,14 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
         // Calculate totals
         let subtotal = 0;
         let gstAmount = 0;
-
         const orderItems: any[] = [];
 
         for (const item of items) {
-            const menuItem = await prisma.menuItem.findUnique({
-                where: { id: item.menuItemId },
-            });
+            const { data: menuItem } = await sb
+                .from('menu_items')
+                .select('*')
+                .eq('id', item.menuItemId)
+                .single();
 
             if (!menuItem) continue;
 
@@ -107,9 +158,11 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
             // Check for variant price
             if (item.variantId) {
-                const variant = await prisma.menuItemVariant.findUnique({
-                    where: { id: item.variantId },
-                });
+                const { data: variant } = await sb
+                    .from('menu_item_variants')
+                    .select('price')
+                    .eq('id', item.variantId)
+                    .single();
                 if (variant) {
                     unitPrice = Number(variant.price);
                 }
@@ -118,15 +171,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
-            if (menuItem.hasGST) {
-                gstAmount += itemTotal * (Number(menuItem.gstPercent) / 100);
+            if (menuItem.has_gst) {
+                gstAmount += itemTotal * (Number(menuItem.gst_percent) / 100);
             }
 
             orderItems.push({
-                menuItemId: item.menuItemId,
-                variantId: item.variantId || null,
+                menu_item_id: item.menuItemId,
+                variant_id: item.variantId || null,
+                name: menuItem.name,
                 quantity: item.quantity,
-                unitPrice,
+                unit_price: unitPrice,
                 total: itemTotal,
                 notes: item.notes || null,
             });
@@ -142,176 +196,91 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         const total = subtotal - discountAmount + gstAmount;
 
-        // Check if daily order reset is enabled (passed from frontend)
+        // Check if daily order reset is enabled
         const dailyReset = req.headers['x-daily-order-reset'] === 'true';
 
-        // Get next order number for this branch
-        let lastOrder;
+        // Get next order number
+        let orderQuery = sb
+            .from('orders')
+            .select('order_number')
+            .eq('branch_id', branchId)
+            .order('order_number', { ascending: false })
+            .limit(1);
+
         if (dailyReset) {
-            // Only count orders from today
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
-
-            lastOrder = await prisma.order.findFirst({
-                where: {
-                    branchId,
-                    createdAt: { gte: startOfDay }
-                },
-                orderBy: { orderNumber: 'desc' },
-                select: { orderNumber: true },
-            });
-        } else {
-            // Count all orders (legacy behavior)
-            lastOrder = await prisma.order.findFirst({
-                where: { branchId },
-                orderBy: { orderNumber: 'desc' },
-                select: { orderNumber: true },
-            });
+            orderQuery = orderQuery.gte('created_at', startOfDay.toISOString());
         }
-        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
 
+        const { data: lastOrders } = await orderQuery;
+        const orderNumber = (lastOrders?.[0]?.order_number || 0) + 1;
 
         // Create order
-        const order = await prisma.order.create({
-            data: {
-                orderNumber,
-                branchId,
-                userId,
-                tableId: tableId || null,
-                orderType: orderType || 'DINE_IN',
+        const { data: order, error: orderError } = await sb
+            .from('orders')
+            .insert({
+                order_number: orderNumber,
+                branch_id: branchId,
+                user_id: userId,
+                table_id: tableId || null,
+                order_type: orderType || 'DINE_IN',
                 status: 'CONFIRMED',
-                customerName,
-                customerPhone,
+                customer_name: customerName,
+                customer_phone: customerPhone,
                 subtotal,
-                discountType,
-                discountValue,
-                discountAmount,
-                gstAmount,
+                discount_type: discountType,
+                discount_value: discountValue,
+                discount_amount: discountAmount,
+                gst_amount: gstAmount,
                 total,
                 notes,
-                onlineOrderId,
-                onlinePlatform,
-                items: { create: orderItems },
-            },
-            include: {
-                items: { include: { menuItem: true, variant: true } },
-                table: true,
-            },
-        });
+                online_order_id: onlineOrderId,
+                online_platform: onlinePlatform,
+            })
+            .select()
+            .single();
+
+        if (orderError) throw orderError;
+
+        // Create order items
+        if (orderItems.length > 0) {
+            const itemsWithOrderId = orderItems.map(item => ({
+                ...item,
+                order_id: order.id,
+            }));
+
+            await sb.from('order_items').insert(itemsWithOrderId);
+        }
 
         // Update table status if dine-in
         if (tableId && orderType === 'DINE_IN') {
-            await prisma.table.update({
-                where: { id: tableId },
-                data: { status: 'OCCUPIED' },
-            });
+            await sb
+                .from('tables')
+                .update({ status: 'OCCUPIED' })
+                .eq('id', tableId);
         }
 
-        // ========== AUTO CONSUME INVENTORY ==========
-        // Deduct stock for each menu item based on linked ingredients
-        try {
-            for (const item of items) {
-                // Get ingredient mappings for this menu item
-                const ingredients = await prisma.itemIngredient.findMany({
-                    where: { menuItemId: item.menuItemId },
-                    include: { inventoryItem: true },
-                });
-
-                for (const ing of ingredients) {
-                    const consumeQty = Number(ing.quantityUsed) * item.quantity;
-                    const previousQty = Number(ing.inventoryItem.quantity);
-                    const newQty = Math.max(0, previousQty - consumeQty);
-
-                    // Calculate new status
-                    const minStock = Number(ing.inventoryItem.minStock);
-                    const safetyStock = Number(ing.inventoryItem.safetyStock);
-                    let stockStatus = 'SUFFICIENT';
-                    if (newQty <= 0) stockStatus = 'OUT_OF_STOCK';
-                    else if (newQty <= minStock * 0.5) stockStatus = 'CRITICAL';
-                    else if (newQty <= minStock) stockStatus = 'LOW_STOCK';
-
-                    // Update inventory
-                    await prisma.inventoryItem.update({
-                        where: { id: ing.inventoryItem.id },
-                        data: { quantity: newQty, stockStatus },
-                    });
-
-                    // Create transaction log
-                    await prisma.stockTransaction.create({
-                        data: {
-                            inventoryItemId: ing.inventoryItem.id,
-                            type: 'CONSUMPTION',
-                            quantity: -consumeQty,
-                            previousQty,
-                            newQty,
-                            reason: `Order #${orderNumber}`,
-                            orderId: order.id,
-                            performedById: userId,
-                        },
-                    });
-
-                    // Create alert if low stock
-                    if (stockStatus !== 'SUFFICIENT') {
-                        const existingAlert = await prisma.stockAlert.findFirst({
-                            where: {
-                                inventoryItemId: ing.inventoryItem.id,
-                                alertType: stockStatus,
-                                isRead: false,
-                            },
-                        });
-                        if (!existingAlert) {
-                            await prisma.stockAlert.create({
-                                data: {
-                                    branchId,
-                                    inventoryItemId: ing.inventoryItem.id,
-                                    alertType: stockStatus,
-                                    message: `${ing.inventoryItem.name} is ${stockStatus.replace('_', ' ').toLowerCase()}! Qty: ${newQty} ${ing.inventoryItem.unit}`,
-                                },
-                            });
-                        }
-                    }
-                }
-            }
-        } catch (invError) {
-            console.error('Inventory consumption error (non-blocking):', invError);
-            // Don't fail the order, just log the error
-        }
-        // ========== END INVENTORY CONSUMPTION ==========
-
-        // ========== SUPABASE SHADOW WRITE ==========
-        // Async, non-blocking - write order to cloud for realtime
-        setImmediate(async () => {
-            try {
-                await shadowWriteOrder({
-                    id: order.id,
-                    branchId: order.branchId,
-                    orderNumber: order.orderNumber,
-                    billNumber: order.billNumber,
-                    orderType: order.orderType,
-                    status: order.status,
-                    tableNumber: order.table?.number,
-                    customerName: order.customerName,
-                    customerPhone: order.customerPhone,
-                    items: order.items,
-                    subtotal: order.subtotal,
-                    discountAmount: order.discountAmount,
-                    gstAmount: order.gstAmount,
-                    total: order.total,
-                    createdBy: order.userId,
-                    createdAt: order.createdAt,
-                });
-                await createOrderEvent(order.id, 'CREATED', {
-                    orderType,
-                    itemCount: items.length,
-                    total: order.total
-                }, order.userId);
-            } catch (e) {
-                console.error('[Supabase] Shadow write failed:', e);
-            }
+        // Create order event
+        await sb.from('order_events').insert({
+            order_id: order.id,
+            event: 'CREATED',
+            payload: { orderType, itemCount: items.length, total },
+            created_by: userId,
         });
-        // ========== END SHADOW WRITE ==========
 
-        res.status(201).json(order);
+        // Fetch complete order
+        const { data: completeOrder } = await sb
+            .from('orders')
+            .select(`
+                *,
+                order_items (*, menu_items (id, name, price)),
+                tables (id, name)
+            `)
+            .eq('id', order.id)
+            .single();
+
+        res.status(201).json(transformOrder(completeOrder || order));
     } catch (error) {
         console.error('Create order error:', error);
         res.status(500).json({ error: 'Failed to create order' });
@@ -319,78 +288,63 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 });
 
 // Add payment to order
-router.post('/:id/payment', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/:id/payment', authMiddleware, validate(orderPaymentSchema), async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { mode, amount, reference } = req.body;
 
-        const payment = await prisma.payment.create({
-            data: {
-                orderId: id,
+        const { data: payment, error: paymentError } = await sb
+            .from('payments')
+            .insert({
+                order_id: id,
                 mode,
                 amount,
                 reference,
-            },
-        });
+            })
+            .select()
+            .single();
+
+        if (paymentError) throw paymentError;
 
         // Check if order is fully paid
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: { payments: true },
-        });
+        const { data: order } = await sb
+            .from('orders')
+            .select('*, payments (*)')
+            .eq('id', id)
+            .single();
 
         const totalPaid = order.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
         if (totalPaid >= Number(order.total)) {
-            await prisma.order.update({
-                where: { id },
-                data: { status: 'COMPLETED', completedAt: new Date() },
-            });
+            await sb
+                .from('orders')
+                .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+                .eq('id', id);
 
             // Free up table
-            if (order.tableId) {
-                await prisma.table.update({
-                    where: { id: order.tableId },
-                    data: { status: 'CLEANING' },
-                });
+            if (order.table_id) {
+                await sb
+                    .from('tables')
+                    .update({ status: 'EMPTY' })
+                    .eq('id', order.table_id);
             }
+
+            // Create order event
+            await sb.from('order_events').insert({
+                order_id: id,
+                event: 'COMPLETED',
+                payload: { totalPaid, paymentMode: mode },
+            });
         }
 
-        // Shadow write payment to Supabase
-        setImmediate(async () => {
-            try {
-                await shadowWriteOrder({
-                    id: order.id,
-                    branchId: order.branchId,
-                    orderNumber: order.orderNumber,
-                    billNumber: order.billNumber,
-                    orderType: order.orderType,
-                    status: order.status,
-                    tableNumber: null,
-                    customerName: order.customerName,
-                    customerPhone: order.customerPhone,
-                    items: [],
-                    subtotal: order.subtotal,
-                    discountAmount: order.discountAmount,
-                    gstAmount: order.gstAmount,
-                    total: order.total,
-                    createdBy: order.userId,
-                    createdAt: order.createdAt,
-                    updatedAt: new Date().toISOString(),
-                });
-                await createOrderEvent(order.id, 'PAID', {
-                    amount,
-                    method: mode,
-                    totalPaid,
-                    isComplete: totalPaid >= Number(order.total)
-                });
-            } catch (e) {
-                console.error('[Supabase] Payment shadow write failed:', e);
-            }
+        res.status(201).json({
+            id: payment.id,
+            orderId: payment.order_id,
+            mode: payment.mode,
+            amount: payment.amount,
+            reference: payment.reference,
         });
-
-        res.json(payment);
     } catch (error) {
         console.error('Add payment error:', error);
         res.status(500).json({ error: 'Failed to add payment' });
@@ -400,98 +354,175 @@ router.post('/:id/payment', authMiddleware, async (req: AuthRequest, res: Respon
 // Update order status
 router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
         const { status } = req.body;
 
-        const order = await prisma.order.update({
-            where: { id },
-            data: {
-                status,
-                completedAt: status === 'COMPLETED' ? new Date() : undefined,
-            },
+        const updateData: any = { status };
+        if (status === 'COMPLETED') {
+            updateData.completed_at = new Date().toISOString();
+        }
+
+        const { data: order, error } = await sb
+            .from('orders')
+            .update(updateData)
+            .eq('id', id)
+            .select('*, tables (id, name)')
+            .single();
+
+        if (error) throw error;
+
+        // Free up table if completed or cancelled
+        if (['COMPLETED', 'CANCELLED'].includes(status) && order.table_id) {
+            await sb
+                .from('tables')
+                .update({ status: 'EMPTY' })
+                .eq('id', order.table_id);
+        }
+
+        // Create order event
+        await sb.from('order_events').insert({
+            order_id: id,
+            event: `STATUS_${status}`,
+            payload: { previousStatus: order.status, newStatus: status },
         });
 
-        res.json(order);
+        res.json(transformOrder(order));
     } catch (error) {
         console.error('Update order status error:', error);
         res.status(500).json({ error: 'Failed to update order status' });
     }
 });
 
-// Cancel order
-router.post('/:id/cancel', authMiddleware, async (req: AuthRequest, res: Response) => {
+// Update order items
+router.put('/:id/items', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
+        const sb = (req as any).supabase || supabase;
         const { id } = req.params;
-        const branchId = req.user!.branchId;
-        const userId = req.user!.id;
+        const { items } = req.body;
 
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: { items: true },
-        });
+        // Get current order
+        const { data: order } = await sb
+            .from('orders')
+            .select('*')
+            .eq('id', id)
+            .single();
+
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        await prisma.order.update({
-            where: { id },
-            data: { status: 'CANCELLED' },
-        });
+        // Delete existing items
+        await sb.from('order_items').delete().eq('order_id', id);
 
-        // Free up table
-        if (order.tableId) {
-            await prisma.table.update({
-                where: { id: order.tableId },
-                data: { status: 'EMPTY' },
+        // Recalculate and add new items
+        let subtotal = 0;
+        let gstAmount = 0;
+        const orderItems: any[] = [];
+
+        for (const item of items) {
+            const { data: menuItem } = await sb
+                .from('menu_items')
+                .select('*')
+                .eq('id', item.menuItemId)
+                .single();
+
+            if (!menuItem) continue;
+
+            let unitPrice = Number(menuItem.price);
+            if (item.variantId) {
+                const { data: variant } = await sb
+                    .from('menu_item_variants')
+                    .select('price')
+                    .eq('id', item.variantId)
+                    .single();
+                if (variant) unitPrice = Number(variant.price);
+            }
+
+            const itemTotal = unitPrice * item.quantity;
+            subtotal += itemTotal;
+
+            if (menuItem.has_gst) {
+                gstAmount += itemTotal * (Number(menuItem.gst_percent) / 100);
+            }
+
+            orderItems.push({
+                order_id: id,
+                menu_item_id: item.menuItemId,
+                variant_id: item.variantId || null,
+                name: menuItem.name,
+                quantity: item.quantity,
+                unit_price: unitPrice,
+                total: itemTotal,
+                notes: item.notes || null,
             });
         }
 
-        // ========== RESTORE INVENTORY ==========
-        // Add back stock that was consumed by this order
-        try {
-            for (const item of order.items) {
-                const ingredients = await prisma.itemIngredient.findMany({
-                    where: { menuItemId: item.menuItemId },
-                    include: { inventoryItem: true },
-                });
-
-                for (const ing of ingredients) {
-                    const restoreQty = Number(ing.quantityUsed) * item.quantity;
-                    const previousQty = Number(ing.inventoryItem.quantity);
-                    const newQty = previousQty + restoreQty;
-
-                    // Recalculate status
-                    const minStock = Number(ing.inventoryItem.minStock);
-                    let stockStatus = 'SUFFICIENT';
-                    if (newQty <= 0) stockStatus = 'OUT_OF_STOCK';
-                    else if (newQty <= minStock * 0.5) stockStatus = 'CRITICAL';
-                    else if (newQty <= minStock) stockStatus = 'LOW_STOCK';
-
-                    await prisma.inventoryItem.update({
-                        where: { id: ing.inventoryItem.id },
-                        data: { quantity: newQty, stockStatus },
-                    });
-
-                    await prisma.stockTransaction.create({
-                        data: {
-                            inventoryItemId: ing.inventoryItem.id,
-                            type: 'ADJUSTMENT',
-                            quantity: restoreQty,
-                            previousQty,
-                            newQty,
-                            reason: `Order #${order.orderNumber} cancelled - stock restored`,
-                            orderId: id,
-                            performedById: userId,
-                        },
-                    });
-                }
-            }
-        } catch (invError) {
-            console.error('Inventory restore error (non-blocking):', invError);
+        // Insert new items
+        if (orderItems.length > 0) {
+            await sb.from('order_items').insert(orderItems);
         }
-        // ========== END RESTORE ==========
+
+        // Calculate discount
+        let discountAmount = 0;
+        if (order.discount_type === 'PERCENTAGE' && order.discount_value) {
+            discountAmount = subtotal * (order.discount_value / 100);
+        } else if (order.discount_type === 'FIXED' && order.discount_value) {
+            discountAmount = order.discount_value;
+        }
+
+        const total = subtotal - discountAmount + gstAmount;
+
+        // Update order totals
+        const { data: updatedOrder, error } = await sb
+            .from('orders')
+            .update({ subtotal, gst_amount: gstAmount, discount_amount: discountAmount, total })
+            .eq('id', id)
+            .select(`
+                *,
+                order_items (*, menu_items (id, name, price)),
+                tables (id, name)
+            `)
+            .single();
+
+        if (error) throw error;
+
+        res.json(transformOrder(updatedOrder));
+    } catch (error) {
+        console.error('Update order items error:', error);
+        res.status(500).json({ error: 'Failed to update order items' });
+    }
+});
+
+// Cancel order
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const sb = (req as any).supabase || supabase;
+        const { id } = req.params;
+
+        const { data: order } = await sb
+            .from('orders')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Update status to cancelled instead of deleting
+        await sb
+            .from('orders')
+            .update({ status: 'CANCELLED' })
+            .eq('id', id);
+
+        // Free up table
+        if (order.table_id) {
+            await sb
+                .from('tables')
+                .update({ status: 'EMPTY' })
+                .eq('id', order.table_id);
+        }
 
         res.json({ message: 'Order cancelled' });
     } catch (error) {
@@ -500,340 +531,353 @@ router.post('/:id/cancel', authMiddleware, async (req: AuthRequest, res: Respons
     }
 });
 
-// Add items to existing order
-router.post('/:id/add-items', authMiddleware, async (req: AuthRequest, res: Response) => {
+// ==================== OFFLINE SYNC ENDPOINTS ====================
+
+// Sync single order (with idempotency)
+router.post('/sync', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
-        const { id } = req.params;
-        const { items } = req.body;
+        const sb = (req as any).supabase || supabase;
+        const {
+            idempotency_key,
+            local_id,
+            branch_id,
+            table_id,
+            order_type,
+            customer_name,
+            customer_phone,
+            items,
+            subtotal,
+            discount_type,
+            discount_value,
+            discount_amount,
+            gst_amount,
+            total,
+            notes,
+            created_at,
+        } = req.body;
 
-        // Get current order
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: { items: true },
-        });
+        // Check idempotency - if exists, return existing
+        const { data: existingSync } = await sb
+            .from('sync_events')
+            .select('entity_id')
+            .eq('idempotency_key', idempotency_key)
+            .eq('status', 'success')
+            .single();
 
-        if (!order) {
-            return res.status(404).json({ error: 'Order not found' });
-        }
+        if (existingSync?.entity_id) {
+            const { data: existingOrder } = await sb
+                .from('orders')
+                .select('id, order_number')
+                .eq('id', existingSync.entity_id)
+                .single();
 
-        if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
-            return res.status(400).json({ error: 'Cannot edit completed or cancelled orders' });
-        }
-
-        // Calculate new items
-        let additionalSubtotal = 0;
-        let additionalGst = 0;
-        const newItems: any[] = [];
-
-        for (const item of items) {
-            const menuItem = await prisma.menuItem.findUnique({
-                where: { id: item.menuItemId },
+            return res.json({
+                id: existingOrder?.id,
+                bill_number: existingOrder?.order_number,
+                already_synced: true,
             });
+        }
 
-            if (!menuItem) continue;
+        // Get next order number
+        const { data: lastOrders } = await sb
+            .from('orders')
+            .select('order_number')
+            .eq('branch_id', branch_id || req.user!.branchId)
+            .order('order_number', { ascending: false })
+            .limit(1);
 
-            let unitPrice = Number(menuItem.price);
+        const orderNumber = (lastOrders?.[0]?.order_number || 0) + 1;
 
-            if (item.variantId) {
-                const variant = await prisma.menuItemVariant.findUnique({
-                    where: { id: item.variantId },
-                });
-                if (variant) {
-                    unitPrice = Number(variant.price);
-                }
-            }
+        // Create order
+        const { data: order, error } = await sb
+            .from('orders')
+            .insert({
+                order_number: orderNumber,
+                branch_id: branch_id || req.user!.branchId,
+                user_id: req.user!.id,
+                table_id,
+                order_type: order_type || 'TAKEAWAY',
+                status: 'CONFIRMED',
+                customer_name,
+                customer_phone,
+                subtotal,
+                discount_type,
+                discount_value,
+                discount_amount,
+                gst_amount,
+                total,
+                notes,
+                synced_from_offline: true,
+                offline_local_id: local_id,
+                created_at: created_at || new Date().toISOString(),
+            })
+            .select()
+            .single();
 
-            const itemTotal = unitPrice * item.quantity;
-            additionalSubtotal += itemTotal;
+        if (error) throw error;
 
-            if (menuItem.hasGST) {
-                additionalGst += itemTotal * (Number(menuItem.gstPercent) / 100);
-            }
-
-            newItems.push({
-                orderId: id,
-                menuItemId: item.menuItemId,
-                variantId: item.variantId || null,
+        // Create order items
+        if (items?.length > 0) {
+            const orderItems = items.map((item: any) => ({
+                order_id: order.id,
+                menu_item_id: item.menuItemId,
+                variant_id: item.variantId || null,
+                name: item.menuItemName,
                 quantity: item.quantity,
-                unitPrice,
-                total: itemTotal,
-                notes: item.notes || null,
-            });
+                unit_price: item.unitPrice,
+                total: item.total,
+                notes: item.notes,
+            }));
+            await sb.from('order_items').insert(orderItems);
         }
 
-        // Add new items
-        await prisma.orderItem.createMany({ data: newItems });
+        // Record success
+        await sb.from('sync_events').upsert({
+            branch_id: branch_id || req.user!.branchId,
+            entity_type: 'ORDER',
+            entity_id: order.id,
+            local_id,
+            idempotency_key,
+            status: 'success',
+            processed_at: new Date().toISOString(),
+        }, { onConflict: 'idempotency_key' });
 
-        // Recalculate order totals
-        const newSubtotal = Number(order.subtotal) + additionalSubtotal;
-        const newGstAmount = Number(order.gstAmount) + additionalGst;
-
-        // Recalculate discount if percentage
-        let discountAmount = Number(order.discountAmount);
-        if (order.discountType === 'PERCENTAGE' && order.discountValue) {
-            discountAmount = newSubtotal * (Number(order.discountValue) / 100);
-        }
-
-        const newTotal = newSubtotal - discountAmount + newGstAmount;
-
-        // Update order
-        const updatedOrder = await prisma.order.update({
-            where: { id },
-            data: {
-                subtotal: newSubtotal,
-                gstAmount: newGstAmount,
-                discountAmount,
-                total: newTotal,
-            },
-            include: {
-                items: { include: { menuItem: true, variant: true } },
-                payments: true,
-            },
+        res.status(201).json({
+            id: order.id,
+            bill_number: order.order_number,
+            synced: true,
         });
-
-        res.json(updatedOrder);
     } catch (error) {
-        console.error('Add items to order error:', error);
-        res.status(500).json({ error: 'Failed to add items to order' });
+        console.error('Sync order error:', error);
+        res.status(500).json({ error: 'Failed to sync order' });
     }
 });
 
-// ==================== OFFLINE SYNC ENDPOINT ====================
-// Sync orders created offline - idempotent with hash-based duplicate detection
-router.post('/offline-sync', authMiddleware, async (req: AuthRequest, res: Response) => {
+// Sync payment
+router.post('/sync-payment', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
-        const prisma = (req as any).prisma;
-        const { localId, orderHash, order } = req.body;
-        const branchId = req.user!.branchId;
-        const userId = req.user!.id;
+        const sb = (req as any).supabase || supabase;
+        const { idempotency_key, order_id, mode, amount, reference } = req.body;
 
-        console.log(`[OfflineSync] Processing order localId=${localId}, hash=${orderHash?.substring(0, 20)}...`);
+        // Check idempotency
+        const { data: existing } = await sb
+            .from('sync_events')
+            .select('entity_id')
+            .eq('idempotency_key', idempotency_key)
+            .eq('status', 'success')
+            .single();
 
-        // Check for duplicate using hash
-        if (orderHash) {
-            const existingSync = await prisma.offlineSyncLog.findFirst({
-                where: { orderHash },
-            });
-
-            if (existingSync) {
-                console.log(`[OfflineSync] Duplicate detected, returning existing serverId=${existingSync.serverId}`);
-                return res.json({
-                    success: true,
-                    isDuplicate: true,
-                    serverId: existingSync.serverId,
-                    billNumber: existingSync.billNumber,
-                    message: 'Order already synced',
-                });
-            }
+        if (existing?.entity_id) {
+            return res.json({ id: existing.entity_id, already_synced: true });
         }
 
-        // Validate order data
-        if (!order || !order.items || order.items.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid order data: items are required',
-            });
+        // Create payment
+        const { data: payment, error } = await sb
+            .from('payments')
+            .insert({ order_id, mode, amount, reference })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Check if order is fully paid
+        const { data: order } = await sb
+            .from('orders')
+            .select('*, payments (*)')
+            .eq('id', order_id)
+            .single();
+
+        const totalPaid = order.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        if (totalPaid >= Number(order.total)) {
+            await sb.from('orders')
+                .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+                .eq('id', order_id);
         }
 
-        // Calculate totals (recalculate to ensure accuracy)
-        let subtotal = 0;
-        let gstAmount = 0;
-        const orderItems: any[] = [];
+        // Record sync event
+        await sb.from('sync_events').upsert({
+            branch_id: req.user!.branchId,
+            entity_type: 'PAYMENT',
+            entity_id: payment.id,
+            local_id: idempotency_key.split(':')[1],
+            idempotency_key,
+            status: 'success',
+            processed_at: new Date().toISOString(),
+        }, { onConflict: 'idempotency_key' });
 
-        for (const item of order.items) {
-            const menuItem = await prisma.menuItem.findUnique({
-                where: { id: item.menuItemId },
-            });
-
-            if (!menuItem) {
-                console.warn(`[OfflineSync] Menu item not found: ${item.menuItemId}, using offline data`);
-                // Use offline data if menu item not found (deleted item)
-                const itemTotal = Number(item.unitPrice || item.total / item.quantity) * item.quantity;
-                subtotal += itemTotal;
-                orderItems.push({
-                    menuItemId: item.menuItemId,
-                    variantId: item.variantId || null,
-                    quantity: item.quantity,
-                    unitPrice: Number(item.unitPrice || item.total / item.quantity),
-                    total: itemTotal,
-                    notes: item.notes || null,
-                });
-                continue;
-            }
-
-            let unitPrice = Number(menuItem.price);
-
-            // Check for variant price
-            if (item.variantId) {
-                const variant = await prisma.menuItemVariant.findUnique({
-                    where: { id: item.variantId },
-                });
-                if (variant) {
-                    unitPrice = Number(variant.price);
-                }
-            }
-
-            const itemTotal = unitPrice * item.quantity;
-            subtotal += itemTotal;
-
-            if (menuItem.hasGST) {
-                gstAmount += itemTotal * (Number(menuItem.gstPercent) / 100);
-            }
-
-            orderItems.push({
-                menuItemId: item.menuItemId,
-                variantId: item.variantId || null,
-                quantity: item.quantity,
-                unitPrice,
-                total: itemTotal,
-                notes: item.notes || null,
-            });
-        }
-
-        // Calculate discount
-        let discountAmount = 0;
-        if (order.discountType === 'PERCENTAGE' && order.discountValue) {
-            discountAmount = subtotal * (Number(order.discountValue) / 100);
-        } else if (order.discountType === 'FIXED' && order.discountValue) {
-            discountAmount = Number(order.discountValue);
-        }
-
-        const total = subtotal - discountAmount + gstAmount;
-
-        // Get next order number
-        const lastOrder = await prisma.order.findFirst({
-            where: { branchId },
-            orderBy: { orderNumber: 'desc' },
-            select: { orderNumber: true },
-        });
-        const orderNumber = (lastOrder?.orderNumber || 0) + 1;
-
-        // Create order
-        const createdOrder = await prisma.order.create({
-            data: {
-                orderNumber,
-                branchId,
-                userId,
-                tableId: order.tableId || null,
-                orderType: order.orderType || 'DINE_IN',
-                status: 'CONFIRMED',
-                customerName: order.customerName,
-                customerPhone: order.customerPhone,
-                subtotal,
-                discountType: order.discountType,
-                discountValue: order.discountValue,
-                discountAmount,
-                gstAmount,
-                total,
-                notes: order.notes,
-                // Mark as offline-created
-                offlineCreatedAt: order.createdAt ? new Date(order.createdAt) : undefined,
-                offlineTempBillNumber: order.tempBillNumber,
-                items: { create: orderItems },
-            },
-            include: {
-                items: { include: { menuItem: true, variant: true } },
-                table: true,
-            },
-        });
-
-        // Update table status if dine-in
-        if (order.tableId && order.orderType === 'DINE_IN') {
-            await prisma.table.update({
-                where: { id: order.tableId },
-                data: { status: 'OCCUPIED' },
-            }).catch(() => {
-                // Table might not exist anymore, ignore
-            });
-        }
-
-        // Log sync for duplicate detection
-        await prisma.offlineSyncLog.create({
-            data: {
-                localId,
-                orderHash: orderHash || '',
-                serverId: createdOrder.id,
-                billNumber: `ORD-${String(orderNumber).padStart(4, '0')}`,
-                branchId,
-                userId,
-                syncedAt: new Date(),
-            },
-        });
-
-        // ========== AUTO CONSUME INVENTORY (non-blocking) ==========
-        try {
-            for (const item of order.items) {
-                const ingredients = await prisma.itemIngredient.findMany({
-                    where: { menuItemId: item.menuItemId },
-                    include: { inventoryItem: true },
-                });
-
-                for (const ing of ingredients) {
-                    const consumeQty = Number(ing.quantityUsed) * item.quantity;
-                    const previousQty = Number(ing.inventoryItem.quantity);
-                    // Allow negative stock for offline orders, flag for review
-                    const newQty = previousQty - consumeQty;
-
-                    const minStock = Number(ing.inventoryItem.minStock);
-                    let stockStatus = 'SUFFICIENT';
-                    if (newQty <= 0) stockStatus = 'OUT_OF_STOCK';
-                    else if (newQty <= minStock * 0.5) stockStatus = 'CRITICAL';
-                    else if (newQty <= minStock) stockStatus = 'LOW_STOCK';
-
-                    await prisma.inventoryItem.update({
-                        where: { id: ing.inventoryItem.id },
-                        data: { quantity: Math.max(0, newQty), stockStatus },
-                    });
-
-                    await prisma.stockTransaction.create({
-                        data: {
-                            inventoryItemId: ing.inventoryItem.id,
-                            type: 'CONSUMPTION',
-                            quantity: -consumeQty,
-                            previousQty,
-                            newQty: Math.max(0, newQty),
-                            reason: `Offline Order #${orderNumber} (synced)`,
-                            orderId: createdOrder.id,
-                            performedById: userId,
-                        },
-                    });
-
-                    // Create alert if negative stock (needs admin attention)
-                    if (newQty < 0) {
-                        await prisma.stockAlert.create({
-                            data: {
-                                branchId,
-                                inventoryItemId: ing.inventoryItem.id,
-                                alertType: 'OUT_OF_STOCK',
-                                message: `OFFLINE SYNC: ${ing.inventoryItem.name} went negative. Actual: ${newQty}, shown: 0. Needs review.`,
-                            },
-                        });
-                    }
-                }
-            }
-        } catch (invError) {
-            console.error('[OfflineSync] Inventory consumption error (non-blocking):', invError);
-        }
-        // ========== END INVENTORY CONSUMPTION ==========
-
-        console.log(`[OfflineSync] Successfully synced order, serverId=${createdOrder.id}`);
-
-        res.json({
-            success: true,
-            isDuplicate: false,
-            serverId: createdOrder.id,
-            billNumber: `ORD-${String(orderNumber).padStart(4, '0')}`,
-            orderNumber,
-            message: 'Order synced successfully',
-        });
+        res.status(201).json({ id: payment.id, synced: true });
     } catch (error) {
-        console.error('[OfflineSync] Sync error:', error);
-        res.status(500).json({
-            success: false,
-            message: error instanceof Error ? error.message : 'Failed to sync order',
+        console.error('Sync payment error:', error);
+        res.status(500).json({ error: 'Failed to sync payment' });
+    }
+});
+
+// Sync KOT
+router.post('/sync-kot', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const sb = (req as any).supabase || supabase;
+        const { idempotency_key, order_id, kot_number, items, status } = req.body;
+
+        // Check idempotency
+        const { data: existing } = await sb
+            .from('sync_events')
+            .select('entity_id')
+            .eq('idempotency_key', idempotency_key)
+            .eq('status', 'success')
+            .single();
+
+        if (existing?.entity_id) {
+            return res.json({ id: existing.entity_id, already_synced: true });
+        }
+
+        // Create KOT items
+        const kotItems = items.map((item: any) => ({
+            order_id,
+            menu_item_id: item.menuItemId,
+            name: item.menuItemName,
+            quantity: item.quantity,
+            notes: item.notes,
+            kot_number,
+            status: status || 'PENDING',
+        }));
+
+        const { data: insertedItems, error } = await sb
+            .from('kot_items')
+            .insert(kotItems)
+            .select();
+
+        if (error) throw error;
+
+        // Record sync event
+        await sb.from('sync_events').upsert({
+            branch_id: req.user!.branchId,
+            entity_type: 'KOT',
+            entity_id: insertedItems?.[0]?.id,
+            local_id: idempotency_key.split(':')[1],
+            idempotency_key,
+            status: 'success',
+            processed_at: new Date().toISOString(),
+        }, { onConflict: 'idempotency_key' });
+
+        res.status(201).json({ synced: true, items_count: kotItems.length });
+    } catch (error) {
+        console.error('Sync KOT error:', error);
+        res.status(500).json({ error: 'Failed to sync KOT' });
+    }
+});
+
+// Order status intent (server-authoritative)
+router.post('/status-intent', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const sb = (req as any).supabase || supabase;
+        const { order_id, intended_status, changed_by, changed_at } = req.body;
+
+        // Get current server state
+        const { data: order, error: fetchError } = await sb
+            .from('orders')
+            .select('status')
+            .eq('id', order_id)
+            .single();
+
+        if (fetchError || !order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Server-authoritative: only update if intent is valid progression
+        const validTransitions: Record<string, string[]> = {
+            'CONFIRMED': ['PREPARING', 'COMPLETED', 'CANCELLED'],
+            'PREPARING': ['READY', 'COMPLETED', 'CANCELLED'],
+            'READY': ['SERVED', 'COMPLETED', 'CANCELLED'],
+            'SERVED': ['COMPLETED'],
+        };
+
+        const currentStatus = order.status;
+        const allowed = validTransitions[currentStatus] || [];
+
+        if (!allowed.includes(intended_status)) {
+            return res.json({
+                accepted: false,
+                server_status: currentStatus,
+                message: `Cannot transition from ${currentStatus} to ${intended_status}`,
+            });
+        }
+
+        // Apply the status change
+        const updateData: any = { status: intended_status };
+        if (intended_status === 'COMPLETED') {
+            updateData.completed_at = new Date().toISOString();
+        }
+
+        await sb.from('orders').update(updateData).eq('id', order_id);
+
+        // Record event
+        await sb.from('order_events').insert({
+            order_id,
+            event: `STATUS_${intended_status}`,
+            payload: { previousStatus: currentStatus, changedBy: changed_by, changedAt: changed_at },
         });
+
+        res.json({ accepted: true, server_status: intended_status });
+    } catch (error) {
+        console.error('Status intent error:', error);
+        res.status(500).json({ error: 'Failed to process status intent' });
+    }
+});
+
+// Sync cancelled items
+router.post('/sync-cancellation', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+        const sb = (req as any).supabase || supabase;
+        const { idempotency_key, order_id, menu_item_id, quantity, reason, cancelled_by, cancelled_at } = req.body;
+
+        // Check idempotency
+        const { data: existing } = await sb
+            .from('sync_events')
+            .select('entity_id')
+            .eq('idempotency_key', idempotency_key)
+            .eq('status', 'success')
+            .single();
+
+        if (existing?.entity_id) {
+            return res.json({ id: existing.entity_id, already_synced: true });
+        }
+
+        // Record cancellation in order_events
+        const { data: event, error } = await sb
+            .from('order_events')
+            .insert({
+                order_id,
+                event: 'ITEM_CANCELLED',
+                payload: {
+                    menu_item_id,
+                    quantity,
+                    reason,
+                    cancelled_by,
+                    cancelled_at,
+                },
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Record sync event
+        await sb.from('sync_events').upsert({
+            branch_id: req.user!.branchId,
+            entity_type: 'CANCELLED_ITEM',
+            entity_id: event.id,
+            local_id: idempotency_key.split(':').slice(1).join(':'),
+            idempotency_key,
+            status: 'success',
+            processed_at: new Date().toISOString(),
+        }, { onConflict: 'idempotency_key' });
+
+        res.status(201).json({ id: event.id, synced: true });
+    } catch (error) {
+        console.error('Sync cancellation error:', error);
+        res.status(500).json({ error: 'Failed to sync cancellation' });
     }
 });
 
 export default router;
+

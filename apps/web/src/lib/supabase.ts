@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not set. Supabase features disabled.');
+    logger.warn('Supabase environment variables not set. Supabase features disabled.');
 }
 
 // Public client for frontend use
@@ -38,12 +39,12 @@ export const subscribeChannel = (
     handler: (payload: any) => void
 ) => {
     if (activeChannels.size >= MAX_CHANNELS) {
-        console.error(`[Supabase] Channel limit (${MAX_CHANNELS}) reached. Unsubscribe from an existing channel first.`);
+        logger.error(`[Supabase] Channel limit (${MAX_CHANNELS}) reached. Unsubscribe from an existing channel first.`);
         return null;
     }
 
     if (activeChannels.has(name)) {
-        console.warn(`[Supabase] Channel ${name} already exists`);
+        logger.warn(`[Supabase] Channel ${name} already exists`);
         return activeChannels.get(name)!;
     }
 
@@ -55,7 +56,7 @@ export const subscribeChannel = (
             handler
         )
         .subscribe((status: string) => {
-            console.log(`[Supabase] Channel ${name} status: ${status}`);
+            logger.debug(`[Supabase] Channel ${name} status: ${status}`);
         });
 
     activeChannels.set(name, channel);
@@ -70,7 +71,7 @@ export const unsubscribeChannel = (name: string) => {
     if (channel) {
         channel.unsubscribe();
         activeChannels.delete(name);
-        console.log(`[Supabase] Unsubscribed from ${name}`);
+        logger.debug(`[Supabase] Unsubscribed from ${name}`);
     }
 };
 
@@ -80,7 +81,7 @@ export const unsubscribeChannel = (name: string) => {
 export const unsubscribeAllChannels = () => {
     activeChannels.forEach((channel, name) => {
         channel.unsubscribe();
-        console.log(`[Supabase] Unsubscribed from ${name}`);
+        logger.debug(`[Supabase] Unsubscribed from ${name}`);
     });
     activeChannels.clear();
 };

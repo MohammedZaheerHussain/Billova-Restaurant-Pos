@@ -1,12 +1,122 @@
 // Settings Page
 import { useState } from 'react';
-import { Store, Printer, Database, Globe, Share2, Copy, ExternalLink, Settings as SettingsIcon, Save } from 'lucide-react';
+import { Store, Printer, Database, Globe, Share2, Copy, ExternalLink, Settings as SettingsIcon, Save, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import { useBranchSettingsStore } from '../store/branch-settings-store';
+import { useSyncStore, getSyncStatusDisplay, getTotalPending } from '../store/sync-store';
+import { syncAll } from '../services/sync-service';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Switch } from '../components/ui/Switch';
 import './Settings.css';
+
+// Cloud Sync Status Component
+function CloudSyncStatus() {
+    const { status, isOnline, licenseExpiredHard } = useSyncStore();
+    const display = getSyncStatusDisplay();
+
+    return (
+        <div className="sync-status-box" style={{
+            padding: '16px',
+            borderRadius: '12px',
+            background: 'rgba(255,255,255,0.05)',
+            border: `1px solid ${display.color}33`,
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 24 }}>{display.icon}</span>
+                <div>
+                    <div style={{ fontWeight: 600, color: display.color }}>{display.text}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                        {isOnline ? 'Connected to internet' : 'No internet connection'}
+                    </div>
+                    {licenseExpiredHard && (
+                        <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>
+                            ⚠️ License expired - please renew to sync
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Auto Sync Toggle Component
+function AutoSyncToggle() {
+    const { autoSyncEnabled, setAutoSync } = useSyncStore();
+
+    return (
+        <Switch enabled={autoSyncEnabled} onChange={setAutoSync} />
+    );
+}
+
+// Sync Now Button Component
+function SyncNowButton() {
+    const { isSyncing, status, isOnline } = useSyncStore();
+    const [syncing, setSyncing] = useState(false);
+    const pending = getTotalPending();
+
+    const handleSync = async () => {
+        if (syncing || isSyncing) return;
+        setSyncing(true);
+        try {
+            const result = await syncAll();
+            if (result.synced > 0) {
+                toast.success(`Synced ${result.synced} items!`);
+            } else if (result.failed > 0) {
+                toast.error(`${result.failed} items failed to sync`);
+            } else if (pending === 0) {
+                toast.success('Already synced!');
+            }
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const disabled = syncing || isSyncing || !isOnline || status === 'blocked';
+
+    return (
+        <button
+            className="btn btn-primary"
+            style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
+            onClick={handleSync}
+            disabled={disabled}
+        >
+            <RefreshCw size={16} className={syncing || isSyncing ? 'spin' : ''} />
+            {syncing || isSyncing ? 'Syncing...' : `Sync Now${pending > 0 ? ` (${pending})` : ''}`}
+        </button>
+    );
+}
+
+// Last Sync Info Component
+function LastSyncInfo() {
+    const { lastSyncAt, lastSyncError } = useSyncStore();
+
+    if (!lastSyncAt) return null;
+
+    const syncDate = new Date(lastSyncAt);
+    const timeAgo = getTimeAgo(syncDate);
+
+    return (
+        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
+            <div>Last synced: {timeAgo}</div>
+            {lastSyncError && (
+                <div style={{ color: '#ef4444', marginTop: 4 }}>{lastSyncError}</div>
+            )}
+        </div>
+    );
+}
+
+function getTimeAgo(date: Date): string {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+}
 
 export default function SettingsPage() {
     const user = useAuthStore((state) => state.user);
@@ -104,12 +214,10 @@ export default function SettingsPage() {
                                 <span className="toggle-label">Daily Order Reset</span>
                                 <span className="toggle-desc">Order numbers reset to #1 at midnight</span>
                             </div>
-                            <button
-                                className={`toggle-switch ${printerSettings.dailyOrderReset ? 'active' : ''}`}
-                                onClick={() => updatePrinterSettings({ dailyOrderReset: !printerSettings.dailyOrderReset })}
-                            >
-                                <span className="toggle-knob" />
-                            </button>
+                            <Switch
+                                enabled={printerSettings.dailyOrderReset}
+                                onChange={(v) => updatePrinterSettings({ dailyOrderReset: v })}
+                            />
                         </div>
                         {printerSettings.dailyOrderReset && (
                             <div className="info-row" style={{ marginTop: 8 }}>
@@ -131,12 +239,10 @@ export default function SettingsPage() {
                                 <span className="toggle-label">Enable GST</span>
                                 <span className="toggle-desc">Apply GST to applicable items</span>
                             </div>
-                            <button
-                                className={`toggle-switch ${branchSettings.gstEnabled ? 'active' : ''}`}
-                                onClick={() => updateBranchSettings({ gstEnabled: !branchSettings.gstEnabled })}
-                            >
-                                <span className="toggle-knob" />
-                            </button>
+                            <Switch
+                                enabled={branchSettings.gstEnabled}
+                                onChange={(v) => updateBranchSettings({ gstEnabled: v })}
+                            />
                         </div>
                         {branchSettings.gstEnabled && (
                             <div className="form-group">
@@ -163,20 +269,24 @@ export default function SettingsPage() {
                             <input
                                 type="text"
                                 readOnly
-                                value={`${window.location.origin}/m/${user?.branch?.id}`}
+                                value={user?.branch?.id ? `${window.location.origin}/m/${user.branch.id}` : 'Branch not configured — log out and log back in'}
                             />
                             <button
                                 className="btn btn-icon"
+                                disabled={!user?.branch?.id}
                                 onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/m/${user?.branch?.id}`);
-                                    toast.success('Menu link copied!');
+                                    if (user?.branch?.id) {
+                                        navigator.clipboard.writeText(`${window.location.origin}/m/${user.branch.id}`);
+                                        toast.success('Menu link copied!');
+                                    }
                                 }}
                             >
                                 <Copy size={16} />
                             </button>
                             <button
                                 className="btn btn-icon"
-                                onClick={() => window.open(`/m/${user?.branch?.id}`, '_blank')}
+                                disabled={!user?.branch?.id}
+                                onClick={() => user?.branch?.id && window.open(`/m/${user.branch.id}`, '_blank')}
                             >
                                 <ExternalLink size={16} />
                             </button>
@@ -196,12 +306,10 @@ export default function SettingsPage() {
                                 <span className="toggle-label">Auto-Print Bill</span>
                                 <span className="toggle-desc">Print bill automatically after payment</span>
                             </div>
-                            <button
-                                className={`toggle-switch ${printerSettings.autoPrintBill ? 'active' : ''}`}
-                                onClick={() => updatePrinterSettings({ autoPrintBill: !printerSettings.autoPrintBill })}
-                            >
-                                <span className="toggle-knob" />
-                            </button>
+                            <Switch
+                                enabled={printerSettings.autoPrintBill}
+                                onChange={(v) => updatePrinterSettings({ autoPrintBill: v })}
+                            />
                         </div>
 
                         {/* Auto-Print KOT Toggle */}
@@ -210,12 +318,10 @@ export default function SettingsPage() {
                                 <span className="toggle-label">Auto-Print KOT</span>
                                 <span className="toggle-desc">Print kitchen order ticket on order</span>
                             </div>
-                            <button
-                                className={`toggle-switch ${printerSettings.autoPrintKOT ? 'active' : ''}`}
-                                onClick={() => updatePrinterSettings({ autoPrintKOT: !printerSettings.autoPrintKOT })}
-                            >
-                                <span className="toggle-knob" />
-                            </button>
+                            <Switch
+                                enabled={printerSettings.autoPrintKOT}
+                                onChange={(v) => updatePrinterSettings({ autoPrintKOT: v })}
+                            />
                         </div>
 
                         {/* Play Print Sound Toggle */}
@@ -224,12 +330,10 @@ export default function SettingsPage() {
                                 <span className="toggle-label">Print Sound</span>
                                 <span className="toggle-desc">Play sound when printing</span>
                             </div>
-                            <button
-                                className={`toggle-switch ${printerSettings.playPrintSound ? 'active' : ''}`}
-                                onClick={() => updatePrinterSettings({ playPrintSound: !printerSettings.playPrintSound })}
-                            >
-                                <span className="toggle-knob" />
-                            </button>
+                            <Switch
+                                enabled={printerSettings.playPrintSound}
+                                onChange={(v) => updatePrinterSettings({ playPrintSound: v })}
+                            />
                         </div>
 
                         <div className="divider" style={{ margin: '16px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
@@ -250,23 +354,29 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="settings-card">
+                <div className="settings-card highlight">
                     <div className="settings-card-header">
                         <Database size={20} />
-                        <h3>Data & Sync</h3>
+                        <h3>Cloud Backup</h3>
                     </div>
                     <div className="settings-form">
-                        <div className="info-row">
-                            <span>Local Database</span>
-                            <span className="badge badge-success">Connected</span>
+                        {/* Sync Status Display */}
+                        <CloudSyncStatus />
+
+                        {/* Auto-Sync Toggle */}
+                        <div className="toggle-row" style={{ marginTop: 16 }}>
+                            <div>
+                                <span className="toggle-label">Auto-Sync</span>
+                                <span className="toggle-desc">Automatically sync when connected to internet</span>
+                            </div>
+                            <AutoSyncToggle />
                         </div>
-                        <div className="info-row">
-                            <span>Cloud Sync</span>
-                            <span className="badge badge-warning">Not configured</span>
-                        </div>
-                        <button className="btn btn-secondary" style={{ marginTop: 16 }}>
-                            Configure Cloud Sync
-                        </button>
+
+                        {/* Manual Sync Button */}
+                        <SyncNowButton />
+
+                        {/* Last Sync Info */}
+                        <LastSyncInfo />
                     </div>
                 </div>
             </div>
