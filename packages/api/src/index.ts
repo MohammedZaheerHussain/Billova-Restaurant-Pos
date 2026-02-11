@@ -90,9 +90,39 @@ app.use((req, res, next) => {
 });
 
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Billova API is running!' });
+// Deep Health Check
+app.get('/api/health', async (req, res) => {
+    const start = Date.now();
+    let dbStatus = 'unknown';
+    let dbLatency = -1;
+
+    try {
+        const dbStart = Date.now();
+        const { error } = await supabase.from('branches').select('id').limit(1);
+        dbLatency = Date.now() - dbStart;
+        dbStatus = error ? 'error' : 'connected';
+    } catch {
+        dbStatus = 'unreachable';
+    }
+
+    const memUsage = process.memoryUsage();
+    const healthy = dbStatus === 'connected';
+
+    res.status(healthy ? 200 : 503).json({
+        status: healthy ? 'healthy' : 'degraded',
+        version: '1.0.0',
+        uptime: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString(),
+        checks: {
+            database: { status: dbStatus, latencyMs: dbLatency },
+            memory: {
+                heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+                heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+                rssMB: Math.round(memUsage.rss / 1024 / 1024),
+            },
+        },
+        responseMs: Date.now() - start,
+    });
 });
 
 // Routes
@@ -120,10 +150,24 @@ app.use('/api/dashboard', dashboardRoutes);
 // Public routes (no auth required)
 app.use('/api/public', customerOrderRoutes);
 
-// Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('Error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+// Standardized Error Handler
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    // CORS errors
+    if (err.message?.startsWith('CORS:')) {
+        return res.status(403).json({
+            error: 'Forbidden',
+            message: err.message,
+        });
+    }
+
+    // Log the error (keep console.error for server-side — not browser)
+    console.error(`[API Error] ${req.method} ${req.path}:`, err.message || err);
+
+    const statusCode = err.statusCode || err.status || 500;
+    res.status(statusCode).json({
+        error: statusCode === 500 ? 'Internal server error' : err.message || 'Something went wrong',
+        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+    });
 });
 
 // Start server

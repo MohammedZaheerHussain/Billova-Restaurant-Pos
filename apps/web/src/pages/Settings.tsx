@@ -13,7 +13,7 @@ import './Settings.css';
 
 // Cloud Sync Status Component
 function CloudSyncStatus() {
-    const { status, isOnline, licenseExpiredHard } = useSyncStore();
+    const { isOnline, licenseExpiredHard } = useSyncStore();
     const display = getSyncStatusDisplay();
 
     return (

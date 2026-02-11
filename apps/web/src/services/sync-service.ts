@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 
 const BATCH_SIZE = 20;
 const MAX_RETRIES = 3;
-const BACKOFF_MS = [1000, 3000, 10000];
+const _BACKOFF_MS = [1000, 3000, 10000]; // Reserved for future exponential backoff
 
 type SyncEntityType = 'ORDER' | 'PAYMENT' | 'KOT' | 'ORDER_STATUS' | 'CANCELLED_ITEM';
 

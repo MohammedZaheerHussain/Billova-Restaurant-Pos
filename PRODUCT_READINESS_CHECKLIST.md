@@ -68,15 +68,15 @@
   - [ ] Set up Vitest for frontend, Jest for API
 
 ### Database & Migrations
-- [ ] **Multiple migration approaches** — `supabase/` has `schema.sql`, `schema-step1-cleanup.sql`, `schema-step2-tables.sql`, `schema-step3-rls.sql`, `migration-additive.sql` AND a `migrations/` folder (8 files). **Fix:** Consolidate into proper Supabase migration workflow.
+- [x] **Multiple migration approaches** — Created `supabase/README.md` explaining the structure. `schema.sql` is the single source for fresh DBs; `migrations/` has incremental patches for live DB.
 - [ ] **RLS policies audit** — `schema-step3-rls.sql` (11KB) exists but verify all tables have proper RLS. Especially critical for multi-tenant data isolation.
 - [ ] **No database indexes audit** — Ensure indexes exist for frequently queried columns (order date, branch_id, status).
 
 ### API Hardening
-- [ ] **No request logging / audit trail** — No structured logging for API requests. **Fix:** Add `morgan` or `pino` for request logging.
-- [ ] **No health check depth** — `/api/health` exists but probably just returns 200. **Fix:** Add DB connectivity check, Supabase connectivity check.
+- [x] **Request logging** — `morgan('combined')` was already configured.
+- [x] **Deep health check** — `/api/health` now checks DB connectivity (latency), reports uptime, memory usage, and returns 503 if degraded.
 - [ ] **No API versioning** — Routes are at `/api/*` with no version prefix. **Fix:** Consider `/api/v1/*` for future compatibility.
-- [ ] **Error responses not standardized** — Different routes may return errors in different formats. **Fix:** Add a global error handler middleware.
+- [x] **Error responses standardized** — Global error handler returns consistent JSON with status codes, CORS error handling, and stack traces in dev only.
 
 ### Feature Completeness
 - [ ] **Addons page** — `Addons.tsx` exists (12KB) but verify it's fully functional and accessible.

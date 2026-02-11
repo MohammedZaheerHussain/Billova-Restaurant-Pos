@@ -31,6 +31,11 @@ export type { PrintJob, PrinterType } from './print-service';
 export { usePrinterConfigStore } from './printer-config-store';
 export type { PrinterConfig, PrintSettings, PrinterLogo, PrintJobType } from './printer-config-store';
 
+// Print Orchestrator (Central Print Coordination)
+export { printOrchestrator } from './print-orchestrator';
+export type { PrintResult as OrchestratorPrintResult, OrderPrintData } from './print-orchestrator';
+export type { PrintHistoryEntry } from '../db/indexed-db';
+
 // Print Utilities
 export {
     autoPrintKOT,
