@@ -25,7 +25,7 @@
 - [x] **Rate limiting** — Already implemented: `generalLimiter` (500/15min) and `authLimiter` (20/15min) via `express-rate-limit`.
 - [x] **API keys in `.env.production` committed** — Added `.env.production` to `.gitignore` (along with build artifacts, IDE configs, OS files).
 - [x] **CORS configuration review** — Updated CORS to accept comma-separated origins from `FRONTEND_URL` env var. Rejects unlisted origins.
-- [ ] **JWT token expiry & refresh** — Auth store persists token to localStorage with no expiry check. **Fix:** Add token rotation or expiry validation on app init.
+- [x] **JWT token expiry & refresh** — Added `tokenExpiry`, `isTokenExpired()`, `checkAuth()` to auth store. `Layout.tsx` checks on mount + every 5 minutes, auto-logs out expired sessions.
 
 ### Performance & Code Quality
 - [x] **50+ `console.log` statements in production code** — Created `logger.ts` utility (suppresses debug/info in prod). Replaced all console.log/error/warn calls across `Login.tsx`, `sync-service.ts`, `transaction-journal.ts`, `useNetworkStatus.ts`, `supabase.ts`, `indexed-db.ts`.
@@ -49,8 +49,8 @@
   - Are failed syncs retried with exponential backoff?
 
 ### UI/UX Issues
-- [ ] **No loading skeletons** — Pages show blank or spinner while data loads. **Fix:** Add skeleton loaders (per `web-design-guidelines` skill).
-- [ ] **No empty states for most pages** — Only cart has an empty state. Orders, Tables, Menu, Reports pages need proper empty states.
+- [x] **Loading skeletons** — Added contextual skeleton loaders for POS menu grid, Orders table, and Reports dashboard (`Skeleton.tsx` + `Skeleton.css`).
+- [x] **Empty states** — Added professional empty states with icons + helper text for Tables, Menu, Users pages. Orders already had one.
 - [ ] **Mobile responsiveness** — POS page uses fixed `calc(100vh - 70px)` height. Test on actual tablets/phones. Many pages may not be responsive.
 - [ ] **Accessibility (a11y)** — No ARIA labels, no keyboard navigation support, no focus management. Run Lighthouse audit.
 - [ ] **No dark/light theme toggle** — App is dark-only. Some users may prefer light mode.
@@ -89,8 +89,8 @@
 - [x] **Captain page** — KOT/kitchen display with "Select Table" section (empty until tables configured).
 - [x] **Delivery page** — ~~500 error~~ Fixed: returns empty array when `delivery_assignments` table not yet created.
 - [x] **Login/Forgot Password** — Correctly redirect authenticated users to POS.
-- [ ] **Addons page** — `Addons.tsx` exists (12KB) but not in sidebar navigation.
-- [ ] **Owner Dashboard** — `OwnerDashboard.tsx` (17KB) at `/dashboard`, not linked from sidebar.
+- [x] **Addons page** — Wired to sidebar with `inventory` feature gate + lazy-loaded route in `App.tsx`.
+- [x] **Owner Dashboard** — Wired to sidebar with OWNER/ADMIN role guard + route in `App.tsx`.
 - [ ] **Customer self-order** — `CustomerOrder.tsx` + `/order/:token` route — needs end-to-end testing.
 - [ ] **Public Menu** — `/m/:branchId` route — needs branchId fix.
 - [ ] **Online Order** — `/o/:branchId` — needs end-to-end testing.

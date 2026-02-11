@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
     BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Bell, Warehouse, RefreshCw,
-    Puzzle, LayoutDashboard
+    Puzzle, LayoutDashboard, Truck,
+    Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscription, { FeatureKey } from '../hooks/useSubscription';
@@ -244,6 +245,14 @@ export default function Layout() {
                 </div>
             </motion.aside>
 
+            {/* Mobile sidebar backdrop */}
+            {sidebarOpen && (
+                <div
+                    className="sidebar-backdrop"
+                    onClick={toggleSidebar}
+                />
+            )}
+
             {/* Offline Banner - shown when offline at top */}
             {!isOnline && (
                 <OfflineIndicator variant="banner" />
@@ -251,6 +260,14 @@ export default function Layout() {
 
             {/* Main Content */}
             <main className="main-content">
+                {/* Mobile hamburger */}
+                <button
+                    className="mobile-menu-btn"
+                    onClick={toggleSidebar}
+                    aria-label="Open menu"
+                >
+                    <MenuIcon size={22} />
+                </button>
                 <Outlet />
             </main>
         </div>
