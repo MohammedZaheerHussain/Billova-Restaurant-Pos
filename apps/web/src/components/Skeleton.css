@@ -1,0 +1,209 @@
+/* Skeleton Loading Animations */
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.04) 25%,
+            rgba(255, 255, 255, 0.08) 50%,
+            rgba(255, 255, 255, 0.04) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+    border-radius: 8px;
+}
+
+.skeleton-text {
+    height: 14px;
+    margin-bottom: 8px;
+}
+
+.skeleton-text.short {
+    width: 40%;
+}
+
+.skeleton-text.medium {
+    width: 65%;
+}
+
+.skeleton-text.long {
+    width: 90%;
+}
+
+.skeleton-heading {
+    height: 22px;
+    width: 50%;
+    margin-bottom: 12px;
+}
+
+/* ──────── POS Menu Grid Skeleton ──────── */
+
+.pos-skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    padding: 6px;
+}
+
+.skeleton-menu-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.skeleton-menu-card .skeleton-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+
+.skeleton-menu-card .skeleton-name {
+    height: 16px;
+    width: 75%;
+}
+
+.skeleton-menu-card .skeleton-price {
+    height: 14px;
+    width: 35%;
+}
+
+/* ──────── Orders Table Skeleton ──────── */
+
+.orders-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.skeleton-table-header {
+    display: grid;
+    grid-template-columns: 40px 80px 1fr 100px 90px 80px 100px;
+    gap: 16px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px 8px 0 0;
+}
+
+.skeleton-table-header .skeleton {
+    height: 14px;
+    border-radius: 4px;
+}
+
+.skeleton-table-row {
+    display: grid;
+    grid-template-columns: 40px 80px 1fr 100px 90px 80px 100px;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.skeleton-table-row .skeleton {
+    height: 14px;
+    border-radius: 4px;
+}
+
+.skeleton-table-row .skeleton-checkbox {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+}
+
+/* ──────── Reports Dashboard Skeleton ──────── */
+
+.reports-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.skeleton-summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.skeleton-summary-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.skeleton-summary-card .skeleton-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.skeleton-summary-card .skeleton-card-value {
+    height: 28px;
+    width: 70%;
+    margin-bottom: 8px;
+}
+
+.skeleton-summary-card .skeleton-card-label {
+    height: 13px;
+    width: 50%;
+}
+
+.skeleton-charts-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+}
+
+.skeleton-chart-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.skeleton-chart-card .skeleton-chart-title {
+    height: 18px;
+    width: 40%;
+    margin-bottom: 20px;
+}
+
+.skeleton-bar-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 120px;
+}
+
+.skeleton-bar-group .skeleton-bar {
+    flex: 1;
+    border-radius: 6px 6px 0 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .skeleton-summary-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .skeleton-charts-row {
+        grid-template-columns: 1fr;
+    }
+
+    .skeleton-table-header,
+    .skeleton-table-row {
+        grid-template-columns: 40px 70px 1fr 80px;
+    }
+}

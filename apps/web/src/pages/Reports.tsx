@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { reportsAPI } from '../api';
 import './Reports.css';
+import { ReportsSkeleton } from '../components/Skeleton';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -116,7 +117,7 @@ export default function ReportsPage() {
             </div>
 
             {loading ? (
-                <div className="loading-state"><div className="spinner" /></div>
+                <ReportsSkeleton />
             ) : (
                 <>
                     {/* Summary Cards - Period Specific */}

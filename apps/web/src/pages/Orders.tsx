@@ -11,6 +11,7 @@ import { ordersAPI, menuAPI } from '../api';
 import { useAuthStore, MenuItem } from '../store';
 import { reprintReceipt, ReceiptData } from '../printing';
 import './Orders.css';
+import { OrdersSkeleton } from '../components/Skeleton';
 
 interface OrderItem {
     id: string;
@@ -408,9 +409,7 @@ export default function OrdersPage() {
             </div>
 
             {loading ? (
-                <div className="loading-state">
-                    <div className="spinner" />
-                </div>
+                <OrdersSkeleton />
             ) : filteredOrders.length === 0 ? (
                 <div className="empty-state">
                     <ShoppingBag size={48} strokeWidth={1} />

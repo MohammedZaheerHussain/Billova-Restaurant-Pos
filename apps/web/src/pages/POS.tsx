@@ -13,6 +13,7 @@ import { OrderCompleteModal, OrderCompleteData } from '../components/order';
 import { ReceiptData } from '../printing';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import './POS.css';
+import { POSSkeleton } from '../components/Skeleton';
 
 // Helper function to format product names with proper title case
 function formatProductName(name: string): string {
@@ -317,10 +318,7 @@ export default function POSPage() {
                 {/* Menu Grid */}
                 <div className={`menu-grid ${filteredItems.length > 0 && filteredItems.length <= 6 ? 'menu-grid-sparse' : ''}`}>
                     {loading ? (
-                        <div className="loading-state">
-                            <div className="spinner" />
-                            <p>Loading menu...</p>
-                        </div>
+                        <POSSkeleton />
                     ) : filteredItems.length === 0 ? (
                         <div className="empty-state">
                             <Search size={32} strokeWidth={1.5} />
