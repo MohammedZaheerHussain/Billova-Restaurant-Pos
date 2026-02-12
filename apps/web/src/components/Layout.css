@@ -1,5 +1,35 @@
 /* Layout Styles */
 
+/* Skip to content — visually hidden, shown on focus */
+.skip-to-content {
+    position: absolute;
+    top: -100%;
+    left: 16px;
+    z-index: 9999;
+    padding: 12px 24px;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 0 0 8px 8px;
+    text-decoration: none;
+    transition: top 0.2s;
+}
+
+.skip-to-content:focus {
+    top: 0;
+}
+
+/* Global focus-visible outlines for keyboard navigation */
+*:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.nav-item:focus-visible {
+    outline-offset: -2px;
+}
+
 .layout {
     display: flex;
     height: 100vh;

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
     BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Bell, Warehouse, RefreshCw,
-    Puzzle, LayoutDashboard, Truck,
+    Puzzle, LayoutDashboard,
     Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
@@ -108,18 +108,28 @@ export default function Layout() {
 
     return (
         <div className="layout">
+            {/* Skip to content link for keyboard users */}
+            <a href="#main-content" className="skip-to-content">Skip to main content</a>
+
             {/* Sidebar */}
             <motion.aside
                 className={`sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}
                 animate={{ width: sidebarOpen ? 220 : 70 }}
                 transition={{ duration: 0.2 }}
+                role="navigation"
+                aria-label="Main navigation"
             >
                 {/* Logo - Click to toggle sidebar */}
                 <div className="sidebar-header">
                     <div
                         className="logo clickable"
                         onClick={toggleSidebar}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSidebar(); } }}
                         title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={sidebarOpen}
+                        aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
                         style={{ cursor: 'pointer' }}
                     >
                         <img src="/logo.png" alt="Billova POS" className="logo-icon-img" />
@@ -139,6 +149,7 @@ export default function Layout() {
                     <button
                         className={`notification-bell ${pendingOnlineOrders > 0 ? 'has-orders' : ''}`}
                         onClick={() => navigate('/orders')}
+                        aria-label={pendingOnlineOrders > 0 ? `${pendingOnlineOrders} pending online orders` : 'No pending orders'}
                         title={pendingOnlineOrders > 0 ? `${pendingOnlineOrders} pending online orders` : 'No pending orders'}
                     >
                         <Bell size={20} />
@@ -173,7 +184,7 @@ export default function Layout() {
                 )}
 
                 {/* Navigation */}
-                <nav className="sidebar-nav">
+                <nav className="sidebar-nav" aria-label="Pages">
                     {/* Super Admin sees ONLY Super Admin link */}
                     {isSuperAdmin ? (
                         <NavLink
@@ -239,7 +250,7 @@ export default function Layout() {
                             </div>
                         )}
                     </div>
-                    <button className="logout-btn" onClick={handleLogout} title="Logout">
+                    <button className="logout-btn" onClick={handleLogout} title="Logout" aria-label="Sign out">
                         <LogOut size={18} />
                     </button>
                 </div>
@@ -259,7 +270,7 @@ export default function Layout() {
             )}
 
             {/* Main Content */}
-            <main className="main-content">
+            <main className="main-content" id="main-content" role="main" aria-label="Page content">
                 {/* Mobile hamburger */}
                 <button
                     className="mobile-menu-btn"
