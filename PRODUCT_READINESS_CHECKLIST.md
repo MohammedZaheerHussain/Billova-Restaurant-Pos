@@ -52,7 +52,7 @@
 - [x] **Loading skeletons** — Added contextual skeleton loaders for POS menu grid, Orders table, and Reports dashboard (`Skeleton.tsx` + `Skeleton.css`).
 - [x] **Empty states** — Added professional empty states with icons + helper text for Tables, Menu, Users pages. Orders already had one.
 - [x] **Mobile responsiveness** — Added collapsible sidebar with hamburger toggle for screens ≤768px, backdrop overlay, and content padding adjustments in `Layout.css` + `Layout.tsx`.
-- [ ] **Accessibility (a11y)** — No ARIA labels, no keyboard navigation support, no focus management. Run Lighthouse audit.
+- [x] **Accessibility (a11y)** — Added skip-to-content link, `focus-visible` outlines, ARIA roles/labels on sidebar + nav + buttons, `htmlFor`/`id` on Login form, keyboard-accessible sidebar toggle.
 - [ ] **No dark/light theme toggle** — App is dark-only. Some users may prefer light mode.
 
 ---
@@ -120,7 +120,7 @@
 - [ ] **Print preview component** — `PrintPreview.tsx` — ensure WYSIWYG accuracy.
 
 ### Documentation
-- [ ] **No README.md** — Project root has no README with setup instructions.
+- [x] **No README.md** — Created comprehensive README.md with tech stack, project structure, setup guide, scripts, env vars, features, and deployment instructions.
 - [ ] **No API documentation** — No Swagger/OpenAPI spec for the 21 API routes.
 - [ ] **No architecture docs** — `docs/` folder exists (2 files) but need comprehensive architecture overview.
 - [ ] **No deployment guide** — `deploy.sh` and `docker-compose.yml` exist but no written guide.
@@ -128,7 +128,7 @@
 ### Build & Deployment
 - [ ] **Docker configs** — `Dockerfile.api` and `Dockerfile.web` exist — test full Docker build.
 - [ ] **Nginx configs** — `nginx.conf` and `nginx.web.conf` exist — verify reverse proxy setup.
-- [ ] **Production build test** — Run `npm run build` and verify no TypeScript errors, bundle size is reasonable.
+- [x] **Production build test** — `npm run build` passes with 0 errors, 2.2MB total bundle, 96 code-split chunks.
 - [ ] **Environment variable documentation** — `.env.example` exists (1.2KB) — verify it lists ALL required vars.
 
 ---
