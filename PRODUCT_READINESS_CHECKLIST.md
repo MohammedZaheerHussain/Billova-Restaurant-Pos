@@ -53,7 +53,7 @@
 - [x] **Empty states** — Added professional empty states with icons + helper text for Tables, Menu, Users pages. Orders already had one.
 - [x] **Mobile responsiveness** — Added collapsible sidebar with hamburger toggle for screens ≤768px, backdrop overlay, and content padding adjustments in `Layout.css` + `Layout.tsx`.
 - [x] **Accessibility (a11y)** — Added skip-to-content link, `focus-visible` outlines, ARIA roles/labels on sidebar + nav + buttons, `htmlFor`/`id` on Login form, keyboard-accessible sidebar toggle.
-- [ ] **No dark/light theme toggle** — App is dark-only. Some users may prefer light mode.
+- [x] **Dark/light theme toggle** — Added `[data-theme='light']` CSS vars, `theme`/`toggleTheme` in UIStore with persist, `Sun`/`Moon` toggle in sidebar footer.
 
 ---
 
