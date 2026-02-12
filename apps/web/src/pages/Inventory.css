@@ -3,7 +3,7 @@
 .inventory-page {
     padding: 24px;
     min-height: 100vh;
-    background: linear-gradient(135deg, #0a0a0a 0%, #111111 50%, #1a1a1a 100%);
+    background: var(--gradient-dark);
 }
 
 /* Header */

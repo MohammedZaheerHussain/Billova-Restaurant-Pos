@@ -355,13 +355,13 @@
     flex-shrink: 0;
 }
 
-/* Quantity Controls - Dark background container */
+/* Quantity Controls */
 .quantity-control {
     display: flex;
     align-items: center;
     height: 36px;
     gap: 0;
-    background: #0f0f0f;
+    background: var(--bg-primary);
     padding: 4px;
     border-radius: 10px;
 }
@@ -372,8 +372,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text-primary);
     flex-shrink: 0;
@@ -381,8 +381,8 @@
 }
 
 .quantity-control button:hover {
-    background: #252525;
-    border-color: #3a3a3a;
+    background: var(--bg-card-hover);
+    border-color: var(--border-light);
 }
 
 .quantity-control span {
