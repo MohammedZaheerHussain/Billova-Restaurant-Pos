@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
     BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Bell, Warehouse, RefreshCw,
-    Puzzle, LayoutDashboard,
+    Puzzle, LayoutDashboard, Sun, Moon,
     Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
@@ -43,7 +43,7 @@ export default function Layout() {
 
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
-    const { sidebarOpen, toggleSidebar } = useUIStore();
+    const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
     const { hasFeature, currentPlan, getPlanColor } = useSubscription();
 
     // Initialize offline sync
@@ -250,9 +250,19 @@ export default function Layout() {
                             </div>
                         )}
                     </div>
-                    <button className="logout-btn" onClick={handleLogout} title="Logout" aria-label="Sign out">
-                        <LogOut size={18} />
-                    </button>
+                    <div className="sidebar-footer-actions">
+                        <button
+                            className="theme-toggle-btn"
+                            onClick={toggleTheme}
+                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                        >
+                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                        </button>
+                        <button className="logout-btn" onClick={handleLogout} title="Logout" aria-label="Sign out">
+                            <LogOut size={18} />
+                        </button>
+                    </div>
                 </div>
             </motion.aside>
 

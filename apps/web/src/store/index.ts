@@ -264,26 +264,51 @@ export const useAuthStore = create<AuthStore>()(
 );
 
 // UI Store
+type Theme = 'dark' | 'light';
+
 interface UIStore {
     sidebarOpen: boolean;
     activePage: string;
     selectedCategory: string | null;
     searchQuery: string;
+    theme: Theme;
 
     toggleSidebar: () => void;
     setActivePage: (page: string) => void;
     setSelectedCategory: (categoryId: string | null) => void;
     setSearchQuery: (query: string) => void;
+    toggleTheme: () => void;
 }
 
-export const useUIStore = create<UIStore>((set) => ({
-    sidebarOpen: true,
-    activePage: 'pos',
-    selectedCategory: null,
-    searchQuery: '',
+const applyTheme = (theme: Theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+};
 
-    toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-    setActivePage: (page) => set({ activePage: page }),
-    setSelectedCategory: (categoryId) => set({ selectedCategory: categoryId }),
-    setSearchQuery: (query) => set({ searchQuery: query }),
-}));
+export const useUIStore = create<UIStore>()(
+    persist(
+        (set, get) => ({
+            sidebarOpen: true,
+            activePage: 'pos',
+            selectedCategory: null,
+            searchQuery: '',
+            theme: 'dark',
+
+            toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+            setActivePage: (page) => set({ activePage: page }),
+            setSelectedCategory: (categoryId) => set({ selectedCategory: categoryId }),
+            setSearchQuery: (query) => set({ searchQuery: query }),
+            toggleTheme: () => {
+                const newTheme = get().theme === 'dark' ? 'light' : 'dark';
+                applyTheme(newTheme);
+                set({ theme: newTheme });
+            },
+        }),
+        {
+            name: 'billova-ui',
+            partialize: (state) => ({ theme: state.theme }),
+            onRehydrateStorage: () => (state) => {
+                if (state?.theme) applyTheme(state.theme);
+            },
+        }
+    )
+);

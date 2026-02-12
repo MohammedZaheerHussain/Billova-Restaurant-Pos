@@ -365,6 +365,29 @@
     color: var(--primary);
 }
 
+.sidebar-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.theme-toggle-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    transition: all var(--transition-normal);
+}
+
+.theme-toggle-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--warning);
+}
+
 /* Main Content */
 .main-content {
     flex: 1;
