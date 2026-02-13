@@ -2,6 +2,7 @@
 // Works with any printer configured in the browser
 import { BasePrinterDriver, PrintResult, PrinterInfo } from './printer-interface';
 import { ESCPOSEncoder } from '../escpos/escpos-encoder';
+import { logger } from '../../utils/logger';
 
 export class BrowserPrintDriver extends BasePrinterDriver {
     readonly type = 'browser';
@@ -20,7 +21,7 @@ export class BrowserPrintDriver extends BasePrinterDriver {
     async print(_data: Uint8Array | ESCPOSEncoder): Promise<PrintResult> {
         // For browser printing, we don't use ESC/POS
         // Instead, we'll need HTML content
-        console.warn('[BrowserPrint] ESC/POS data cannot be printed via browser. Use printHTML instead.');
+        logger.warn('[BrowserPrint] ESC/POS data cannot be printed via browser. Use printHTML instead.');
         return {
             success: false,
             error: 'Use printHTML() for browser printing',

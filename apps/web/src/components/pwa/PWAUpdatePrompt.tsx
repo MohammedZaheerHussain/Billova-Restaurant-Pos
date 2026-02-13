@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X, Download } from 'lucide-react';
 import './PWAUpdatePrompt.css';
+import { logger } from '../../utils/logger';
 
 export function PWAUpdatePrompt() {
     const [showPrompt, setShowPrompt] = useState(false);
@@ -12,17 +13,17 @@ export function PWAUpdatePrompt() {
         updateServiceWorker,
     } = useRegisterSW({
         onRegistered(r) {
-            console.log('[PWA] Service Worker registered:', r);
+            logger.debug('[PWA] Service Worker registered:', r);
         },
         onRegisterError(error) {
-            console.error('[PWA] Service Worker registration error:', error);
+            logger.error('[PWA] Service Worker registration error:', error);
         },
         onNeedRefresh() {
-            console.log('[PWA] New content available, refresh needed');
+            logger.debug('[PWA] New content available, refresh needed');
             setShowPrompt(true);
         },
         onOfflineReady() {
-            console.log('[PWA] App ready for offline use');
+            logger.debug('[PWA] App ready for offline use');
         },
     });
 

@@ -5,6 +5,7 @@ import { db, OfflineOrder, OfflinePayment, OfflineKOT } from '../db/indexed-db';
 import { useSyncStore } from '../store/sync-store';
 import { writeJournal, markSynced } from './transaction-journal';
 import api from '../api';
+import { logger } from '../utils/logger';
 
 // ==================== CONFIGURATION ====================
 
@@ -87,26 +88,26 @@ class SyncQueue {
 
         // Layer 1: Online event
         window.addEventListener('online', () => {
-            console.log('[SyncQueue] Network online - triggering sync');
+            logger.debug('[SyncQueue] Network online - triggering sync');
             useSyncStore.getState().setOnline(true);
             this.processQueue();
         });
 
         window.addEventListener('offline', () => {
-            console.log('[SyncQueue] Network offline');
+            logger.debug('[SyncQueue] Network offline');
             useSyncStore.getState().setOnline(false);
         });
 
         // Layer 2: App focus event
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && this.isOnline()) {
-                console.log('[SyncQueue] App focused - checking for pending sync');
+                logger.debug('[SyncQueue] App focused - checking for pending sync');
                 this.processQueue();
             }
         });
 
         this.networkListenerAttached = true;
-        console.log('[SyncQueue] Network listeners attached (3-layer sync)');
+        logger.debug('[SyncQueue] Network listeners attached (3-layer sync)');
     }
 
     // ==================== RETRY LOGIC ====================
@@ -378,12 +379,12 @@ class SyncQueue {
      */
     async processQueue(): Promise<SyncBatchResult> {
         if (this.isProcessing) {
-            console.log('[SyncQueue] Already processing, skipping...');
+            logger.debug('[SyncQueue] Already processing, skipping...');
             return { total: 0, synced: 0, failed: 0, skipped: 0, errors: ['Already processing'] };
         }
 
         if (!this.isOnline()) {
-            console.log('[SyncQueue] Offline, skipping...');
+            logger.debug('[SyncQueue] Offline, skipping...');
             useSyncStore.getState().setOnline(false);
             return { total: 0, synced: 0, failed: 0, skipped: 0, errors: ['Offline'] };
         }
@@ -400,7 +401,7 @@ class SyncQueue {
             const items = await this.getQueueItems();
             result.total = items.length;
 
-            console.log(`[SyncQueue] Processing ${items.length} items...`);
+            logger.debug(`[SyncQueue] Processing ${items.length} items...`);
 
             for (let i = 0; i < items.length; i++) {
                 // Check for abort
@@ -420,7 +421,7 @@ class SyncQueue {
 
                 // Log progress instead of updating store (sync-store doesn't have setSyncProgress)
                 const progress = Math.round(((i + 1) / items.length) * 100);
-                console.log(`[SyncQueue] Progress: ${progress}% - ${item.entityType} ${item.entityId.substring(0, 8)}...`);
+                logger.debug(`[SyncQueue] Progress: ${progress}% - ${item.entityType} ${item.entityId.substring(0, 8)}...`);
 
                 // Process item
                 const { success, error } = await this.processItem(item);
@@ -447,13 +448,13 @@ class SyncQueue {
                 store.setSyncing(false);
             }
 
-            console.log(`[SyncQueue] Complete: ${result.synced} synced, ${result.failed} failed, ${result.skipped} skipped`);
+            logger.debug(`[SyncQueue] Complete: ${result.synced} synced, ${result.failed} failed, ${result.skipped} skipped`);
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Queue processing failed';
             store.setLastSync(new Date().toISOString(), errorMessage);
             result.errors.push(errorMessage);
-            console.error('[SyncQueue] Error:', error);
+            logger.error('[SyncQueue] Error:', error);
         } finally {
             this.isProcessing = false;
             this.abortController = null;
@@ -467,7 +468,7 @@ class SyncQueue {
      * Manual sync trigger (Layer 3)
      */
     async manualSync(): Promise<SyncBatchResult> {
-        console.log('[SyncQueue] Manual sync triggered');
+        logger.debug('[SyncQueue] Manual sync triggered');
         return this.processQueue();
     }
 
@@ -477,7 +478,7 @@ class SyncQueue {
     cancelSync(): void {
         if (this.abortController) {
             this.abortController.abort();
-            console.log('[SyncQueue] Sync cancelled');
+            logger.debug('[SyncQueue] Sync cancelled');
         }
         this.isProcessing = false;
         useSyncStore.getState().reset();

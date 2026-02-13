@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { inventoryAPI, menuAPI } from '../api';
 import { MenuItem } from '../store';
 import './Inventory.css';
+import { logger } from '../utils/logger';
 
 interface InventoryItem {
     id: string;
@@ -193,7 +194,7 @@ export default function InventoryPage() {
                             quantityUsed: Number(link.quantityUsed),
                         });
                     } catch (e) {
-                        console.error('Failed to link:', link.menuItemName);
+                        logger.error('Failed to link:', link.menuItemName);
                     }
                 }
 

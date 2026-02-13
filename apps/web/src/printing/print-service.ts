@@ -7,6 +7,7 @@ import { USBPrintDriver } from './drivers/usb-print';
 import { BluetoothPrintDriver } from './drivers/bluetooth-print';
 import { NetworkPrintDriver } from './drivers/network-print';
 import { ESCPOSEncoder } from './escpos/escpos-encoder';
+import { logger } from '../utils/logger';
 
 export type PrinterType = 'browser' | 'usb' | 'bluetooth' | 'network';
 
@@ -76,7 +77,7 @@ class PrintService {
     async connect(type: PrinterType, address?: string): Promise<boolean> {
         const driver = this.drivers.get(type);
         if (!driver) {
-            console.error(`[PrintService] Unknown printer type: ${type}`);
+            logger.error(`[PrintService] Unknown printer type: ${type}`);
             return false;
         }
 
@@ -117,7 +118,7 @@ class PrintService {
                     const printers = await driver.discover();
                     allPrinters.push(...printers);
                 } catch (error) {
-                    console.error(`[PrintService] Discovery failed for ${type}:`, error);
+                    logger.error(`[PrintService] Discovery failed for ${type}:`, error);
                 }
             }
         }

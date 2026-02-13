@@ -17,6 +17,7 @@ import { generateReceipt, ReceiptData } from './templates/receipt-template';
 import { generateKOT, KOTData } from './templates/kot-template';
 import { ESCPOSEncoder, CutType } from './escpos/escpos-encoder';
 import { db, PrintHistoryEntry } from '../db/indexed-db';
+import { logger } from '../utils/logger';
 
 // ==================== CONFIGURATION ====================
 
@@ -102,7 +103,7 @@ class PrintOrchestrator {
      */
     initialize(deviceId: string): void {
         this.deviceId = deviceId;
-        console.log('[PrintOrchestrator] Initialized with device:', deviceId);
+        logger.debug('[PrintOrchestrator] Initialized with device:', deviceId);
     }
 
     /**
@@ -114,7 +115,7 @@ class PrintOrchestrator {
         const printer = store.getPrinterForJob('bill');
 
         if (!printer) {
-            console.warn('[PrintOrchestrator] No bill printer configured');
+            logger.warn('[PrintOrchestrator] No bill printer configured');
             return this.createFailureResult('No bill printer configured');
         }
 
@@ -187,7 +188,7 @@ class PrintOrchestrator {
             return result;
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            console.error('[PrintOrchestrator] Bill print error:', error);
+            logger.error('[PrintOrchestrator] Bill print error:', error);
             return this.createFailureResult(errorMsg);
         }
     }
@@ -201,7 +202,7 @@ class PrintOrchestrator {
         const printer = store.getPrinterForJob('kot');
 
         if (!printer) {
-            console.warn('[PrintOrchestrator] No KOT printer configured');
+            logger.warn('[PrintOrchestrator] No KOT printer configured');
             return this.createFailureResult('No KOT printer configured');
         }
 
@@ -259,7 +260,7 @@ class PrintOrchestrator {
             return result;
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            console.error('[PrintOrchestrator] KOT print error:', error);
+            logger.error('[PrintOrchestrator] KOT print error:', error);
             return this.createFailureResult(errorMsg);
         }
     }
@@ -303,7 +304,7 @@ class PrintOrchestrator {
             return this.createFailureResult('No previous order to reprint');
         }
 
-        console.log('[PrintOrchestrator] Reprinting last bill');
+        logger.debug('[PrintOrchestrator] Reprinting last bill');
         const result = await this.printCustomerReceipt(this.lastPrintedOrder);
 
         // Log as reprint
@@ -367,11 +368,11 @@ class PrintOrchestrator {
                 orderDate: order.createdAt,
             };
 
-            console.log('[PrintOrchestrator] Reprinting order:', orderId);
+            logger.debug('[PrintOrchestrator] Reprinting order:', orderId);
             return await this.printCustomerReceipt(printData);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-            console.error('[PrintOrchestrator] Reprint error:', error);
+            logger.error('[PrintOrchestrator] Reprint error:', error);
             return this.createFailureResult(errorMsg);
         }
     }
@@ -414,7 +415,7 @@ class PrintOrchestrator {
                 lastError = result.error || 'Print failed';
             } catch (error) {
                 lastError = error instanceof Error ? error.message : 'Unknown error';
-                console.warn(`[PrintOrchestrator] Attempt ${attempt + 1} failed:`, lastError);
+                logger.warn(`[PrintOrchestrator] Attempt ${attempt + 1} failed:`, lastError);
             }
 
             // Wait before retry
@@ -424,7 +425,7 @@ class PrintOrchestrator {
         }
 
         // All attempts failed
-        console.error('[PrintOrchestrator] All print attempts failed:', lastError);
+        logger.error('[PrintOrchestrator] All print attempts failed:', lastError);
 
         return {
             success: false,
@@ -465,7 +466,7 @@ class PrintOrchestrator {
                 await db.printHistory.bulkDelete(oldest);
             }
         } catch (error) {
-            console.error('[PrintOrchestrator] Failed to log print history:', error);
+            logger.error('[PrintOrchestrator] Failed to log print history:', error);
         }
     }
 

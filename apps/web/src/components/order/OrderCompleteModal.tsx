@@ -5,6 +5,7 @@ import { Check, Printer, MessageCircle, Plus, Loader2, X } from 'lucide-react';
 import { usePrinterConfigStore } from '../../printing/printer-config-store';
 import { reprintReceipt, ReceiptData } from '../../printing';
 import './OrderCompleteModal.css';
+import { logger } from '../../utils/logger';
 
 export interface OrderCompleteData {
     orderId: string;
@@ -70,7 +71,7 @@ export function OrderCompleteModal({
                 }
             }
         } catch (error) {
-            console.error('Print failed:', error);
+            logger.error('Print failed:', error);
             setPrintSuccess(false);
         } finally {
             setIsPrinting(false);

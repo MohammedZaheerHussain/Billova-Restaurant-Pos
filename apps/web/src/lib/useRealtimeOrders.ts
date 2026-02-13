@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, subscribeChannel, unsubscribeChannel } from './supabase';
 import { FeatureFlags } from './feature-flags';
+import { logger } from '../utils/logger';
 
 interface Order {
     id: string;
@@ -65,7 +66,7 @@ export const useRealtimeOrders = (branchId: string): UseRealtimeOrdersReturn => 
         // Subscribe to realtime changes
         const channelName = `billova:${branchId}:orders`;
         subscribeChannel(channelName, 'orders', (payload: any) => {
-            console.log('[Realtime] Order change:', payload);
+            logger.debug('[Realtime] Order change:', payload);
 
             if (payload.eventType === 'INSERT') {
                 setOrders(prev => [payload.new as Order, ...prev]);

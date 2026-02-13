@@ -3,6 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useNetworkStatus } from './useNetworkStatus';
 import { useSyncStore } from '../store/sync-store';
 import syncEngine from '../sync/sync-engine';
+import { logger } from '../utils/logger';
 
 export interface UseSyncOptions {
     autoSyncOnReconnect?: boolean;
@@ -27,7 +28,7 @@ export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
     // Auto-sync on reconnect
     useEffect(() => {
         if (options.autoSyncOnReconnect && wasOffline && isOnline) {
-            console.log('[useSync] Reconnected, triggering auto-sync...');
+            logger.debug('[useSync] Reconnected, triggering auto-sync...');
             syncEngine.syncAll();
         }
     }, [wasOffline, isOnline, options.autoSyncOnReconnect]);
@@ -52,14 +53,14 @@ export function useSync(options: UseSyncOptions = DEFAULT_OPTIONS) {
     // Update pending counts on mount
     useEffect(() => {
         syncEngine.updatePendingCounts().catch((e) => {
-            console.warn('[useSync] Failed to update pending counts on mount:', e);
+            logger.warn('[useSync] Failed to update pending counts on mount:', e);
         });
     }, []);
 
     // Manual sync trigger
     const triggerSync = useCallback(async () => {
         if (!isOnline) {
-            console.log('[useSync] Cannot sync while offline');
+            logger.debug('[useSync] Cannot sync while offline');
             return { totalSynced: 0, totalFailed: 0, totalSkipped: 0, errors: ['Device is offline'] };
         }
         return syncEngine.manualSync();
@@ -110,7 +111,7 @@ export function useSyncInit() {
             try {
                 await syncEngine.updatePendingCounts();
             } catch (e) {
-                console.warn('[useSyncInit] Failed to update pending counts:', e);
+                logger.warn('[useSyncInit] Failed to update pending counts:', e);
             }
         };
         initSync();
@@ -122,7 +123,7 @@ export function useSyncInit() {
                 try {
                     syncEngine.syncAll();
                 } catch (e) {
-                    console.warn('[useSyncInit] Failed to trigger initial sync:', e);
+                    logger.warn('[useSyncInit] Failed to trigger initial sync:', e);
                 }
             }, 2000);
 

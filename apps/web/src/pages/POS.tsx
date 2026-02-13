@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { useCartStore, useUIStore, useAuthStore, MenuItem, Category } from '../store';
 import { menuAPI, categoriesAPI, ordersAPI } from '../api';
+import { logger } from '../utils/logger';
 import { OrderCompleteModal, OrderCompleteData } from '../components/order';
 import { ReceiptData } from '../printing';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
@@ -94,7 +95,7 @@ export default function POSPage() {
                 setSelectedCategory(catRes.data[0].id);
             }
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+            logger.error('Failed to fetch data:', error);
             toast.error('Failed to load menu');
         } finally {
             setLoading(false);
@@ -121,7 +122,7 @@ export default function POSPage() {
             }
             toast.success(`Added ${item.name}`, { duration: 1500 });
         } catch (error) {
-            console.error('Error adding item:', error);
+            logger.error('Error adding item:', error);
             toast.error('Failed to add item');
         }
     };
@@ -169,11 +170,11 @@ export default function POSPage() {
                 discountValue: discountValue || undefined,
             };
 
-            console.log('Creating order:', orderData);
+            logger.debug('Creating order:', orderData);
             const response = await ordersAPI.create(orderData, {
                 dailyReset: printerSettings.dailyOrderReset
             });
-            console.log('Order created:', response.data);
+            logger.debug('Order created:', response.data);
 
             // Add payment
             await ordersAPI.addPayment(response.data.id, {
@@ -233,7 +234,7 @@ export default function POSPage() {
             setOnlinePlatform(null);
             setOnlineOrderId('');
         } catch (error: any) {
-            console.error('Order failed:', error);
+            logger.error('Order failed:', error);
             const errorMessage = error.response?.data?.error || 'Failed to create order';
             toast.error(errorMessage);
         } finally {

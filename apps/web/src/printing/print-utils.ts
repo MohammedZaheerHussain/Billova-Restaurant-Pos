@@ -4,6 +4,7 @@ import { usePrinterConfigStore } from './printer-config-store';
 import { generateReceipt, ReceiptData, generateReceiptHTML } from './templates/receipt-template';
 import { generateKOT, KOTData, generateKOTHTML } from './templates/kot-template';
 import { ESCPOSEncoder, TextAlign } from './escpos/escpos-encoder';
+import { logger } from '../utils/logger';
 
 // ==================== AUTO-PRINT FUNCTIONS ====================
 
@@ -15,14 +16,14 @@ export async function autoPrintKOT(kotData: KOTData): Promise<boolean> {
     const store = usePrinterConfigStore.getState();
 
     if (!store.settings.autoPrintKOT) {
-        console.log('[AutoPrint] KOT auto-print disabled');
+        logger.debug('[AutoPrint] KOT auto-print disabled');
         return false;
     }
 
     const printers = store.getPrintersForJob('kot');
 
     if (printers.length === 0) {
-        console.warn('[AutoPrint] No printers configured for KOT');
+        logger.warn('[AutoPrint] No printers configured for KOT');
         return false;
     }
 
@@ -41,7 +42,7 @@ export async function autoPrintKOT(kotData: KOTData): Promise<boolean> {
                 );
 
                 if (!result.success) {
-                    console.error(`[AutoPrint] KOT print failed for ${printer.name}:`, result.error);
+                    logger.error(`[AutoPrint] KOT print failed for ${printer.name}:`, result.error);
                     success = false;
                 }
             }
@@ -53,7 +54,7 @@ export async function autoPrintKOT(kotData: KOTData): Promise<boolean> {
 
             store.markPrinterUsed(printer.id);
         } catch (error) {
-            console.error(`[AutoPrint] KOT print error for ${printer.name}:`, error);
+            logger.error(`[AutoPrint] KOT print error for ${printer.name}:`, error);
             success = false;
         }
     }
@@ -69,14 +70,14 @@ export async function autoPrintBill(receiptData: ReceiptData): Promise<boolean> 
     const store = usePrinterConfigStore.getState();
 
     if (!store.settings.autoPrintBill) {
-        console.log('[AutoPrint] Bill auto-print disabled');
+        logger.debug('[AutoPrint] Bill auto-print disabled');
         return false;
     }
 
     const printer = store.getPrinterForJob('bill');
 
     if (!printer) {
-        console.warn('[AutoPrint] No printer configured for bills');
+        logger.warn('[AutoPrint] No printer configured for bills');
         return false;
     }
 
@@ -93,7 +94,7 @@ export async function autoPrintBill(receiptData: ReceiptData): Promise<boolean> 
             );
 
             if (!result.success) {
-                console.error('[AutoPrint] Bill print failed:', result.error);
+                logger.error('[AutoPrint] Bill print failed:', result.error);
                 return false;
             }
         }
@@ -106,7 +107,7 @@ export async function autoPrintBill(receiptData: ReceiptData): Promise<boolean> 
         store.markPrinterUsed(printer.id);
         return true;
     } catch (error) {
-        console.error('[AutoPrint] Bill print error:', error);
+        logger.error('[AutoPrint] Bill print error:', error);
         return false;
     }
 }
@@ -146,7 +147,7 @@ export async function reprintReceipt(
         for (let i = 0; i < copies; i++) {
             const result = await printService.print(encoder, printerType, printerAddress);
             if (!result.success) {
-                console.error('[Reprint] Receipt print failed:', result.error);
+                logger.error('[Reprint] Receipt print failed:', result.error);
                 return false;
             }
         }
@@ -157,7 +158,7 @@ export async function reprintReceipt(
 
         return true;
     } catch (error) {
-        console.error('[Reprint] Receipt error:', error);
+        logger.error('[Reprint] Receipt error:', error);
         return false;
     }
 }
@@ -188,7 +189,7 @@ export async function reprintKOT(
         for (let i = 0; i < copies; i++) {
             const result = await printService.print(encoder, printerType, printerAddress);
             if (!result.success) {
-                console.error('[Reprint] KOT print failed:', result.error);
+                logger.error('[Reprint] KOT print failed:', result.error);
                 return false;
             }
         }
@@ -199,7 +200,7 @@ export async function reprintKOT(
 
         return true;
     } catch (error) {
-        console.error('[Reprint] KOT error:', error);
+        logger.error('[Reprint] KOT error:', error);
         return false;
     }
 }
@@ -277,12 +278,12 @@ export async function openCashDrawer(): Promise<boolean> {
     const printer = store.getPrinterForJob('bill');
 
     if (!printer) {
-        console.warn('[CashDrawer] No bill printer configured');
+        logger.warn('[CashDrawer] No bill printer configured');
         return false;
     }
 
     if (!printer.openCashDrawer) {
-        console.log('[CashDrawer] Cash drawer command disabled for this printer');
+        logger.debug('[CashDrawer] Cash drawer command disabled for this printer');
         return false;
     }
 

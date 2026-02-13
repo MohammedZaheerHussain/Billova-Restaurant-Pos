@@ -12,6 +12,7 @@ import { useAuthStore, MenuItem } from '../store';
 import { reprintReceipt, ReceiptData } from '../printing';
 import './Orders.css';
 import { OrdersSkeleton } from '../components/Skeleton';
+import { logger } from '../utils/logger';
 
 interface OrderItem {
     id: string;
@@ -112,7 +113,7 @@ export default function OrdersPage() {
             const response = await menuAPI.getAll(user?.branch?.id);
             setMenuItems(response.data || []);
         } catch (error) {
-            console.error('Failed to fetch menu items');
+            logger.error('Failed to fetch menu items');
         }
     };
 
@@ -309,7 +310,7 @@ export default function OrdersPage() {
                 toast.error('Print failed - check printer settings');
             }
         } catch (error) {
-            console.error('Print error:', error);
+            logger.error('Print error:', error);
             toast.error('Failed to print bill');
         }
     };

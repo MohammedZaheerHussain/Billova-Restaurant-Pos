@@ -16,6 +16,7 @@ import { SyncStatusBadge, OfflineIndicator } from './sync';
 import SyncIndicator from './SyncIndicator';
 import { supabase } from '../lib/supabase';
 import './Layout.css';
+import { logger } from '../utils/logger';
 
 interface NavItem {
     path: string;
@@ -70,7 +71,7 @@ export default function Layout() {
             // Sign out from Supabase first
             await supabase.auth.signOut();
         } catch (e) {
-            console.error('Supabase signOut error:', e);
+            logger.error('Supabase signOut error:', e);
         }
         // Clear Zustand state
         logout();
@@ -97,7 +98,7 @@ export default function Layout() {
                 ).length;
                 setPendingOnlineOrders(pending);
             } catch (e) {
-                console.error('Error fetching pending orders:', e);
+                logger.error('Error fetching pending orders:', e);
             }
         };
 

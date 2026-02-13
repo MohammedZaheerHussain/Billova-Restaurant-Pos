@@ -2,6 +2,7 @@
 // Supports: Epson, Star, Bixolon, and other USB ESC/POS printers
 import { BasePrinterDriver, PrintResult, PrinterInfo } from './printer-interface';
 import { ESCPOSEncoder } from '../escpos/escpos-encoder';
+import { logger } from '../../utils/logger';
 
 // Known USB Vendor IDs for thermal printers
 const KNOWN_VENDORS: Record<number, string> = {
@@ -35,7 +36,7 @@ export class USBPrintDriver extends BasePrinterDriver {
      */
     async connect(): Promise<boolean> {
         if (!USBPrintDriver.isSupported()) {
-            console.error('[USBPrint] WebUSB not supported in this browser');
+            logger.error('[USBPrint] WebUSB not supported in this browser');
             return false;
         }
 
@@ -76,10 +77,10 @@ export class USBPrintDriver extends BasePrinterDriver {
             }
 
             this.connected = true;
-            console.log(`[USBPrint] Connected to ${this.device.productName || 'Unknown device'}`);
+            logger.debug(`[USBPrint] Connected to ${this.device.productName || 'Unknown device'}`);
             return true;
         } catch (error) {
-            console.error('[USBPrint] Connection failed:', error);
+            logger.error('[USBPrint] Connection failed:', error);
             this.connected = false;
             return false;
         }
@@ -90,7 +91,7 @@ export class USBPrintDriver extends BasePrinterDriver {
             try {
                 await this.device.close();
             } catch (error) {
-                console.error('[USBPrint] Disconnect error:', error);
+                logger.error('[USBPrint] Disconnect error:', error);
             }
             this.device = null;
         }
@@ -150,7 +151,7 @@ export class USBPrintDriver extends BasePrinterDriver {
                     address: `${device.vendorId.toString(16)}:${device.productId.toString(16)}`,
                 }));
         } catch (error) {
-            console.error('[USBPrint] Discovery failed:', error);
+            logger.error('[USBPrint] Discovery failed:', error);
             return [];
         }
     }

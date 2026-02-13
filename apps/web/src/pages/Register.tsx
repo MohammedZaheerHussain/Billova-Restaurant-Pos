@@ -6,6 +6,7 @@ import { UserPlus, Mail, Lock, Eye, EyeOff, User, Phone, ArrowLeft } from 'lucid
 import toast from 'react-hot-toast';
 import { authAPI } from '../api';
 import './Register.css';
+import { logger } from '../utils/logger';
 
 export default function RegisterPage() {
     const navigate = useNavigate();
@@ -42,7 +43,7 @@ export default function RegisterPage() {
             toast.success(response.data.message);
             navigate('/login');
         } catch (error: any) {
-            console.error('Registration error:', error);
+            logger.error('Registration error:', error);
             toast.error(error.response?.data?.error || 'Registration failed');
         } finally {
             setLoading(false);

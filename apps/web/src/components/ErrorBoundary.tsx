@@ -1,5 +1,6 @@
 // Error Boundary Component - Catches React errors and displays them
 import React from 'react';
+import { logger } from '../utils/logger';
 
 interface ErrorBoundaryState {
     hasError: boolean;
@@ -21,7 +22,7 @@ export default class ErrorBoundary extends React.Component<
     }
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-        console.error('ErrorBoundary caught an error:', error, errorInfo);
+        logger.error('ErrorBoundary caught an error:', error, errorInfo);
         this.setState({ error, errorInfo });
     }
 

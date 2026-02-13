@@ -2,6 +2,7 @@
 // Supports: Portable BT printers like RPP02N, PT-210, etc.
 import { BasePrinterDriver, PrintResult, PrinterInfo } from './printer-interface';
 import { ESCPOSEncoder } from '../escpos/escpos-encoder';
+import { logger } from '../../utils/logger';
 
 // Extend Navigator interface for Web Bluetooth
 declare global {
@@ -38,7 +39,7 @@ export class BluetoothPrintDriver extends BasePrinterDriver {
      */
     async connect(): Promise<boolean> {
         if (!BluetoothPrintDriver.isSupported()) {
-            console.error('[BluetoothPrint] Web Bluetooth not supported');
+            logger.error('[BluetoothPrint] Web Bluetooth not supported');
             return false;
         }
 
@@ -105,14 +106,14 @@ export class BluetoothPrintDriver extends BasePrinterDriver {
             // Set up disconnect listener
             this.device.addEventListener('gattserverdisconnected', () => {
                 this.connected = false;
-                console.log('[BluetoothPrint] Device disconnected');
+                logger.debug('[BluetoothPrint] Device disconnected');
             });
 
             this.connected = true;
-            console.log(`[BluetoothPrint] Connected to ${this.device.name || 'Unknown device'}`);
+            logger.debug(`[BluetoothPrint] Connected to ${this.device.name || 'Unknown device'}`);
             return true;
         } catch (error) {
-            console.error('[BluetoothPrint] Connection failed:', error);
+            logger.error('[BluetoothPrint] Connection failed:', error);
             this.connected = false;
             return false;
         }

@@ -1,5 +1,6 @@
 // ESC/POS Command Encoder for Thermal Printers
 // Supports: Epson, Star, Bixolon, Citizen, and most ESC/POS compatible printers
+import { logger } from '../../utils/logger';
 
 export enum TextAlign {
     LEFT = 0,
@@ -337,7 +338,7 @@ export class ESCPOSEncoder {
 
             return this;
         } catch (error) {
-            console.error('[ESCPOSEncoder] Image print error:', error);
+            logger.error('[ESCPOSEncoder] Image print error:', error);
             return this;
         }
     }
@@ -351,7 +352,7 @@ export class ESCPOSEncoder {
             const { data, width, height } = await this.processImageForPrinting(imageUrl, maxWidth);
             return this.image(data, width, height);
         } catch (error) {
-            console.error('[ESCPOSEncoder] Logo print error:', error);
+            logger.error('[ESCPOSEncoder] Logo print error:', error);
             return this;
         }
     }

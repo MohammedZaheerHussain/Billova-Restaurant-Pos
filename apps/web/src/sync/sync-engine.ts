@@ -2,6 +2,7 @@
 import { db, OfflineOrder, SyncLog, generateOrderHash } from '../db/indexed-db';
 import { useSyncStore } from '../store/sync-store';
 import api from '../api';
+import { logger } from '../utils/logger';
 
 // Configuration
 const SYNC_CONFIG = {
@@ -243,7 +244,7 @@ class SyncEngine {
             }
 
             // Log progress (sync-store doesn't have setSyncProgress, just log it)
-            console.log(`[SyncEngine] Processing order ${processed + 1}/${totalOrders}: ${order.tempBillNumber}`);
+            logger.debug(`[SyncEngine] Processing order ${processed + 1}/${totalOrders}: ${order.tempBillNumber}`);
 
             // Apply retry delay if this is a retry
             if (order.syncAttempts > 0) {
@@ -271,7 +272,7 @@ class SyncEngine {
     // Main sync function
     async syncAll(): Promise<SyncSummary> {
         if (this.isSyncing) {
-            console.log('[SyncEngine] Sync already in progress, skipping...');
+            logger.debug('[SyncEngine] Sync already in progress, skipping...');
             return { totalSynced: 0, totalFailed: 0, totalSkipped: 0, errors: ['Sync already in progress'] };
         }
 
@@ -286,7 +287,7 @@ class SyncEngine {
         const store = useSyncStore.getState();
         store.setSyncing(true);
 
-        console.log('[SyncEngine] Starting sync...');
+        logger.debug('[SyncEngine] Starting sync...');
 
         try {
             // Sync orders
@@ -306,13 +307,13 @@ class SyncEngine {
                 store.setSyncing(false);
             }
 
-            console.log(`[SyncEngine] Sync complete: ${totalSynced} synced, ${totalFailed} failed`);
+            logger.debug(`[SyncEngine] Sync complete: ${totalSynced} synced, ${totalFailed} failed`);
 
             return ordersSummary;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Sync failed';
             store.setLastSync(new Date().toISOString(), errorMessage);
-            console.error('[SyncEngine] Sync error:', error);
+            logger.error('[SyncEngine] Sync error:', error);
             return { totalSynced: 0, totalFailed: 0, totalSkipped: 0, errors: [errorMessage] };
         } finally {
             this.isSyncing = false;
@@ -331,7 +332,7 @@ class SyncEngine {
 
     // Manual sync trigger
     async manualSync(): Promise<SyncSummary> {
-        console.log('[SyncEngine] Manual sync triggered');
+        logger.debug('[SyncEngine] Manual sync triggered');
         return this.syncAll();
     }
 

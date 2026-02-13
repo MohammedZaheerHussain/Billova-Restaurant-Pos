@@ -2,6 +2,7 @@
 // Supports: Epson TM-T88, Star TSP100, and other TCP/IP printers
 import { BasePrinterDriver, PrintResult, PrinterInfo } from './printer-interface';
 import { ESCPOSEncoder } from '../escpos/escpos-encoder';
+import { logger } from '../../utils/logger';
 
 export interface NetworkPrinterConfig {
     host: string;
@@ -23,7 +24,7 @@ export class NetworkPrintDriver extends BasePrinterDriver {
      */
     async connect(address?: string): Promise<boolean> {
         if (!address) {
-            console.error('[NetworkPrint] No address provided');
+            logger.error('[NetworkPrint] No address provided');
             return false;
         }
 
@@ -47,14 +48,14 @@ export class NetworkPrintDriver extends BasePrinterDriver {
 
             if (response.ok) {
                 this.connected = true;
-                console.log(`[NetworkPrint] Connected to ${host}:${port}`);
+                logger.debug(`[NetworkPrint] Connected to ${host}:${port}`);
                 return true;
             }
 
             this.connected = false;
             return false;
         } catch (error) {
-            console.error('[NetworkPrint] Connection failed:', error);
+            logger.error('[NetworkPrint] Connection failed:', error);
             this.connected = false;
             return false;
         }
@@ -119,7 +120,7 @@ export class NetworkPrintDriver extends BasePrinterDriver {
             }
             return [];
         } catch (error) {
-            console.error('[NetworkPrint] Discovery failed:', error);
+            logger.error('[NetworkPrint] Discovery failed:', error);
             return [];
         }
     }

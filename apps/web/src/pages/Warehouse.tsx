@@ -9,6 +9,7 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 import api from '../api';
 import './Warehouse.css';
+import { logger } from '../utils/logger';
 
 interface Warehouse {
     id: string;
@@ -134,7 +135,7 @@ export default function WarehousePage() {
             const res = await api.get(`/warehouses/${warehouseId}/zones`);
             setZones(res.data);
         } catch (error) {
-            console.error('Failed to fetch zones');
+            logger.error('Failed to fetch zones');
         }
     };
 

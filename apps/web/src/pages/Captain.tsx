@@ -6,6 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '../store';
 import { tablesAPI, menuAPI, ordersAPI } from '../api';
 import './Captain.css';
+import { logger } from '../utils/logger';
 
 interface Table {
     id: string;
@@ -74,7 +75,7 @@ export default function CaptainPage() {
             });
             setCategories(Object.values(cats));
         } catch (error) {
-            console.error('Error fetching data:', error);
+            logger.error('Error fetching data:', error);
             toast.error('Failed to load data');
         } finally {
             setLoading(false);
@@ -152,7 +153,7 @@ export default function CaptainPage() {
                 setShowCart(false);
             }, 2000);
         } catch (error) {
-            console.error('Error submitting order:', error);
+            logger.error('Error submitting order:', error);
             toast.error('Failed to submit order');
         } finally {
             setSubmitting(false);

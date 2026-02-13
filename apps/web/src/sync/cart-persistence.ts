@@ -2,6 +2,7 @@
 // Step 4 of Phase 1: Bulletproof Offline Engine
 
 import Dexie, { Table } from 'dexie';
+import { logger } from '../utils/logger';
 
 // ==================== TYPES ====================
 
@@ -98,7 +99,7 @@ class CartPersistence {
         this.branchId = branchId;
         this.userId = userId;
 
-        console.log('[CartPersistence] Initialized for:', { deviceId, branchId, userId });
+        logger.debug('[CartPersistence] Initialized for:', { deviceId, branchId, userId });
     }
 
     /**
@@ -114,7 +115,7 @@ class CartPersistence {
             }
         }, CART_CONFIG.AUTO_SAVE_INTERVAL_MS);
 
-        console.log('[CartPersistence] Auto-save started');
+        logger.debug('[CartPersistence] Auto-save started');
     }
 
     /**
@@ -124,7 +125,7 @@ class CartPersistence {
         if (this.autoSaveInterval) {
             clearInterval(this.autoSaveInterval);
             this.autoSaveInterval = null;
-            console.log('[CartPersistence] Auto-save stopped');
+            logger.debug('[CartPersistence] Auto-save stopped');
         }
     }
 
@@ -133,7 +134,7 @@ class CartPersistence {
      */
     async saveCart(cartData: Partial<PersistedCart>): Promise<void> {
         if (!this.deviceId || !this.branchId || !this.userId) {
-            console.warn('[CartPersistence] Not initialized, skipping save');
+            logger.warn('[CartPersistence] Not initialized, skipping save');
             return;
         }
 
@@ -174,7 +175,7 @@ class CartPersistence {
 
             this.currentCart = cart;
         } catch (error) {
-            console.error('[CartPersistence] Save failed:', error);
+            logger.error('[CartPersistence] Save failed:', error);
         }
     }
 
@@ -217,7 +218,7 @@ class CartPersistence {
                     : `Recent cart with ${existing.items.length} items`,
             };
         } catch (error) {
-            console.error('[CartPersistence] Check for restore failed:', error);
+            logger.error('[CartPersistence] Check for restore failed:', error);
             return { shouldRestore: false, reason: 'Error checking cart' };
         }
     }
@@ -237,7 +238,7 @@ class CartPersistence {
                 .filter(c => c.branch_id === this.branchId && c.user_id === this.userId)
                 .first() || null;
         } catch (error) {
-            console.error('[CartPersistence] Get cart failed:', error);
+            logger.error('[CartPersistence] Get cart failed:', error);
             return null;
         }
     }
@@ -258,9 +259,9 @@ class CartPersistence {
                 .delete();
 
             this.currentCart = null;
-            console.log('[CartPersistence] Cart cleared');
+            logger.debug('[CartPersistence] Cart cleared');
         } catch (error) {
-            console.error('[CartPersistence] Clear cart failed:', error);
+            logger.error('[CartPersistence] Clear cart failed:', error);
         }
     }
 
@@ -317,7 +318,7 @@ class CartPersistence {
         await cartDB.carts.bulkDelete(oldCarts);
 
         if (oldCarts.length > 0) {
-            console.log(`[CartPersistence] Cleaned up ${oldCarts.length} old carts`);
+            logger.debug(`[CartPersistence] Cleaned up ${oldCarts.length} old carts`);
         }
 
         return oldCarts.length;
