@@ -140,7 +140,7 @@
 | Pages | 25 | Built, need testing |
 | API Routes | 21 | Built, need security hardening |
 | Components | 22+ | Built, need a11y review |
-| Console.logs | 50+ | ❌ Remove for production |
+| Console.logs | 0 (frontend) | ✅ All replaced with prod-safe logger |
 | Tests | 0 | ❌ Critical gap |
 | PWA Config | VitePWA | ⚠️ Manifest conflict |
 | Security | Helmet only | ⚠️ Needs rate limiting |
