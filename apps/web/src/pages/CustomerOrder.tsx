@@ -46,7 +46,7 @@ export default function CustomerOrderPage() {
     const [submitting, setSubmitting] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState<{ orderNumber: number } | null>(null);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
     useEffect(() => {
         if (token) {

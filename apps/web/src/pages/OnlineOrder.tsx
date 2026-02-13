@@ -57,7 +57,7 @@ export default function OnlineOrderPage() {
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerAddress, setCustomerAddress] = useState('');
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
     useEffect(() => {
         if (branchId) {

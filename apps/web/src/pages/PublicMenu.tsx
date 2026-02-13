@@ -41,7 +41,7 @@ export default function PublicMenuPage() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const navigate = useNavigate();
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
     useEffect(() => {
         if (branchId) {

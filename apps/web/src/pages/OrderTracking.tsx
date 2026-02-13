@@ -30,7 +30,7 @@ export default function OrderTrackingPage() {
     const [order, setOrder] = useState<OrderStatus | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
     useEffect(() => {
         fetchOrderStatus();
