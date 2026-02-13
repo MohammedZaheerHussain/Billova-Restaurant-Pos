@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/consumption', authMiddleware, async (req: AuthRequest, res: Respons
             totalTransactions: filtered.length,
         });
     } catch (error) {
-        console.error('Consumption report error:', error);
+        logger.error('Consumption report error:', error);
         res.status(500).json({ error: 'Failed to get consumption report' });
     }
 });
@@ -96,7 +97,7 @@ router.get('/branch-levels', authMiddleware, async (req: AuthRequest, res: Respo
 
         res.json({ items: items || [], summary });
     } catch (error) {
-        console.error('Branch levels error:', error);
+        logger.error('Branch levels error:', error);
         res.status(500).json({ error: 'Failed to get branch stock levels' });
     }
 });
@@ -141,7 +142,7 @@ router.get('/reorder-suggestions', authMiddleware, async (req: AuthRequest, res:
 
         res.json(suggestions);
     } catch (error) {
-        console.error('Reorder suggestions error:', error);
+        logger.error('Reorder suggestions error:', error);
         res.status(500).json({ error: 'Failed to get reorder suggestions' });
     }
 });
@@ -209,7 +210,7 @@ router.get('/forecast', authMiddleware, async (req: AuthRequest, res: Response) 
 
         res.json({ forecastDays, basedOnDays: 30, items: forecasts });
     } catch (error) {
-        console.error('Forecast error:', error);
+        logger.error('Forecast error:', error);
         res.status(500).json({ error: 'Failed to generate forecast' });
     }
 });
@@ -292,7 +293,7 @@ router.get('/wastage-ratio', authMiddleware, async (req: AuthRequest, res: Respo
             items,
         });
     } catch (error) {
-        console.error('Wastage ratio error:', error);
+        logger.error('Wastage ratio error:', error);
         res.status(500).json({ error: 'Failed to get wastage ratio' });
     }
 });
@@ -347,7 +348,7 @@ router.get('/movement-timeline', authMiddleware, async (req: AuthRequest, res: R
 
         res.json({ inventoryItemId, days: Number(days), timeline: Object.values(timeline) });
     } catch (error) {
-        console.error('Movement timeline error:', error);
+        logger.error('Movement timeline error:', error);
         res.status(500).json({ error: 'Failed to get movement timeline' });
     }
 });
@@ -418,7 +419,7 @@ router.get('/dashboard-widget', authMiddleware, async (req: AuthRequest, res: Re
 
         res.json({ stockSummary, todayConsumption, weekConsumption, topConsumedToday });
     } catch (error) {
-        console.error('Dashboard widget error:', error);
+        logger.error('Dashboard widget error:', error);
         res.status(500).json({ error: 'Failed to get dashboard widget data' });
     }
 });
@@ -470,7 +471,7 @@ router.get('/inventory-sales-trend', authMiddleware, async (req: AuthRequest, re
 
         res.json({ days: Number(days), trend: dailyData });
     } catch (error) {
-        console.error('Inventory sales trend error:', error);
+        logger.error('Inventory sales trend error:', error);
         res.status(500).json({ error: 'Failed to get inventory sales trend' });
     }
 });

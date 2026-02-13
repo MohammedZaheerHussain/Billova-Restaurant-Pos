@@ -2,6 +2,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 

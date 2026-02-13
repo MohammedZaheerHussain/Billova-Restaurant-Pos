@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/transfers', async (req: Request, res: Response) => {
 
         res.json(transfers || []);
     } catch (error) {
-        console.error('Error fetching transfers:', error);
+        logger.error('Error fetching transfers:', error);
         res.status(500).json({ error: 'Failed to fetch transfers' });
     }
 });
@@ -83,7 +84,7 @@ router.post('/transfers', async (req: Request, res: Response) => {
 
         res.status(201).json(transfer);
     } catch (error) {
-        console.error('Error creating transfer:', error);
+        logger.error('Error creating transfer:', error);
         res.status(500).json({ error: 'Failed to create transfer' });
     }
 });
@@ -165,7 +166,7 @@ router.put('/transfers/:id/status', async (req: Request, res: Response) => {
 
         res.json(updated);
     } catch (error) {
-        console.error('Error updating transfer:', error);
+        logger.error('Error updating transfer:', error);
         res.status(500).json({ error: 'Failed to update transfer' });
     }
 });
@@ -190,7 +191,7 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json(warehouses || []);
     } catch (error) {
-        console.error('Error fetching warehouses:', error);
+        logger.error('Error fetching warehouses:', error);
         res.status(500).json({ error: 'Failed to fetch warehouses' });
     }
 });
@@ -220,7 +221,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         res.status(201).json(warehouse);
     } catch (error) {
-        console.error('Error creating warehouse:', error);
+        logger.error('Error creating warehouse:', error);
         res.status(500).json({ error: 'Failed to create warehouse' });
     }
 });
@@ -253,7 +254,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
         res.json(warehouse);
     } catch (error) {
-        console.error('Error updating warehouse:', error);
+        logger.error('Error updating warehouse:', error);
         res.status(500).json({ error: 'Failed to update warehouse' });
     }
 });
@@ -274,7 +275,7 @@ router.get('/:id/stock', async (req: Request, res: Response) => {
 
         res.json(stock || []);
     } catch (error) {
-        console.error('Error fetching warehouse stock:', error);
+        logger.error('Error fetching warehouse stock:', error);
         res.status(500).json({ error: 'Failed to fetch stock' });
     }
 });
@@ -317,7 +318,7 @@ router.post('/:id/stock', async (req: Request, res: Response) => {
 
         res.json(stock);
     } catch (error) {
-        console.error('Error updating stock:', error);
+        logger.error('Error updating stock:', error);
         res.status(500).json({ error: 'Failed to update stock' });
     }
 });
@@ -341,7 +342,7 @@ router.get('/:id/zones', async (req: Request, res: Response) => {
 
         res.json(zones || []);
     } catch (error) {
-        console.error('Error fetching zones:', error);
+        logger.error('Error fetching zones:', error);
         res.status(500).json({ error: 'Failed to fetch zones' });
     }
 });
@@ -363,7 +364,7 @@ router.post('/:id/zones', async (req: Request, res: Response) => {
 
         res.status(201).json(zone);
     } catch (error) {
-        console.error('Error creating zone:', error);
+        logger.error('Error creating zone:', error);
         res.status(500).json({ error: 'Failed to create zone' });
     }
 });
@@ -385,7 +386,7 @@ router.get('/zones/:zoneId/racks', async (req: Request, res: Response) => {
 
         res.json(racks || []);
     } catch (error) {
-        console.error('Error fetching racks:', error);
+        logger.error('Error fetching racks:', error);
         res.status(500).json({ error: 'Failed to fetch racks' });
     }
 });
@@ -407,7 +408,7 @@ router.post('/zones/:zoneId/racks', async (req: Request, res: Response) => {
 
         res.status(201).json(rack);
     } catch (error) {
-        console.error('Error creating rack:', error);
+        logger.error('Error creating rack:', error);
         res.status(500).json({ error: 'Failed to create rack' });
     }
 });
@@ -429,7 +430,7 @@ router.get('/racks/:rackId/bins', async (req: Request, res: Response) => {
 
         res.json(bins || []);
     } catch (error) {
-        console.error('Error fetching bins:', error);
+        logger.error('Error fetching bins:', error);
         res.status(500).json({ error: 'Failed to fetch bins' });
     }
 });
@@ -451,7 +452,7 @@ router.post('/racks/:rackId/bins', async (req: Request, res: Response) => {
 
         res.status(201).json(bin);
     } catch (error) {
-        console.error('Error creating bin:', error);
+        logger.error('Error creating bin:', error);
         res.status(500).json({ error: 'Failed to create bin' });
     }
 });
@@ -479,7 +480,7 @@ router.get('/:id/locations', async (req: Request, res: Response) => {
 
         res.json(zones || []);
     } catch (error) {
-        console.error('Error fetching locations:', error);
+        logger.error('Error fetching locations:', error);
         res.status(500).json({ error: 'Failed to fetch locations' });
     }
 });

@@ -3,6 +3,7 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
 import crypto from 'crypto';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.json(tablesWithOrders);
     } catch (error) {
-        console.error('Get tables error:', error);
+        logger.error('Get tables error:', error);
         res.status(500).json({ error: 'Failed to get tables' });
     }
 });
@@ -78,7 +79,7 @@ router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Respon
             status: table.status,
         });
     } catch (error) {
-        console.error('Update table status error:', error);
+        logger.error('Update table status error:', error);
         res.status(500).json({ error: 'Failed to update table status' });
     }
 });
@@ -109,7 +110,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
             status: table.status,
         });
     } catch (error) {
-        console.error('Create table error:', error);
+        logger.error('Create table error:', error);
         res.status(500).json({ error: 'Failed to create table' });
     }
 });
@@ -129,7 +130,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
         res.json({ message: 'Table deleted' });
     } catch (error) {
-        console.error('Delete table error:', error);
+        logger.error('Delete table error:', error);
         res.status(500).json({ error: 'Failed to delete table' });
     }
 });
@@ -162,7 +163,7 @@ router.post('/:id/qr-token', authMiddleware, async (req: AuthRequest, res: Respo
             table: { id: table.id, name: table.name }
         });
     } catch (error) {
-        console.error('Generate QR token error:', error);
+        logger.error('Generate QR token error:', error);
         res.status(500).json({ error: 'Failed to generate QR token' });
     }
 });
@@ -182,7 +183,7 @@ router.delete('/:id/qr-token', authMiddleware, async (req: AuthRequest, res: Res
 
         res.json({ message: 'QR token removed' });
     } catch (error) {
-        console.error('Remove QR token error:', error);
+        logger.error('Remove QR token error:', error);
         res.status(500).json({ error: 'Failed to remove QR token' });
     }
 });

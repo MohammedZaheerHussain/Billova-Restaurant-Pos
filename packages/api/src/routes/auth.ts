@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -21,11 +22,11 @@ router.get('/check-setup', async (req: AuthRequest, res: Response) => {
             .maybeSingle();
 
         const isSetupComplete = !!adminProfile && !error;
-        console.log('[check-setup] Admin found:', adminProfile?.role, 'Setup complete:', isSetupComplete);
+        logger.debug('[check-setup] Admin found:', adminProfile?.role, 'Setup complete:', isSetupComplete);
 
         res.json({ isSetupComplete });
     } catch (error) {
-        console.error('Check setup error:', error);
+        logger.error('Check setup error:', error);
         res.status(500).json({ error: 'Failed to check setup status' });
     }
 });
@@ -104,7 +105,7 @@ router.post('/setup', async (req: AuthRequest, res: Response) => {
             })
             .eq('id', authData.user.id);
 
-        if (profileError) console.warn('Profile update warning:', profileError);
+        if (profileError) logger.warn('Profile update warning:', profileError);
 
         res.status(201).json({
             message: 'Setup completed successfully!',
@@ -114,7 +115,7 @@ router.post('/setup', async (req: AuthRequest, res: Response) => {
             },
         });
     } catch (error) {
-        console.error('Setup error:', error);
+        logger.error('Setup error:', error);
         res.status(500).json({ error: 'Setup failed' });
     }
 });
@@ -132,7 +133,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
         });
 
         if (authError) {
-            console.log('Supabase auth error:', authError.message);
+            logger.debug('Supabase auth error:', authError.message);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -178,7 +179,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
             },
         });
     } catch (error) {
-        console.error('Login error:', error);
+        logger.error('Login error:', error);
         res.status(500).json({ error: 'Login failed' });
     }
 });
@@ -210,7 +211,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
             branch: profile.branches,
         });
     } catch (error) {
-        console.error('Profile error:', error);
+        logger.error('Profile error:', error);
         res.status(500).json({ error: 'Failed to get profile' });
     }
 });
@@ -252,7 +253,7 @@ router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Re
 
         res.json({ message: 'Password changed successfully' });
     } catch (error) {
-        console.error('Change password error:', error);
+        logger.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
     }
 });
@@ -314,7 +315,7 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
             })
             .eq('id', authData.user.id);
 
-        if (profileError) console.warn('Profile update warning:', profileError);
+        if (profileError) logger.warn('Profile update warning:', profileError);
 
         res.status(201).json({
             message: 'User registered successfully',
@@ -326,7 +327,7 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
             },
         });
     } catch (error) {
-        console.error('Register error:', error);
+        logger.error('Register error:', error);
         res.status(500).json({ error: 'Registration failed' });
     }
 });
@@ -338,7 +339,7 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res: Response) =
         // This endpoint is for any server-side cleanup if needed
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
-        console.error('Logout error:', error);
+        logger.error('Logout error:', error);
         res.status(500).json({ error: 'Logout failed' });
     }
 });
@@ -365,7 +366,7 @@ router.post('/refresh', async (req: AuthRequest, res: Response) => {
             expires_at: data.session?.expires_at,
         });
     } catch (error) {
-        console.error('Refresh error:', error);
+        logger.error('Refresh error:', error);
         res.status(500).json({ error: 'Token refresh failed' });
     }
 });
@@ -403,7 +404,7 @@ router.post('/verify-supabase', async (req: AuthRequest, res: Response) => {
             },
         });
     } catch (error) {
-        console.error('Verify error:', error);
+        logger.error('Verify error:', error);
         res.status(500).json({ error: 'Verification failed' });
     }
 });

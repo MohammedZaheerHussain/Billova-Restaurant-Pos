@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
         res.json(transformed);
     } catch (error) {
-        console.error('Get categories error:', error);
+        logger.error('Get categories error:', error);
         res.status(500).json({ error: 'Failed to get categories' });
     }
 });
@@ -79,7 +80,7 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
             isActive: category.is_active,
         });
     } catch (error) {
-        console.error('Create category error:', error);
+        logger.error('Create category error:', error);
         res.status(500).json({ error: 'Failed to create category' });
     }
 });
@@ -116,7 +117,7 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
             isActive: category.is_active,
         });
     } catch (error) {
-        console.error('Update category error:', error);
+        logger.error('Update category error:', error);
         res.status(500).json({ error: 'Failed to update category' });
     }
 });
@@ -146,7 +147,7 @@ router.delete('/:id', authMiddleware, requireRole('OWNER'), async (req: AuthRequ
 
         res.json({ message: 'Category deleted' });
     } catch (error) {
-        console.error('Delete category error:', error);
+        logger.error('Delete category error:', error);
         res.status(500).json({ error: 'Failed to delete category' });
     }
 });

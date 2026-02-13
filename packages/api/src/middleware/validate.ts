@@ -1,6 +1,7 @@
 // Zod Validation Middleware
 import { Request, Response, NextFunction } from 'express';
 import { ZodSchema, ZodError } from 'zod';
+import { logger } from '../lib/logger';
 
 /**
  * Express middleware that validates request body against a Zod schema.

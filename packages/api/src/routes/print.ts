@@ -1,6 +1,7 @@
 // Print API Routes - Backend proxy for network printing
 import { Router, Request, Response } from 'express';
 import * as net from 'net';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -48,10 +49,10 @@ router.post('/', async (req: Request, res: Response) => {
 
         await sendToPrinter(host, port, buffer);
 
-        console.log(`[PrintAPI] Sent ${buffer.length} bytes to ${host}:${port}`);
+        logger.debug(`[PrintAPI] Sent ${buffer.length} bytes to ${host}:${port}`);
         res.json({ success: true, bytesWritten: buffer.length });
     } catch (error) {
-        console.error(`[PrintAPI] Print error:`, error);
+        logger.error(`[PrintAPI] Print error:`, error);
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Print failed',

@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.get('/daily-sales', authMiddleware, async (req: AuthRequest, res: Respons
             orderTypeBreakdown,
         });
     } catch (error) {
-        console.error('Daily sales error:', error);
+        logger.error('Daily sales error:', error);
         res.status(500).json({ error: 'Failed to get daily sales' });
     }
 });
@@ -114,7 +115,7 @@ router.get('/item-sales', authMiddleware, async (req: AuthRequest, res: Response
             items: sorted,
         });
     } catch (error) {
-        console.error('Item sales error:', error);
+        logger.error('Item sales error:', error);
         res.status(500).json({ error: 'Failed to get item sales' });
     }
 });
@@ -163,7 +164,7 @@ router.get('/category-sales', authMiddleware, async (req: AuthRequest, res: Resp
 
         res.json(Object.values(categorySales).sort((a, b) => b.total - a.total));
     } catch (error) {
-        console.error('Category sales error:', error);
+        logger.error('Category sales error:', error);
         res.status(500).json({ error: 'Failed to get category sales' });
     }
 });
@@ -199,7 +200,7 @@ router.get('/hourly-sales', authMiddleware, async (req: AuthRequest, res: Respon
 
         res.json(hourlyData);
     } catch (error) {
-        console.error('Hourly sales error:', error);
+        logger.error('Hourly sales error:', error);
         res.status(500).json({ error: 'Failed to get hourly sales' });
     }
 });
@@ -270,7 +271,7 @@ router.get('/weekly-summary', authMiddleware, async (req: AuthRequest, res: Resp
             trend: Math.round(trend * 10) / 10,
         });
     } catch (error) {
-        console.error('Weekly summary error:', error);
+        logger.error('Weekly summary error:', error);
         res.status(500).json({ error: 'Failed to get weekly summary' });
     }
 });
@@ -320,7 +321,7 @@ router.get('/monthly-summary', authMiddleware, async (req: AuthRequest, res: Res
             daysElapsed: daysInMonth,
         });
     } catch (error) {
-        console.error('Monthly summary error:', error);
+        logger.error('Monthly summary error:', error);
         res.status(500).json({ error: 'Failed to get monthly summary' });
     }
 });
@@ -364,7 +365,7 @@ router.get('/sales-trend', authMiddleware, async (req: AuthRequest, res: Respons
 
         res.json(trend);
     } catch (error) {
-        console.error('Sales trend error:', error);
+        logger.error('Sales trend error:', error);
         res.status(500).json({ error: 'Failed to get sales trend' });
     }
 });

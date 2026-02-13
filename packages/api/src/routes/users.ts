@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Aut
 
         res.json(transformed);
     } catch (error) {
-        console.error('Get users error:', error);
+        logger.error('Get users error:', error);
         res.status(500).json({ error: 'Failed to get users' });
     }
 });
@@ -96,7 +97,7 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
             isActive: true,
         });
     } catch (error) {
-        console.error('Create user error:', error);
+        logger.error('Create user error:', error);
         res.status(500).json({ error: 'Failed to create user' });
     }
 });
@@ -132,7 +133,7 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
             isActive: user.is_active,
         });
     } catch (error) {
-        console.error('Update user error:', error);
+        logger.error('Update user error:', error);
         res.status(500).json({ error: 'Failed to update user' });
     }
 });
@@ -152,7 +153,7 @@ router.post('/:id/reset-password', authMiddleware, requireRole('OWNER'), async (
 
         res.json({ message: 'Password reset successfully' });
     } catch (error) {
-        console.error('Reset password error:', error);
+        logger.error('Reset password error:', error);
         res.status(500).json({ error: 'Failed to reset password' });
     }
 });
@@ -175,7 +176,7 @@ router.delete('/:id', authMiddleware, requireRole('OWNER'), async (req: AuthRequ
 
         res.json({ message: 'User deleted' });
     } catch (error) {
-        console.error('Delete user error:', error);
+        logger.error('Delete user error:', error);
         res.status(500).json({ error: 'Failed to delete user' });
     }
 });
@@ -211,7 +212,7 @@ router.post('/activate-by-email', async (req: AuthRequest, res: Response) => {
 
         res.json({ message: 'User activated successfully! You can now login.' });
     } catch (error) {
-        console.error('Activate user error:', error);
+        logger.error('Activate user error:', error);
         res.status(500).json({ error: 'Failed to activate user' });
     }
 });
@@ -249,7 +250,7 @@ router.post('/upgrade-role', async (req: AuthRequest, res: Response) => {
 
         res.json({ message: `User role updated to ${role}` });
     } catch (error) {
-        console.error('Upgrade role error:', error);
+        logger.error('Upgrade role error:', error);
         res.status(500).json({ error: 'Failed to upgrade role' });
     }
 });

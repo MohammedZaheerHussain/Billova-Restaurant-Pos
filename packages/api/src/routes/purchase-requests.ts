@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json(requests || []);
     } catch (error) {
-        console.error('Error fetching requests:', error);
+        logger.error('Error fetching requests:', error);
         res.status(500).json({ error: 'Failed to fetch requests' });
     }
 });
@@ -85,7 +86,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         res.status(201).json(fullRequest);
     } catch (error) {
-        console.error('Error creating request:', error);
+        logger.error('Error creating request:', error);
         res.status(500).json({ error: 'Failed to create request' });
     }
 });
@@ -116,7 +117,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
 
         res.json(request);
     } catch (error) {
-        console.error('Error updating request:', error);
+        logger.error('Error updating request:', error);
         res.status(500).json({ error: 'Failed to update request' });
     }
 });
@@ -133,7 +134,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting request:', error);
+        logger.error('Error deleting request:', error);
         res.status(500).json({ error: 'Failed to delete request' });
     }
 });

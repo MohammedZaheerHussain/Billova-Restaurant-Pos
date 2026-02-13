@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 export interface AuthRequest extends Request {
     user?: {
@@ -32,7 +33,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             const { data: { user: supabaseUser }, error: supabaseError } = await sb.auth.getUser(token);
 
             if (supabaseError || !supabaseUser) {
-                console.log('[Auth] Supabase token invalid:', supabaseError?.message);
+                logger.debug('[Auth] Supabase token invalid:', supabaseError?.message);
                 return res.status(401).json({ error: 'Invalid token' });
             }
 
@@ -49,7 +50,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
                     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
                     userId = decoded.id;
                 } catch (jwtError) {
-                    console.log('[Auth] Both Supabase and JWT validation failed');
+                    logger.debug('[Auth] Both Supabase and JWT validation failed');
                     return res.status(401).json({ error: 'Invalid token' });
                 }
             }
@@ -63,7 +64,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             .single();
 
         if (error || !freshUser) {
-            console.log('[Auth] User not found in profiles:', userId, error?.message);
+            logger.debug('[Auth] User not found in profiles:', userId, error?.message);
             return res.status(401).json({ error: 'User not found or inactive' });
         }
 
@@ -82,7 +83,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
 
         next();
     } catch (error) {
-        console.error('[Auth] Middleware error:', error);
+        logger.error('[Auth] Middleware error:', error);
         return res.status(401).json({ error: 'Invalid token' });
     }
 };

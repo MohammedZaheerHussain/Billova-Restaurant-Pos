@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             items: c.combo_items,
         })));
     } catch (error) {
-        console.error('Get combos error:', error);
+        logger.error('Get combos error:', error);
         res.status(500).json({ error: 'Failed to get combos' });
     }
 });
@@ -85,7 +86,7 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
             items: comboWithItems.combo_items,
         });
     } catch (error) {
-        console.error('Create combo error:', error);
+        logger.error('Create combo error:', error);
         res.status(500).json({ error: 'Failed to create combo' });
     }
 });
@@ -123,7 +124,7 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
             items: combo.combo_items,
         });
     } catch (error) {
-        console.error('Update combo error:', error);
+        logger.error('Update combo error:', error);
         res.status(500).json({ error: 'Failed to update combo' });
     }
 });
@@ -139,7 +140,7 @@ router.delete('/:id', authMiddleware, requireRole('OWNER'), async (req: AuthRequ
 
         res.json({ message: 'Combo deleted' });
     } catch (error) {
-        console.error('Delete combo error:', error);
+        logger.error('Delete combo error:', error);
         res.status(500).json({ error: 'Failed to delete combo' });
     }
 });

@@ -4,6 +4,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createOrderSchema, orderPaymentSchema } from '../middleware/schemas';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -83,7 +84,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.json((orders || []).map(transformOrder));
     } catch (error) {
-        console.error('Get orders error:', error);
+        logger.error('Get orders error:', error);
         res.status(500).json({ error: 'Failed to get orders' });
     }
 });
@@ -115,7 +116,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.json(transformOrder(order));
     } catch (error) {
-        console.error('Get order error:', error);
+        logger.error('Get order error:', error);
         res.status(500).json({ error: 'Failed to get order' });
     }
 });
@@ -282,7 +283,7 @@ router.post('/', authMiddleware, validate(createOrderSchema), async (req: AuthRe
 
         res.status(201).json(transformOrder(completeOrder || order));
     } catch (error) {
-        console.error('Create order error:', error);
+        logger.error('Create order error:', error);
         res.status(500).json({ error: 'Failed to create order' });
     }
 });
@@ -346,7 +347,7 @@ router.post('/:id/payment', authMiddleware, validate(orderPaymentSchema), async 
             reference: payment.reference,
         });
     } catch (error) {
-        console.error('Add payment error:', error);
+        logger.error('Add payment error:', error);
         res.status(500).json({ error: 'Failed to add payment' });
     }
 });
@@ -389,7 +390,7 @@ router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Respon
 
         res.json(transformOrder(order));
     } catch (error) {
-        console.error('Update order status error:', error);
+        logger.error('Update order status error:', error);
         res.status(500).json({ error: 'Failed to update order status' });
     }
 });
@@ -489,7 +490,7 @@ router.put('/:id/items', authMiddleware, async (req: AuthRequest, res: Response)
 
         res.json(transformOrder(updatedOrder));
     } catch (error) {
-        console.error('Update order items error:', error);
+        logger.error('Update order items error:', error);
         res.status(500).json({ error: 'Failed to update order items' });
     }
 });
@@ -526,7 +527,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
         res.json({ message: 'Order cancelled' });
     } catch (error) {
-        console.error('Cancel order error:', error);
+        logger.error('Cancel order error:', error);
         res.status(500).json({ error: 'Failed to cancel order' });
     }
 });
@@ -648,7 +649,7 @@ router.post('/sync', authMiddleware, async (req: AuthRequest, res: Response) => 
             synced: true,
         });
     } catch (error) {
-        console.error('Sync order error:', error);
+        logger.error('Sync order error:', error);
         res.status(500).json({ error: 'Failed to sync order' });
     }
 });
@@ -707,7 +708,7 @@ router.post('/sync-payment', authMiddleware, async (req: AuthRequest, res: Respo
 
         res.status(201).json({ id: payment.id, synced: true });
     } catch (error) {
-        console.error('Sync payment error:', error);
+        logger.error('Sync payment error:', error);
         res.status(500).json({ error: 'Failed to sync payment' });
     }
 });
@@ -761,7 +762,7 @@ router.post('/sync-kot', authMiddleware, async (req: AuthRequest, res: Response)
 
         res.status(201).json({ synced: true, items_count: kotItems.length });
     } catch (error) {
-        console.error('Sync KOT error:', error);
+        logger.error('Sync KOT error:', error);
         res.status(500).json({ error: 'Failed to sync KOT' });
     }
 });
@@ -819,7 +820,7 @@ router.post('/status-intent', authMiddleware, async (req: AuthRequest, res: Resp
 
         res.json({ accepted: true, server_status: intended_status });
     } catch (error) {
-        console.error('Status intent error:', error);
+        logger.error('Status intent error:', error);
         res.status(500).json({ error: 'Failed to process status intent' });
     }
 });
@@ -874,7 +875,7 @@ router.post('/sync-cancellation', authMiddleware, async (req: AuthRequest, res: 
 
         res.status(201).json({ id: event.id, synced: true });
     } catch (error) {
-        console.error('Sync cancellation error:', error);
+        logger.error('Sync cancellation error:', error);
         res.status(500).json({ error: 'Failed to sync cancellation' });
     }
 });

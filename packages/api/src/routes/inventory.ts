@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -103,7 +104,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.json((items || []).map(transformItem));
     } catch (error) {
-        console.error('Get inventory error:', error);
+        logger.error('Get inventory error:', error);
         res.status(500).json({ error: 'Failed to get inventory' });
     }
 });
@@ -141,7 +142,7 @@ router.get('/dashboard-summary', authMiddleware, async (req: AuthRequest, res: R
             unreadAlerts: alertsRes.count || 0,
         });
     } catch (error) {
-        console.error('Dashboard summary error:', error);
+        logger.error('Dashboard summary error:', error);
         res.status(500).json({ error: 'Failed to get dashboard summary' });
     }
 });
@@ -185,7 +186,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
             alerts: alerts || [],
         });
     } catch (error) {
-        console.error('Get inventory item error:', error);
+        logger.error('Get inventory item error:', error);
         res.status(500).json({ error: 'Failed to get inventory item' });
     }
 });
@@ -240,7 +241,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.status(201).json(transformItem(item));
     } catch (error) {
-        console.error('Create inventory item error:', error);
+        logger.error('Create inventory item error:', error);
         res.status(500).json({ error: 'Failed to create inventory item' });
     }
 });
@@ -292,7 +293,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
 
         res.json(transformItem(item));
     } catch (error) {
-        console.error('Update inventory item error:', error);
+        logger.error('Update inventory item error:', error);
         res.status(500).json({ error: 'Failed to update inventory item' });
     }
 });
@@ -319,7 +320,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 
         res.json({ message: 'Inventory item deleted' });
     } catch (error) {
-        console.error('Delete inventory item error:', error);
+        logger.error('Delete inventory item error:', error);
         res.status(500).json({ error: 'Failed to delete inventory item' });
     }
 });
@@ -395,7 +396,7 @@ router.post('/:id/adjust', authMiddleware, async (req: AuthRequest, res: Respons
 
         res.json({ approved: false, message: 'Adjustment request submitted for approval', request });
     } catch (error) {
-        console.error('Adjust stock error:', error);
+        logger.error('Adjust stock error:', error);
         res.status(500).json({ error: 'Failed to adjust stock' });
     }
 });
@@ -423,7 +424,7 @@ router.get('/alerts/list', authMiddleware, async (req: AuthRequest, res: Respons
 
         res.json(alerts || []);
     } catch (error) {
-        console.error('Get stock alerts error:', error);
+        logger.error('Get stock alerts error:', error);
         res.status(500).json({ error: 'Failed to get stock alerts' });
     }
 });
@@ -438,7 +439,7 @@ router.patch('/alerts/:id/read', authMiddleware, async (req: AuthRequest, res: R
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Mark alert read error:', error);
+        logger.error('Mark alert read error:', error);
         res.status(500).json({ error: 'Failed to mark alert as read' });
     }
 });
@@ -456,7 +457,7 @@ router.post('/alerts/read-all', authMiddleware, async (req: AuthRequest, res: Re
 
         res.json({ success: true });
     } catch (error) {
-        console.error('Mark all alerts read error:', error);
+        logger.error('Mark all alerts read error:', error);
         res.status(500).json({ error: 'Failed to mark all alerts as read' });
     }
 });
@@ -510,7 +511,7 @@ router.post('/consume', authMiddleware, async (req: AuthRequest, res: Response) 
 
         res.json({ success: true, consumedItems });
     } catch (error) {
-        console.error('Consume stock error:', error);
+        logger.error('Consume stock error:', error);
         res.status(500).json({ error: 'Failed to consume stock' });
     }
 });
@@ -536,7 +537,7 @@ router.post('/link-menu-item', authMiddleware, async (req: AuthRequest, res: Res
 
         res.status(201).json(link);
     } catch (error) {
-        console.error('Link menu item error:', error);
+        logger.error('Link menu item error:', error);
         res.status(500).json({ error: 'Failed to link menu item' });
     }
 });
@@ -551,7 +552,7 @@ router.delete('/link/:id', authMiddleware, async (req: AuthRequest, res: Respons
 
         res.json({ message: 'Link removed' });
     } catch (error) {
-        console.error('Remove link error:', error);
+        logger.error('Remove link error:', error);
         res.status(500).json({ error: 'Failed to remove link' });
     }
 });

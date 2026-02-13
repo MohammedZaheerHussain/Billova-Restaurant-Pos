@@ -3,6 +3,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -255,7 +256,7 @@ router.get('/owner-summary', authMiddleware, requireRole('SUPER_ADMIN', 'ADMIN',
             branchId,
         });
     } catch (error) {
-        console.error('Owner dashboard error:', error);
+        logger.error('Owner dashboard error:', error);
         res.status(500).json({ error: 'Failed to load dashboard' });
     }
 });

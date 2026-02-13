@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get('/menu/:token', async (req: Request, res: Response) => {
             menuItems: menuItems || [],
         });
     } catch (error) {
-        console.error('Error fetching menu:', error);
+        logger.error('Error fetching menu:', error);
         res.status(500).json({ error: 'Failed to load menu' });
     }
 });
@@ -75,7 +76,7 @@ router.get('/branch/:branchId', async (req: Request, res: Response) => {
             gstNumber: branch.gst_number,
         });
     } catch (error) {
-        console.error('Error fetching branch:', error);
+        logger.error('Error fetching branch:', error);
         res.status(500).json({ error: 'Failed to load restaurant info' });
     }
 });
@@ -111,7 +112,7 @@ router.get('/menu-full/:branchId', async (req: Request, res: Response) => {
 
         res.json({ branch, categories: categories || [], menuItems: menuItems || [] });
     } catch (error) {
-        console.error('Error fetching full menu:', error);
+        logger.error('Error fetching full menu:', error);
         res.status(500).json({ error: 'Failed to load menu' });
     }
 });
@@ -144,7 +145,7 @@ router.get('/order-status/:orderId', async (req: Request, res: Response) => {
             })),
         });
     } catch (error) {
-        console.error('Error fetching order status:', error);
+        logger.error('Error fetching order status:', error);
         res.status(500).json({ error: 'Failed to get order status' });
     }
 });
@@ -246,7 +247,7 @@ router.post('/order', async (req: Request, res: Response) => {
             message: 'Order placed successfully! Your order will be prepared shortly.',
         });
     } catch (error) {
-        console.error('Error creating order:', error);
+        logger.error('Error creating order:', error);
         res.status(500).json({ error: 'Failed to place order' });
     }
 });
@@ -349,7 +350,7 @@ router.post('/online-order', async (req: Request, res: Response) => {
                 : 'Order placed! We will call you when ready for pickup.',
         });
     } catch (error) {
-        console.error('Error creating online order:', error);
+        logger.error('Error creating online order:', error);
         res.status(500).json({ error: 'Failed to place order' });
     }
 });

@@ -1,11 +1,12 @@
 // Supabase Client for API (Service Role)
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { logger } from './logger';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    logger.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
     process.exit(1);
 }
 
@@ -148,7 +149,7 @@ export async function getProfileByAuthId(authId: string): Promise<Profile | null
         .single();
 
     if (error) {
-        console.error('Error fetching profile:', error);
+        logger.error('Error fetching profile:', error);
         return null;
     }
     return data;
@@ -162,10 +163,10 @@ export async function getBranchById(branchId: string): Promise<Branch | null> {
         .single();
 
     if (error) {
-        console.error('Error fetching branch:', error);
+        logger.error('Error fetching branch:', error);
         return null;
     }
     return data;
 }
 
-console.log('✅ Supabase service client initialized');
+logger.info('✅ Supabase service client initialized');

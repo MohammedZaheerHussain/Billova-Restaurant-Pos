@@ -2,6 +2,7 @@
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 const requireSuperAdmin = requireRole('SUPER_ADMIN');
@@ -44,7 +45,7 @@ router.get('/dashboard', authMiddleware, requireSuperAdmin, async (req: AuthRequ
             openTickets: ticketsRes.count || 0,
         });
     } catch (error) {
-        console.error('Super admin dashboard error:', error);
+        logger.error('Super admin dashboard error:', error);
         res.status(500).json({ error: 'Failed to get dashboard data' });
     }
 });
@@ -99,7 +100,7 @@ router.get('/restaurants', authMiddleware, requireSuperAdmin, async (req: AuthRe
 
         res.json(enriched);
     } catch (error) {
-        console.error('Get restaurants error:', error);
+        logger.error('Get restaurants error:', error);
         res.status(500).json({ error: 'Failed to get restaurants' });
     }
 });
@@ -168,7 +169,7 @@ router.get('/restaurants/:id', authMiddleware, requireSuperAdmin, async (req: Au
             _count: { orders: orderCount || 0, users: userCount || 0 },
         });
     } catch (error) {
-        console.error('Get restaurant error:', error);
+        logger.error('Get restaurant error:', error);
         res.status(500).json({ error: 'Failed to get restaurant' });
     }
 });
@@ -197,7 +198,7 @@ router.post('/restaurants/:id/force-deactivate', authMiddleware, requireSuperAdm
 
         res.json({ message: 'Restaurant deactivated successfully' });
     } catch (error) {
-        console.error('Force deactivate error:', error);
+        logger.error('Force deactivate error:', error);
         res.status(500).json({ error: 'Failed to deactivate restaurant' });
     }
 });
@@ -250,7 +251,7 @@ router.post('/restaurants/:id/upgrade-plan', authMiddleware, requireSuperAdmin, 
             license,
         });
     } catch (error) {
-        console.error('Upgrade plan error:', error);
+        logger.error('Upgrade plan error:', error);
         res.status(500).json({ error: 'Failed to upgrade plan' });
     }
 });
@@ -275,7 +276,7 @@ router.post('/restaurants/:id/reactivate', authMiddleware, requireSuperAdmin, as
 
         res.json({ message: 'Restaurant reactivated successfully' });
     } catch (error) {
-        console.error('Reactivate error:', error);
+        logger.error('Reactivate error:', error);
         res.status(500).json({ error: 'Failed to reactivate restaurant' });
     }
 });
@@ -404,7 +405,7 @@ router.post('/restaurants', authMiddleware, requireSuperAdmin, async (req: AuthR
             },
         });
     } catch (error) {
-        console.error('Create restaurant error:', error);
+        logger.error('Create restaurant error:', error);
         res.status(500).json({ error: 'Failed to create restaurant' });
     }
 });
@@ -433,7 +434,7 @@ router.patch('/restaurants/:id', authMiddleware, requireSuperAdmin, async (req: 
 
         res.json(branch);
     } catch (error) {
-        console.error('Update restaurant error:', error);
+        logger.error('Update restaurant error:', error);
         res.status(500).json({ error: 'Failed to update restaurant' });
     }
 });
@@ -475,7 +476,7 @@ router.patch('/licenses/:branchId', authMiddleware, requireSuperAdmin, async (re
 
         res.json(updated);
     } catch (error) {
-        console.error('Update license error:', error);
+        logger.error('Update license error:', error);
         res.status(500).json({ error: 'Failed to update license' });
     }
 });
@@ -491,7 +492,7 @@ router.delete('/restaurants/:id', authMiddleware, requireSuperAdmin, async (req:
 
         res.json({ message: 'Restaurant deactivated' });
     } catch (error) {
-        console.error('Delete restaurant error:', error);
+        logger.error('Delete restaurant error:', error);
         res.status(500).json({ error: 'Failed to deactivate restaurant' });
     }
 });
@@ -508,7 +509,7 @@ router.get('/password-resets', authMiddleware, requireSuperAdmin, async (req: Au
 
         if (error) {
             // Table might not exist, return empty array
-            console.log('Password resets query note:', error.message);
+            logger.debug('Password resets query note:', error.message);
             return res.json([]);
         }
 
@@ -524,7 +525,7 @@ router.get('/password-resets', authMiddleware, requireSuperAdmin, async (req: Au
 
         res.json(enriched);
     } catch (error) {
-        console.error('Get password resets error:', error);
+        logger.error('Get password resets error:', error);
         res.json([]);
     }
 });
@@ -565,7 +566,7 @@ router.post('/password-resets/:id/complete', authMiddleware, requireSuperAdmin, 
 
         res.json({ message: 'Password reset successfully!' });
     } catch (error) {
-        console.error('Complete password reset error:', error);
+        logger.error('Complete password reset error:', error);
         res.status(500).json({ error: 'Failed to reset password' });
     }
 });
@@ -589,7 +590,7 @@ router.post('/users/:userId/reset-password', authMiddleware, requireSuperAdmin, 
 
         res.json({ message: 'Password reset successfully!' });
     } catch (error) {
-        console.error('Reset password error:', error);
+        logger.error('Reset password error:', error);
         res.status(500).json({ error: 'Failed to reset password' });
     }
 });
@@ -606,7 +607,7 @@ router.get('/support-tickets', authMiddleware, requireSuperAdmin, async (req: Au
 
         if (error) {
             // Table might not exist, return empty array
-            console.log('Support tickets query note:', error.message);
+            logger.debug('Support tickets query note:', error.message);
             return res.json([]);
         }
 
@@ -622,7 +623,7 @@ router.get('/support-tickets', authMiddleware, requireSuperAdmin, async (req: Au
 
         res.json(enriched);
     } catch (error) {
-        console.error('Get support tickets error:', error);
+        logger.error('Get support tickets error:', error);
         res.json([]);
     }
 });
@@ -652,7 +653,7 @@ router.patch('/support-tickets/:id', authMiddleware, requireSuperAdmin, async (r
 
         res.json(ticket);
     } catch (error) {
-        console.error('Update ticket error:', error);
+        logger.error('Update ticket error:', error);
         res.status(500).json({ error: 'Failed to update ticket' });
     }
 });

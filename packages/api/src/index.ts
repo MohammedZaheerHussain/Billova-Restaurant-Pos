@@ -32,6 +32,7 @@ import purchaseOrderRoutes from './routes/purchase-orders';
 import adjustmentsRoutes from './routes/adjustments';
 import printRoutes from './routes/print';
 import dashboardRoutes from './routes/dashboard';
+import { logger } from './lib/logger';
 
 
 const app = express();
@@ -161,7 +162,7 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
     }
 
     // Log the error (keep console.error for server-side — not browser)
-    console.error(`[API Error] ${req.method} ${req.path}:`, err.message || err);
+    logger.error(`[API Error] ${req.method} ${req.path}:`, err.message || err);
 
     const statusCode = err.statusCode || err.status || 500;
     res.status(statusCode).json({
@@ -172,7 +173,7 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`
+    logger.debug(`
   🚀 Billova POS API Server
   ========================
   🌐 Server: http://localhost:${PORT}
@@ -183,6 +184,6 @@ app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('Shutting down gracefully...');
+    logger.debug('Shutting down gracefully...');
     process.exit(0);
 });

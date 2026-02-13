@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json(adjustments || []);
     } catch (error) {
-        console.error('Error fetching adjustments:', error);
+        logger.error('Error fetching adjustments:', error);
         res.status(500).json({ error: 'Failed to fetch adjustments' });
     }
 });
@@ -65,7 +66,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         res.status(201).json(adjustment);
     } catch (error) {
-        console.error('Error creating adjustment:', error);
+        logger.error('Error creating adjustment:', error);
         res.status(500).json({ error: 'Failed to create adjustment' });
     }
 });
@@ -155,7 +156,7 @@ router.put('/:id/approve', async (req: Request, res: Response) => {
 
         res.json(updated);
     } catch (error) {
-        console.error('Error approving adjustment:', error);
+        logger.error('Error approving adjustment:', error);
         res.status(500).json({ error: 'Failed to approve adjustment' });
     }
 });
@@ -184,7 +185,7 @@ router.put('/:id/reject', async (req: Request, res: Response) => {
 
         res.json(adjustment);
     } catch (error) {
-        console.error('Error rejecting adjustment:', error);
+        logger.error('Error rejecting adjustment:', error);
         res.status(500).json({ error: 'Failed to reject adjustment' });
     }
 });
@@ -219,7 +220,7 @@ router.get('/stats', async (req: Request, res: Response) => {
             return { adjustmentType, status, _count: value.count, _sum: { quantity: value.totalQty } };
         }));
     } catch (error) {
-        console.error('Error fetching stats:', error);
+        logger.error('Error fetching stats:', error);
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });

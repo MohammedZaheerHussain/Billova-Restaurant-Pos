@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -29,7 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json(orders || []);
     } catch (error) {
-        console.error('Error fetching purchase orders:', error);
+        logger.error('Error fetching purchase orders:', error);
         res.status(500).json({ error: 'Failed to fetch purchase orders' });
     }
 });
@@ -57,7 +58,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
         res.json(order);
     } catch (error) {
-        console.error('Error fetching purchase order:', error);
+        logger.error('Error fetching purchase order:', error);
         res.status(500).json({ error: 'Failed to fetch purchase order' });
     }
 });
@@ -115,7 +116,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         res.status(201).json(order);
     } catch (error) {
-        console.error('Error creating purchase order:', error);
+        logger.error('Error creating purchase order:', error);
         res.status(500).json({ error: 'Failed to create purchase order' });
     }
 });
@@ -146,7 +147,7 @@ router.put('/:id/status', async (req: Request, res: Response) => {
 
         res.json(order);
     } catch (error) {
-        console.error('Error updating PO status:', error);
+        logger.error('Error updating PO status:', error);
         res.status(500).json({ error: 'Failed to update status' });
     }
 });
@@ -295,7 +296,7 @@ router.post('/:id/receive', async (req: Request, res: Response) => {
 
         res.status(201).json(grn);
     } catch (error) {
-        console.error('Error receiving goods:', error);
+        logger.error('Error receiving goods:', error);
         res.status(500).json({ error: 'Failed to receive goods' });
     }
 });

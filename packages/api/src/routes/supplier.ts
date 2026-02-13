@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
 
         res.json((suppliers || []).map(transformSupplier));
     } catch (error) {
-        console.error('Error fetching suppliers:', error);
+        logger.error('Error fetching suppliers:', error);
         res.status(500).json({ error: 'Failed to fetch suppliers' });
     }
 });
@@ -72,7 +73,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
         res.json({ ...transformSupplier(supplier), purchaseOrders: purchaseOrders || [] });
     } catch (error) {
-        console.error('Error fetching supplier:', error);
+        logger.error('Error fetching supplier:', error);
         res.status(500).json({ error: 'Failed to fetch supplier' });
     }
 });
@@ -103,7 +104,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         res.status(201).json(transformSupplier(supplier));
     } catch (error) {
-        console.error('Error creating supplier:', error);
+        logger.error('Error creating supplier:', error);
         res.status(500).json({ error: 'Failed to create supplier' });
     }
 });
@@ -136,7 +137,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
         res.json(transformSupplier(supplier));
     } catch (error) {
-        console.error('Error updating supplier:', error);
+        logger.error('Error updating supplier:', error);
         res.status(500).json({ error: 'Failed to update supplier' });
     }
 });
@@ -151,7 +152,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
         res.json({ message: 'Supplier deleted successfully' });
     } catch (error) {
-        console.error('Error deleting supplier:', error);
+        logger.error('Error deleting supplier:', error);
         res.status(500).json({ error: 'Failed to delete supplier' });
     }
 });

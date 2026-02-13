@@ -3,6 +3,7 @@ import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
 import Groq from 'groq-sdk';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -56,7 +57,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
         res.json(transformed);
     } catch (error) {
-        console.error('Get menu error:', error);
+        logger.error('Get menu error:', error);
         res.status(500).json({ error: 'Failed to get menu' });
     }
 });
@@ -100,7 +101,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
         res.json(transformed);
     } catch (error) {
-        console.error('Get menu item error:', error);
+        logger.error('Get menu item error:', error);
         res.status(500).json({ error: 'Failed to get menu item' });
     }
 });
@@ -173,7 +174,7 @@ router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: Au
             variants: completeItem.menu_item_variants,
         });
     } catch (error) {
-        console.error('Create menu item error:', error);
+        logger.error('Create menu item error:', error);
         res.status(500).json({ error: 'Failed to create menu item' });
     }
 });
@@ -224,7 +225,7 @@ router.put('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: 
             variants: item.menu_item_variants,
         });
     } catch (error) {
-        console.error('Update menu item error:', error);
+        logger.error('Update menu item error:', error);
         res.status(500).json({ error: 'Failed to update menu item' });
     }
 });
@@ -261,7 +262,7 @@ router.patch('/:id/toggle-availability', authMiddleware, async (req: AuthRequest
             isAvailable: updated.is_available,
         });
     } catch (error) {
-        console.error('Toggle availability error:', error);
+        logger.error('Toggle availability error:', error);
         res.status(500).json({ error: 'Failed to toggle availability' });
     }
 });
@@ -299,7 +300,7 @@ router.delete('/:id', authMiddleware, requireRole('OWNER', 'MANAGER'), async (re
 
         res.json({ message: 'Menu item deleted' });
     } catch (error: any) {
-        console.error('Delete menu item error:', error);
+        logger.error('Delete menu item error:', error);
         if (error.code === '23503') { // Foreign key violation
             res.status(400).json({ error: 'Cannot delete item - it is used in existing orders' });
         } else {
@@ -390,7 +391,7 @@ Rules:
                 extractedData = JSON.parse(cleanJson);
 
             } catch (aiError: any) {
-                console.error('AI extraction failed:', aiError);
+                logger.error('AI extraction failed:', aiError);
                 return res.status(500).json({
                     error: 'AI extraction failed. ' + (aiError.message || 'Please try again.'),
                 });
@@ -444,7 +445,7 @@ Rules:
             message: `✨ AI extracted ${itemsWithCategoryIds.length} items in ${extractedData.categories.length} categories`,
         });
     } catch (error) {
-        console.error('Extract menu error:', error);
+        logger.error('Extract menu error:', error);
         res.status(500).json({ error: 'Failed to extract menu items' });
     }
 });

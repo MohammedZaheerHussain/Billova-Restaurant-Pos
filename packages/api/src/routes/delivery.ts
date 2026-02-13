@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router.get('/orders', async (req: Request, res: Response) => {
         // Gracefully handle missing table (table may not exist yet in some deployments)
         if (error) {
             if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-                console.warn('[Delivery] delivery_assignments table not found — returning empty array');
+                logger.warn('[Delivery] delivery_assignments table not found — returning empty array');
                 return res.json([]);
             }
             throw error;
@@ -44,7 +45,7 @@ router.get('/orders', async (req: Request, res: Response) => {
 
         res.json(assignments || []);
     } catch (error) {
-        console.error('Error fetching delivery orders:', error);
+        logger.error('Error fetching delivery orders:', error);
         res.status(500).json({ error: 'Failed to fetch orders' });
     }
 });
@@ -84,7 +85,7 @@ router.post('/assign', async (req: Request, res: Response) => {
 
         res.json(assignment);
     } catch (error) {
-        console.error('Error assigning driver:', error);
+        logger.error('Error assigning driver:', error);
         res.status(500).json({ error: 'Failed to assign driver' });
     }
 });
@@ -131,7 +132,7 @@ router.put('/orders/:id/status', async (req: Request, res: Response) => {
 
         res.json(updated);
     } catch (error) {
-        console.error('Error updating delivery:', error);
+        logger.error('Error updating delivery:', error);
         res.status(500).json({ error: 'Failed to update delivery' });
     }
 });
@@ -153,7 +154,7 @@ router.get('/drivers', async (req: Request, res: Response) => {
 
         res.json(drivers || []);
     } catch (error) {
-        console.error('Error fetching drivers:', error);
+        logger.error('Error fetching drivers:', error);
         res.status(500).json({ error: 'Failed to fetch drivers' });
     }
 });
