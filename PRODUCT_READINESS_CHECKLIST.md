@@ -92,7 +92,7 @@
 - [x] **Addons page** — Wired to sidebar with `inventory` feature gate + lazy-loaded route in `App.tsx`.
 - [x] **Owner Dashboard** — Wired to sidebar with OWNER/ADMIN role guard + route in `App.tsx`.
 - [ ] **Customer self-order** — `CustomerOrder.tsx` + `/order/:token` route — needs end-to-end testing.
-- [ ] **Public Menu** — `/m/:branchId` route — needs branchId fix.
+- [x] **Public Menu** — `/m/:branchId` route — Fixed: API port was wrong (3001→3002), added `VITE_API_URL` to `.env`.
 - [ ] **Online Order** — `/o/:branchId` — needs end-to-end testing.
 - [ ] **Order Tracking** — `/track/:orderId` — needs real-time verification.
 - [ ] **Warehouse ↔ Inventory sync** — Both pages exist (locked 🔒) but need data sync verification.
