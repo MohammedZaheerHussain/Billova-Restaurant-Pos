@@ -305,7 +305,7 @@ async function syncPendingOrders(): Promise<{ synced: number; failed: number }> 
             await recordSyncEvent(order.branchId, 'ORDER', order.localId, 'pending');
 
             // Transform and send to API
-            const response = await fetch('/api/orders/sync', {
+            const response = await fetch('/api/v1/orders/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -387,7 +387,7 @@ async function syncPendingPayments(): Promise<{ synced: number; failed: number }
                 continue;
             }
 
-            const response = await fetch('/api/orders/sync-payment', {
+            const response = await fetch('/api/v1/orders/sync-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -446,7 +446,7 @@ async function syncPendingKOTs(): Promise<{ synced: number; failed: number }> {
             const order = await db.offlineOrders.get(kot.orderLocalId);
             if (!order?.serverId) continue;
 
-            const response = await fetch('/api/orders/sync-kot', {
+            const response = await fetch('/api/v1/orders/sync-kot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -493,7 +493,7 @@ async function syncOrderStatusUpdates(): Promise<{ synced: number; failed: numbe
             if (!order?.serverId) continue;
 
             // Order status is server-authoritative - we send intent only
-            const response = await fetch('/api/orders/status-intent', {
+            const response = await fetch('/api/v1/orders/status-intent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -547,7 +547,7 @@ async function syncCancelledItems(): Promise<{ synced: number; failed: number }>
             const order = await db.offlineOrders.get(item.orderLocalId);
             if (!order?.serverId) continue;
 
-            const response = await fetch('/api/orders/sync-cancellation', {
+            const response = await fetch('/api/v1/orders/sync-cancellation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

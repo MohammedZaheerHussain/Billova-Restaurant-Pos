@@ -82,7 +82,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Apply rate limiting
 app.use('/api/', generalLimiter);
-app.use('/api/auth', authLimiter);
+app.use('/api/v1/auth', authLimiter);
 
 // Make Supabase available to routes
 app.use((req, res, next) => {
@@ -126,30 +126,30 @@ app.get('/api/health', async (req, res) => {
     });
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/menu', menuRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/tables', tableRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/combos', comboRoutes);
-app.use('/api/super-admin', superAdminRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/inventory-reports', inventoryReportsRoutes);
-app.use('/api/addons', addonsRoutes);
-app.use('/api/warehouses', warehouseRoutes);
-app.use('/api/purchase-requests', purchaseRequestRoutes);
-app.use('/api/delivery', deliveryRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/purchase-orders', purchaseOrderRoutes);
-app.use('/api/adjustments', adjustmentsRoutes);
-app.use('/api/print', printRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+// Versioned Routes (v1)
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/menu', menuRoutes);
+app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1/tables', tableRoutes);
+app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/combos', comboRoutes);
+app.use('/api/v1/super-admin', superAdminRoutes);
+app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/inventory-reports', inventoryReportsRoutes);
+app.use('/api/v1/addons', addonsRoutes);
+app.use('/api/v1/warehouses', warehouseRoutes);
+app.use('/api/v1/purchase-requests', purchaseRequestRoutes);
+app.use('/api/v1/delivery', deliveryRoutes);
+app.use('/api/v1/suppliers', supplierRoutes);
+app.use('/api/v1/purchase-orders', purchaseOrderRoutes);
+app.use('/api/v1/adjustments', adjustmentsRoutes);
+app.use('/api/v1/print', printRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 
-// Public routes (no auth required)
-app.use('/api/public', customerOrderRoutes);
+// Public routes (no auth required) — also versioned
+app.use('/api/v1/public', customerOrderRoutes);
 
 // Standardized Error Handler
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

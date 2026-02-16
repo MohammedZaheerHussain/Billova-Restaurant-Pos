@@ -52,7 +52,7 @@ export default function PublicMenuPage() {
     const fetchMenu = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}/api/public/menu-full/${branchId}`);
+            const response = await fetch(`${API_URL}/api/v1/public/menu-full/${branchId}`);
             if (!response.ok) {
                 throw new Error('Restaurant not found');
             }

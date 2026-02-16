@@ -4,7 +4,7 @@ import { useAuthStore } from '../store';
 import { supabase } from '../lib/supabase';
 
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: '/api/v1',
     headers: {
         'Content-Type': 'application/json',
     },

@@ -57,7 +57,7 @@ export default function CustomerOrderPage() {
     const fetchMenu = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}/api/public/menu/${token}`);
+            const response = await fetch(`${API_URL}/api/v1/public/menu/${token}`);
             if (!response.ok) {
                 throw new Error('Invalid or expired QR code');
             }
@@ -122,7 +122,7 @@ export default function CustomerOrderPage() {
 
         try {
             setSubmitting(true);
-            const response = await fetch(`${API_URL}/api/public/order`, {
+            const response = await fetch(`${API_URL}/api/v1/public/order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

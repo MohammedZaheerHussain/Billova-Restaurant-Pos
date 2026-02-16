@@ -15,7 +15,7 @@ export class NetworkPrintDriver extends BasePrinterDriver {
     readonly name = 'Network Printer';
 
     private config: NetworkPrinterConfig | null = null;
-    private printServerUrl: string = '/api/print';  // Backend proxy endpoint
+    private printServerUrl: string = '/api/v1/print';  // Backend proxy endpoint
 
     /**
      * Connect to a network printer
@@ -126,7 +126,7 @@ export class NetworkPrintDriver extends BasePrinterDriver {
     }
 
     /**
-     * Set custom print server URL (if not using default /api/print)
+     * Set custom print server URL (if not using default /api/v1/print)
      */
     setPrintServerUrl(url: string): void {
         this.printServerUrl = url;

@@ -42,7 +42,7 @@ export default function OrderTrackingPage() {
     const fetchOrderStatus = async () => {
         try {
             if (!loading) setRefreshing(true);
-            const response = await fetch(`${API_URL}/api/public/order-status/${orderId}`);
+            const response = await fetch(`${API_URL}/api/v1/public/order-status/${orderId}`);
             if (!response.ok) throw new Error('Order not found');
             const data = await response.json();
             setOrder(data);

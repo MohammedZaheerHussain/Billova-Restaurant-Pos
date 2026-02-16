@@ -68,7 +68,7 @@ export default function OnlineOrderPage() {
     const fetchMenu = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}/api/public/menu-full/${branchId}`);
+            const response = await fetch(`${API_URL}/api/v1/public/menu-full/${branchId}`);
             if (!response.ok) {
                 throw new Error('Restaurant not found');
             }
@@ -147,7 +147,7 @@ export default function OnlineOrderPage() {
 
         try {
             setSubmitting(true);
-            const response = await fetch(`${API_URL}/api/public/online-order`, {
+            const response = await fetch(`${API_URL}/api/v1/public/online-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
