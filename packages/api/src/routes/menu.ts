@@ -326,7 +326,7 @@ router.post('/extract-menu-card', authMiddleware, requireRole('OWNER', 'MANAGER'
             .select('*')
             .eq('branch_id', branchId);
 
-        let categoriesList = existingCategories || [];
+        const categoriesList = existingCategories || [];
 
         let extractedData: { categories: Array<{ name: string, icon: string }>, items: Array<{ name: string, price: number, isVeg: boolean, categoryName: string }> };
 
