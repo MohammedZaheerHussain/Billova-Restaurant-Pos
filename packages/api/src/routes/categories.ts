@@ -1,6 +1,8 @@
 // Category Routes (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { createCategorySchema } from '../middleware/schemas';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 
@@ -50,7 +52,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // Create category
-router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, requireRole('OWNER', 'MANAGER'), validate(createCategorySchema), async (req: AuthRequest, res: Response) => {
     try {
         const sb = (req as any).supabase || supabase;
         const { name, icon, color, sortOrder } = req.body;

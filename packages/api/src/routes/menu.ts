@@ -1,6 +1,8 @@
 // Menu Routes - CRUD for menu items (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest, requireRole } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { createMenuItemSchema } from '../middleware/schemas';
 import { supabase } from '../lib/supabase';
 import Groq from 'groq-sdk';
 import { logger } from '../lib/logger';

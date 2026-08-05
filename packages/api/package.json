@@ -9,6 +9,7 @@
         "start": "node dist/index.js"
     },
     "dependencies": {
+        "@billova/types": "*",
         "@google/generative-ai": "^0.24.1",
         "@supabase/supabase-js": "^2.90.1",
         "bcryptjs": "^2.4.3",

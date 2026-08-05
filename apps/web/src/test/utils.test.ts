@@ -79,6 +79,38 @@ describe('Price Calculations', () => {
         const rounded = Math.round(price * 100) / 100;
         expect(rounded).toBe(100);
     });
+
+    it('should test calculateOrderTotals utility accurately', async () => {
+        const { calculateOrderTotals, calculateSubtotal, calculateDiscount, calculateGST } = await import('../utils/calculations');
+
+        const items = [
+            { unitPrice: 200, quantity: 2 }, // 400
+            { unitPrice: 100, quantity: 1 }, // 100
+        ];
+
+        const subtotal = calculateSubtotal(items);
+        expect(subtotal).toBe(500);
+
+        const discount = calculateDiscount(subtotal, 'PERCENTAGE', 10);
+        expect(discount).toBe(50);
+
+        const gst = calculateGST(subtotal - discount, 5);
+        expect(gst).toBe(22.5);
+
+        const result = calculateOrderTotals({
+            items,
+            discountType: 'PERCENTAGE',
+            discountValue: 10,
+            defaultGstPercent: 5,
+        });
+
+        expect(result.subtotal).toBe(500);
+        expect(result.discountAmount).toBe(50);
+        expect(result.taxableSubtotal).toBe(450);
+        expect(result.gstAmount).toBe(22.5);
+        expect(result.total).toBe(472.5);
+        expect(result.itemCount).toBe(3);
+    });
 });
 
 describe('Order Number Generation', () => {

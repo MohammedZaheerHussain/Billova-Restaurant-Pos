@@ -1,6 +1,8 @@
 // Table Routes (Supabase)
 import { Router, Response } from 'express';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { createTableSchema, updateTableStatusSchema } from '../middleware/schemas';
 import { supabase } from '../lib/supabase';
 import crypto from 'crypto';
 import { logger } from '../lib/logger';
@@ -56,7 +58,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
 });
 
 // Update table status
-router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.patch('/:id/status', authMiddleware, validate(updateTableStatusSchema), async (req: AuthRequest, res: Response) => {
     try {
         const sb = (req as any).supabase || supabase;
         const { id } = req.params;
@@ -85,7 +87,7 @@ router.patch('/:id/status', authMiddleware, async (req: AuthRequest, res: Respon
 });
 
 // Create table
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+router.post('/', authMiddleware, validate(createTableSchema), async (req: AuthRequest, res: Response) => {
     try {
         const sb = (req as any).supabase || supabase;
         const { name, capacity } = req.body;

@@ -45,9 +45,14 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             if (!supabaseError && supabaseUser) {
                 userId = supabaseUser.id;
             } else {
-                // Fallback to legacy JWT verification
+                // Fallback to legacy JWT verification using JWT_SECRET
                 try {
-                    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
+                    const secret = process.env.JWT_SECRET;
+                    if (!secret) {
+                        logger.error('[Auth] JWT_SECRET environment variable is missing');
+                        return res.status(500).json({ error: 'Server authentication configuration error' });
+                    }
+                    const decoded = jwt.verify(token, secret) as any;
                     userId = decoded.id;
                 } catch (jwtError) {
                     logger.debug('[Auth] Both Supabase and JWT validation failed');

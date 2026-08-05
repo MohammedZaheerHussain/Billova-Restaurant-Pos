@@ -75,7 +75,7 @@
 ### API Hardening
 - [x] **Request logging** — `morgan('combined')` was already configured.
 - [x] **Deep health check** — `/api/health` now checks DB connectivity (latency), reports uptime, memory usage, and returns 503 if degraded.
-- [ ] **No API versioning** — Routes are at `/api/*` with no version prefix. **Fix:** Consider `/api/v1/*` for future compatibility.
+- [x] **API versioning** — All routes moved to `/api/v1/*`. Health check stays at `/api/health`.
 - [x] **Error responses standardized** — Global error handler returns consistent JSON with status codes, CORS error handling, and stack traces in dev only.
 
 ### Feature Completeness (Browser Verified ✅)
@@ -102,7 +102,7 @@
 ## 🟢 P3 — Nice to Have (Post-Launch Polish)
 
 ### Developer Experience
-- [ ] **Add ESLint + Prettier** — No linting configuration found. **Fix:** Set up ESLint with React + TypeScript rules.
+- [x] **ESLint + Prettier** — ESLint v10 flat config (TS, React hooks, `no-console: warn`) + Prettier (4-space, single quotes). Scripts: `npm run lint`, `npm run format`.
 - [ ] **Add pre-commit hooks** — Use Husky + lint-staged to enforce code quality.
 - [ ] **Add TypeScript strict mode** — Enable `strict: true` in `tsconfig.json` if not already.
 - [ ] **CI/CD pipeline** — `.github/` folder exists but verify GitHub Actions are set up for build + test + deploy.
@@ -140,7 +140,7 @@
 | Pages | 25 | Built, need testing |
 | API Routes | 21 | Built, need security hardening |
 | Components | 22+ | Built, need a11y review |
-| Console.logs | 0 (frontend) | ✅ All replaced with prod-safe logger |
+| Console.logs | 0 (frontend) | ✅ All replaced with prod-safe logger — Replaced 263+ raw console calls with production-safe `logger` across 48 files (23 frontend + 25 backend). Build verified. |
 | Tests | 0 | ❌ Critical gap |
 | PWA Config | VitePWA | ⚠️ Manifest conflict |
 | Security | Helmet only | ⚠️ Needs rate limiting |

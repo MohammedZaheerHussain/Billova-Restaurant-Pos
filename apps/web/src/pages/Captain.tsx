@@ -136,7 +136,7 @@ export default function CaptainPage() {
         try {
             setSubmitting(true);
             await ordersAPI.create({
-                orderType: 'DINEIN',
+                orderType: 'DINE_IN',
                 tableId: selectedTable.id,
                 items: cart.map(c => ({
                     menuItemId: c.menuItem.id,

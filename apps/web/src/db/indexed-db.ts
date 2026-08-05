@@ -262,24 +262,36 @@ export function generateLocalId(): string {
 
 // Generate temporary bill number
 let tempBillCounter = 0;
+let isTempCounterInitialized = false;
+
 export function generateTempBillNumber(): string {
     tempBillCounter++;
     const paddedNumber = String(tempBillCounter).padStart(4, '0');
+    if (!isTempCounterInitialized && tempBillCounter === 1) {
+        const timeEntropy = Date.now().toString(36).toUpperCase().slice(-3);
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        return `TEMP-${timeEntropy}-${randomSuffix}`;
+    }
     return `TEMP-${paddedNumber}`;
 }
 
 // Reset temp bill counter (call on app start after loading existing)
 export async function initializeTempBillCounter(): Promise<void> {
-    const orders = await db.offlineOrders.toArray();
-    const maxNumber = orders.reduce((max, order) => {
-        const match = order.tempBillNumber.match(/TEMP-(\d+)/);
-        if (match) {
-            const num = parseInt(match[1], 10);
-            return Math.max(max, num);
-        }
-        return max;
-    }, 0);
-    tempBillCounter = maxNumber;
+    try {
+        const orders = await db.offlineOrders.toArray();
+        const maxNumber = orders.reduce((max, order) => {
+            const match = order.tempBillNumber.match(/TEMP-(\d+)/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                return Math.max(max, num);
+            }
+            return max;
+        }, 0);
+        tempBillCounter = Math.max(tempBillCounter, maxNumber);
+        isTempCounterInitialized = true;
+    } catch {
+        isTempCounterInitialized = false;
+    }
 }
 
 // Generate hash for duplicate detection
