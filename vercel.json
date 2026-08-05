@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "if [ -d \"../../packages/types\" ]; then cd ../..; fi && npx tsc -p packages/types/tsconfig.json && npx vite build apps/web",
-  "outputDirectory": "apps/web/dist",
+  "buildCommand": "if [ -d \"../../packages/types\" ]; then cd ../..; fi && npx tsc -p packages/types/tsconfig.json && npx vite build apps/web && mkdir -p dist && cp -r apps/web/dist/* dist/ 2>/dev/null || true",
+  "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
     {
