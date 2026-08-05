@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build --workspace=packages/types && npm run build --workspace=apps/web",
+  "buildCommand": "npx tsc -p packages/types/tsconfig.json && npx vite build apps/web",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
   "rewrites": [
