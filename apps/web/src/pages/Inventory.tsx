@@ -2,15 +2,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Package, Plus, Edit2, Trash2, X, AlertTriangle, Search,
-    TrendingDown, TrendingUp, Bell, Check, Upload, Link2,
-    RefreshCw, AlertCircle, CheckCircle
+    Package, Plus, Edit2, Trash2, X, Search,
+    TrendingDown, TrendingUp, Bell, Upload, Link2,
+    RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { inventoryAPI, menuAPI } from '../api';
 import { MenuItem } from '../store';
 import './Inventory.css';
 import { logger } from '../utils/logger';
+import { InventorySummaryGrid } from '../components/inventory/InventorySummaryGrid';
+import { StockAlertsSidebar } from '../components/inventory/StockAlertsSidebar';
 
 interface InventoryItem {
     id: string;
@@ -355,15 +357,6 @@ export default function InventoryPage() {
         }
     };
 
-    const getAlertIcon = (type: string) => {
-        switch (type) {
-            case 'OUT_OF_STOCK': return <AlertCircle size={16} />;
-            case 'CRITICAL': return <AlertTriangle size={16} />;
-            case 'LOW_STOCK': return <TrendingDown size={16} />;
-            default: return <Bell size={16} />;
-        }
-    };
-
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         (item.sku && item.sku.toLowerCase().includes(search.toLowerCase()))
@@ -401,119 +394,7 @@ export default function InventoryPage() {
             </div>
 
             {/* Dashboard Summary Cards */}
-            {summary && (
-                <div className="summary-grid">
-                    <motion.div
-                        className="summary-card glass-card"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                    >
-                        <div className="summary-icon total">
-                            <Package size={24} />
-                        </div>
-                        <div className="summary-content">
-                            <motion.span
-                                className="summary-value"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', delay: 0.2 }}
-                            >
-                                {summary.totalItems}
-                            </motion.span>
-                            <span className="summary-label">Total Items</span>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="summary-card glass-card sufficient"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
-                    >
-                        <div className="summary-icon sufficient">
-                            <CheckCircle size={24} />
-                        </div>
-                        <div className="summary-content">
-                            <motion.span
-                                className="summary-value"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', delay: 0.25 }}
-                            >
-                                {summary.sufficient}
-                            </motion.span>
-                            <span className="summary-label">Sufficient</span>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="summary-card glass-card low"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                    >
-                        <div className="summary-icon low">
-                            <TrendingDown size={24} />
-                        </div>
-                        <div className="summary-content">
-                            <motion.span
-                                className="summary-value"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', delay: 0.3 }}
-                            >
-                                {summary.lowStock}
-                            </motion.span>
-                            <span className="summary-label">Low Stock</span>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="summary-card glass-card critical"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.25 }}
-                    >
-                        <div className="summary-icon critical">
-                            <AlertTriangle size={24} />
-                        </div>
-                        <div className="summary-content">
-                            <motion.span
-                                className="summary-value"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', delay: 0.35 }}
-                            >
-                                {summary.critical}
-                            </motion.span>
-                            <span className="summary-label">Critical</span>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        className="summary-card glass-card out"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                    >
-                        <div className="summary-icon out">
-                            <AlertCircle size={24} />
-                        </div>
-                        <div className="summary-content">
-                            <motion.span
-                                className="summary-value"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: 'spring', delay: 0.4 }}
-                            >
-                                {summary.outOfStock}
-                            </motion.span>
-                            <span className="summary-label">Out of Stock</span>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
+            {summary && <InventorySummaryGrid summary={summary} />}
 
             {/* Filters */}
             <div className="filters-bar glass-card">
@@ -909,79 +790,13 @@ export default function InventoryPage() {
             </AnimatePresence>
 
             {/* Alerts Sidebar */}
-            <AnimatePresence>
-                {showAlerts && (
-                    <motion.div
-                        className="alerts-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setShowAlerts(false)}
-                    >
-                        <motion.div
-                            className="alerts-sidebar glass-card"
-                            initial={{ x: 300 }}
-                            animate={{ x: 0 }}
-                            exit={{ x: 300 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="alerts-header">
-                                <h3>
-                                    <Bell size={20} /> Stock Alerts
-                                </h3>
-                                <div className="alerts-actions">
-                                    {alerts.length > 0 && (
-                                        <button
-                                            className="btn btn-sm btn-glass"
-                                            onClick={handleMarkAllAlertsRead}
-                                        >
-                                            <Check size={14} /> Mark All Read
-                                        </button>
-                                    )}
-                                    <button className="close-btn" onClick={() => setShowAlerts(false)}>
-                                        <X size={20} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="alerts-list">
-                                {alerts.length === 0 ? (
-                                    <div className="no-alerts">
-                                        <CheckCircle size={32} />
-                                        <p>No unread alerts</p>
-                                    </div>
-                                ) : (
-                                    alerts.map((alert) => (
-                                        <motion.div
-                                            key={alert.id}
-                                            className={`alert-item ${alert.alertType.toLowerCase()}`}
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            exit={{ opacity: 0, x: -20 }}
-                                        >
-                                            <div className="alert-icon">
-                                                {getAlertIcon(alert.alertType)}
-                                            </div>
-                                            <div className="alert-content">
-                                                <p className="alert-message">{alert.message}</p>
-                                                <span className="alert-time">
-                                                    {new Date(alert.createdAt).toLocaleString()}
-                                                </span>
-                                            </div>
-                                            <button
-                                                className="dismiss-btn"
-                                                onClick={() => handleMarkAlertRead(alert.id)}
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </motion.div>
-                                    ))
-                                )}
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <StockAlertsSidebar
+                showAlerts={showAlerts}
+                alerts={alerts}
+                onClose={() => setShowAlerts(false)}
+                onMarkRead={handleMarkAlertRead}
+                onMarkAllRead={handleMarkAllAlertsRead}
+            />
 
             {/* Link Menu Item Modal */}
             <AnimatePresence>
