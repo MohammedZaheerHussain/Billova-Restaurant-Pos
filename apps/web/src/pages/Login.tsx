@@ -27,7 +27,7 @@ export default function LoginPage() {
             try {
                 // Check cache first
                 const cached = sessionStorage.getItem('billova_setup_checked');
-                if (cached === 'complete') {
+                if (cached === 'complete' || import.meta.env.VITE_SUPABASE_AUTH_ONLY === 'true') {
                     setCheckingSetup(false);
                     return;
                 }
