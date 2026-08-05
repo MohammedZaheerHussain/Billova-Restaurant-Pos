@@ -3,10 +3,9 @@
   "buildCommand": "if [ -d \"../../packages/types\" ]; then cd ../..; fi && npx tsc -p packages/types/tsconfig.json && npx vite build apps/web && mkdir -p dist && cp -r apps/web/dist/* dist/ 2>/dev/null || true",
   "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/(.*\\.(js|css|png|jpg|jpeg|svg|ico|json|html|webmanifest|woff|woff2))", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html", "methods": ["GET", "HEAD"] }
   ]
 }
