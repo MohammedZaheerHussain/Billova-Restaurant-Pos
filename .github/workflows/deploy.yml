@@ -1,80 +1,44 @@
-name: Deploy Billova POS
+name: CI — Billova POS
 
 on:
   push:
-    branches: [main, master]
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
-
-env:
-  DOCKER_USERNAME: fahadfx
-  SERVER_IP: 164.52.213.134
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  build-and-deploy:
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.api
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/billova:api
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build and push Web image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.web
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/billova:web
-          build-args: |
-            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
-            VITE_SUPABASE_AUTH_ONLY=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build shared types package
+        run: npm run build --workspace=packages/types
 
-      - name: Deploy to E2E Server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd ~/billova
-            
-            # Update environment file
-            cat > .env << 'EOF'
-            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-            SUPABASE_AUTH_ONLY=true
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            FRONTEND_URL=https://billova.com
-            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
-            EOF
-            
-            # Pull latest images and restart
-            docker compose pull
-            docker compose up -d
-            docker system prune -f
-            
-            echo "✅ Billova POS deployed successfully!"
-            echo "🌐 Web: https://billova.com"
-            echo "🔌 API: https://billova.com/api"
+      - name: Type check API
+        run: npm run build --workspace=packages/api
+
+      - name: Type check & build web app
+        run: npm run build --workspace=apps/web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_SUPABASE_AUTH_ONLY: 'true'
+          VITE_SUPABASE_REALTIME: 'true'
+          VITE_DUAL_AUTH_ENABLED: 'false'
+
+      - name: Run unit tests
+        run: npm test --workspace=apps/web
