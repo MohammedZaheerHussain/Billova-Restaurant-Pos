@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Clock, Shield, Ban, Zap, Building2, Key, User, Crown, X, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
+import { hasExpressBackend, getRestaurantDirect, deactivateBranchDirect, reactivateBranchDirect, upgradePlanDirect } from '../lib/superadmin-direct';
 import './ClientDetail.css';
 
 interface Client {
@@ -65,8 +66,13 @@ export default function ClientDetailPage() {
     const fetchClient = async () => {
         try {
             setLoading(true);
-            const res = await superAdminAPI.getRestaurant(id!);
-            setClient(res.data);
+            if (hasExpressBackend()) {
+                const res = await superAdminAPI.getRestaurant(id!);
+                setClient(res.data);
+            } else {
+                const data = await getRestaurantDirect(id!);
+                setClient(data as any);
+            }
         } catch (error: any) {
             toast.error('Failed to load client');
             navigate('/super-admin');
@@ -78,12 +84,16 @@ export default function ClientDetailPage() {
     const handleForceDeactivate = async () => {
         try {
             setActionLoading(true);
-            await superAdminAPI.forceDeactivate(id!);
+            if (hasExpressBackend()) {
+                await superAdminAPI.forceDeactivate(id!);
+            } else {
+                await deactivateBranchDirect(id!);
+            }
             toast.success('Client deactivated');
             setShowDeactivateModal(false);
             fetchClient();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Deactivation failed');
+            toast.error(error?.message || error.response?.data?.error || 'Deactivation failed');
         } finally {
             setActionLoading(false);
         }
@@ -92,11 +102,15 @@ export default function ClientDetailPage() {
     const handleReactivate = async () => {
         try {
             setActionLoading(true);
-            await superAdminAPI.reactivate(id!);
+            if (hasExpressBackend()) {
+                await superAdminAPI.reactivate(id!);
+            } else {
+                await reactivateBranchDirect(id!);
+            }
             toast.success('Client reactivated');
             fetchClient();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Reactivation failed');
+            toast.error(error?.message || error.response?.data?.error || 'Reactivation failed');
         } finally {
             setActionLoading(false);
         }
@@ -110,11 +124,19 @@ export default function ClientDetailPage() {
         try {
             setActionLoading(true);
             const plan = upgradePlans.find(p => p.id === selectedPlan);
-            await superAdminAPI.upgradePlan(id!, {
-                plan: selectedPlan,
-                durationMonths: plan?.duration || 12,
-                isLifetime: plan?.isLifetime || false,
-            });
+            if (hasExpressBackend()) {
+                await superAdminAPI.upgradePlan(id!, {
+                    plan: selectedPlan,
+                    durationMonths: plan?.duration || 12,
+                    isLifetime: plan?.isLifetime || false,
+                });
+            } else {
+                await upgradePlanDirect(id!, {
+                    plan: selectedPlan,
+                    durationMonths: plan?.duration || 12,
+                    isLifetime: plan?.isLifetime || false,
+                });
+            }
             toast.success('Plan upgraded!');
             setShowUpgradeModal(false);
             setSelectedPlan('');

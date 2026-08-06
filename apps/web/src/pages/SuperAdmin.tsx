@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
 import { supabase } from '../lib/supabase';
+import { hasExpressBackend as checkExpressBackend } from '../lib/superadmin-direct';
 import { logger } from '../utils/logger';
 import './SuperAdmin.css';
 
@@ -201,16 +202,7 @@ export default function SuperAdminPage() {
     };
 
     // Detect if Express backend is available (not on Vercel static hosting)
-    const hasExpressBackend = (() => {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        const supabaseOnly = import.meta.env.VITE_SUPABASE_AUTH_ONLY === 'true';
-        // Skip Express if: flag is set, API URL is localhost, or no API URL configured
-        if (supabaseOnly) return false;
-        if (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) return false;
-        // On Vercel static hosting, there's no Express backend
-        if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return false;
-        return true;
-    })();
+    const hasExpressBackend = checkExpressBackend();
 
     const fetchData = async () => {
         try {

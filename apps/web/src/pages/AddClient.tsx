@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Zap, Building2, User, MapPin, FileText, Crown, Check, Copy, Key } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
+import { hasExpressBackend, createRestaurantDirect } from '../lib/superadmin-direct';
 import './AddClient.css';
 
 interface Plan {
@@ -89,16 +90,29 @@ export default function AddClientPage() {
             const demoEmail = `demo_${timestamp}@billova.test`;
             const demoPassword = generatePassword();
 
-            await superAdminAPI.createRestaurant({
-                restaurantName: `Demo Restaurant`,
-                ownerName: 'Demo User',
-                ownerEmail: demoEmail,
-                ownerPassword: demoPassword,
-                phone: '',
-                address: '',
-                plan: `DEMO_${selectedDemoTier.toUpperCase()}`,
-                isDemo: true,
-            });
+            if (hasExpressBackend()) {
+                await superAdminAPI.createRestaurant({
+                    restaurantName: `Demo Restaurant`,
+                    ownerName: 'Demo User',
+                    ownerEmail: demoEmail,
+                    ownerPassword: demoPassword,
+                    phone: '',
+                    address: '',
+                    plan: `DEMO_${selectedDemoTier.toUpperCase()}`,
+                    isDemo: true,
+                });
+            } else {
+                await createRestaurantDirect({
+                    restaurantName: `Demo Restaurant`,
+                    ownerName: 'Demo User',
+                    ownerEmail: demoEmail,
+                    ownerPassword: demoPassword,
+                    phone: '',
+                    address: '',
+                    plan: `DEMO_${selectedDemoTier.toUpperCase()}`,
+                    isDemo: true,
+                });
+            }
 
             // Show credentials modal
             setCredentials({ email: demoEmail, password: demoPassword });
@@ -128,18 +142,33 @@ export default function AddClientPage() {
 
         setLoading(true);
         try {
-            await superAdminAPI.createRestaurant({
-                restaurantName: form.restaurantName,
-                ownerName: form.ownerName,
-                ownerEmail: form.ownerEmail,
-                ownerPassword: form.ownerPassword,
-                phone: form.phone,
-                address: `${form.address}, ${form.city}, ${form.state} - ${form.pincode}`,
-                gstNumber: form.gstNumber,
-                plan: planName,
-                licenseDuration: duration,
-                isDemo,
-            });
+            if (hasExpressBackend()) {
+                await superAdminAPI.createRestaurant({
+                    restaurantName: form.restaurantName,
+                    ownerName: form.ownerName,
+                    ownerEmail: form.ownerEmail,
+                    ownerPassword: form.ownerPassword,
+                    phone: form.phone,
+                    address: `${form.address}, ${form.city}, ${form.state} - ${form.pincode}`,
+                    gstNumber: form.gstNumber,
+                    plan: planName,
+                    licenseDuration: duration,
+                    isDemo,
+                });
+            } else {
+                await createRestaurantDirect({
+                    restaurantName: form.restaurantName,
+                    ownerName: form.ownerName,
+                    ownerEmail: form.ownerEmail,
+                    ownerPassword: form.ownerPassword,
+                    phone: form.phone,
+                    address: `${form.address}, ${form.city}, ${form.state} - ${form.pincode}`,
+                    gstNumber: form.gstNumber,
+                    plan: planName,
+                    licenseDuration: duration,
+                    isDemo,
+                });
+            }
 
             // Show credentials modal
             setCredentials({ email: form.ownerEmail, password: form.ownerPassword });
