@@ -81,9 +81,64 @@ export default function SuperAdminPage() {
                 .from('branches')
                 .select('*');
 
-            const { data: profileData } = await supabase
+            if (branchErr) {
+                logger.error('[SuperAdmin] branches query error:', branchErr.message, branchErr.code);
+                toast.error(`Database error: ${branchErr.message}. Please run the RLS fix migration.`);
+            }
+
+            const { data: profileData, error: profileErr } = await supabase
                 .from('profiles')
                 .select('*');
+
+            if (profileErr) {
+                logger.error('[SuperAdmin] profiles query error:', profileErr.message);
+            }
+
+            // Fetch support tickets (may not exist yet)
+            let ticketList: SupportTicket[] = [];
+            let pendingResetCount = 0;
+            try {
+                const { data: ticketData } = await supabase
+                    .from('support_tickets')
+                    .select('*, user:profiles(name, email, branch:branches(name))');
+                if (ticketData) {
+                    ticketList = ticketData.map((t: any) => ({
+                        id: t.id,
+                        subject: t.subject,
+                        message: t.message,
+                        status: t.status,
+                        priority: t.priority,
+                        adminReply: t.admin_reply,
+                        createdAt: t.created_at,
+                        user: {
+                            name: t.user?.name || 'Unknown',
+                            email: t.user?.email || '',
+                            branch: { name: t.user?.branch?.name || 'Unknown' },
+                        },
+                    }));
+                }
+            } catch { /* table may not exist */ }
+
+            try {
+                const { data: resetData } = await supabase
+                    .from('password_reset_requests')
+                    .select('*, user:profiles(name, email, branch:branches(name))')
+                    .eq('status', 'PENDING');
+                if (resetData) {
+                    pendingResetCount = resetData.length;
+                    setPasswordResets(resetData.map((r: any) => ({
+                        id: r.id,
+                        userId: r.user_id,
+                        status: r.status,
+                        requestedAt: r.requested_at,
+                        user: {
+                            name: r.user?.name || 'Unknown',
+                            email: r.user?.email || '',
+                            branch: { name: r.user?.branch?.name || 'Unknown' },
+                        },
+                    })));
+                }
+            } catch { /* table may not exist */ }
 
             let restList: Restaurant[] = [];
             if (branchData && !branchErr) {
@@ -117,16 +172,17 @@ export default function SuperAdminPage() {
             }
 
             setRestaurants(restList);
+            setSupportTickets(ticketList);
             setStats({
                 totalCustomers: restList.length,
-                activeLicenses: restList.length,
+                activeLicenses: restList.filter(r => r.isActive).length,
                 expiredLicenses: 0,
                 totalRevenue: restList.length * 9999,
-                pendingResets: 0,
-                openTickets: 0
+                pendingResets: pendingResetCount,
+                openTickets: ticketList.filter(t => t.status === 'OPEN').length,
             });
-            setPasswordResets([]);
-            setSupportTickets([]);
+
+            logger.info(`[SuperAdmin] Loaded ${restList.length} branches, ${(profileData || []).length} profiles`);
         } catch (err) {
             logger.error('[SuperAdmin] Supabase fetch error:', err);
         }
