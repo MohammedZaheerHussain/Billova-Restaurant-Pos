@@ -1,234 +1,340 @@
-/* Login Page Styles */
+/* =======================================================
+   Login Page — Premium SaaS Auth Screen
+   Split layout: left branding panel + right login card
+   ======================================================= */
 
 .login-page {
     min-height: 100vh;
+    background: var(--bg-root);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Left Branding Panel ── */
+.login-page::before {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(249, 115, 22, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Loading state */
+.login-page .loading-state {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    background: var(--bg-primary);
-    background-image:
-        radial-gradient(circle at 20% 50%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(234, 88, 12, 0.05) 0%, transparent 50%);
+    min-height: 100vh;
 }
 
+/* ── Login Card (right side) ── */
 .login-card {
-    width: 100%;
-    max-width: 420px;
-    background: rgba(30, 34, 48, 0.75);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 40px;
-    box-shadow: var(--shadow-lg);
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    background: var(--bg-canvas);
+    border-left: 1px solid var(--border);
+    grid-column: 2;
 }
 
+/* On small screens, take full width */
+@media (max-width: 768px) {
+    .login-page {
+        grid-template-columns: 1fr;
+    }
+    .login-card {
+        grid-column: 1;
+        border-left: none;
+        padding: 40px 24px;
+    }
+}
+
+/* ── Login Header ── */
 .login-header {
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
     margin-bottom: 32px;
-}
-
-.login-logo {
-    display: inline-block;
-    font-size: 48px;
-    margin-bottom: 16px;
+    width: 100%;
 }
 
 .login-logo-img {
-    width: 90px;
-    height: 90px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     object-fit: contain;
-    margin-bottom: 16px;
-    filter: drop-shadow(0 0 24px rgba(249, 115, 22, 0.35));
-}
-
-@keyframes logoFloat {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-8px);
-    }
 }
 
 .login-header h1 {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
-    background: linear-gradient(135deg, var(--primary) 0%, #f97316 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 8px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 .login-header p {
-    color: var(--text-secondary);
-    font-size: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
 }
 
+/* ── Login Form ── */
 .login-form {
+    width: 100%;
+    max-width: 360px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
 }
 
 .form-group label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
+/* ── Input Wrapper ── */
 .input-wrapper {
     position: relative;
     display: flex;
     align-items: center;
 }
 
-.input-wrapper .input-icon {
+.input-icon {
     position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 12px;
     color: var(--text-muted);
     pointer-events: none;
-    z-index: 1;
+    flex-shrink: 0;
 }
 
 .input-wrapper input {
     width: 100%;
-    padding: 12px 16px;
-    padding-left: 44px !important;
-    padding-right: 44px !important;
+    padding: 10px 12px 10px 40px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-wrapper input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.input-wrapper input::placeholder {
+    color: var(--text-muted);
 }
 
 .password-toggle {
     position: absolute;
-    right: 8px;
-    width: 36px;
-    height: 36px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: var(--text-muted);
-    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
 }
 
 .password-toggle:hover {
-    background: var(--bg-card-hover);
     color: var(--text-primary);
 }
 
-.login-form .btn {
-    margin-top: 8px;
-}
-
-/* Login Options (Remember Me + Forgot Password) */
+/* ── Login Options ── */
 .login-options {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: -4px;
+    margin-top: 2px;
 }
 
 .remember-me {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     cursor: pointer;
     user-select: none;
+    position: relative;
 }
 
 .remember-me input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.checkmark {
     width: 16px;
     height: 16px;
-    accent-color: var(--primary);
-    cursor: pointer;
+    background: var(--bg-input);
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.remember-me input:checked ~ .checkmark,
+.remember-me:has(input:checked) .checkmark {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.remember-me:has(input:checked) .checkmark::after {
+    content: '✓';
+    font-size: 10px;
+    color: #fff;
+    font-weight: 700;
 }
 
 .forgot-password-link {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--primary);
-    transition: color 0.2s;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity var(--transition-fast);
 }
 
 .forgot-password-link:hover {
-    color: var(--accent);
-    text-decoration: underline;
+    opacity: 0.8;
 }
 
-/* Forgot Hint */
-.forgot-hint {
-    text-align: center;
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 8px;
-}
-
-/* License Panel - Like Billova Medical */
-.license-panel {
-    margin-top: 28px;
-    padding: 20px;
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: var(--radius-lg);
-    text-align: center;
-}
-
-.license-panel h4 {
-    font-size: 14px;
+/* ── Login Submit Button ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-sm);
     font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: none;
+    white-space: nowrap;
+    text-decoration: none;
 }
 
-.license-panel>p {
-    font-size: 12px;
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 20px;
+    font-size: 14px;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-lg {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    margin-top: 6px;
+}
+
+/* ── Hint Text ── */
+.forgot-hint {
+    font-size: 11px;
     color: var(--text-muted);
-    margin-bottom: 12px;
+    text-align: center;
+    margin-top: 4px;
+    line-height: 1.5;
+}
+
+/* ── License Panel ── */
+.license-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-root);
+    z-index: 10;
 }
 
 .contact-info {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    gap: 16px;
 }
 
 .contact-item {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: rgba(139, 92, 246, 0.15);
-    border-radius: var(--radius-md);
-    color: #8b5cf6;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition-fast);
 }
 
 .contact-item:hover {
-    background: rgba(139, 92, 246, 0.25);
-    color: #a78bfa;
+    color: var(--text-primary);
 }
 
-/* Powered By */
 .powered-by {
-    text-align: center;
     font-size: 11px;
     color: var(--text-muted);
-    margin-top: 20px;
+    opacity: 0.6;
 }
+
+/* ── Spinner ── */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: login-spin 0.7s linear infinite;
+    display: inline-block;
+}
+
+.spinner.dark {
+    border-color: var(--border);
+    border-top-color: var(--primary);
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+}
+
+@keyframes login-spin { to { transform: rotate(360deg); } }

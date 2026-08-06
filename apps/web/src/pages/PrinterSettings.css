@@ -1,696 +1,472 @@
-/* Printer Settings Page Styles */
+/* =======================================================
+   Printer Settings Page
+   ======================================================= */
 
 .printer-settings-page {
-    padding: 24px;
-    max-width: 900px;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 52px);
+    overflow-y: auto;
+    background: var(--bg-root);
 }
 
+/* ── Settings Header ── */
 .settings-header {
-    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-canvas);
+    flex-shrink: 0;
+    gap: 12px;
 }
 
 .settings-header h1 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 28px;
+    font-size: 15px;
     font-weight: 700;
-    color: #fff;
-    margin: 0 0 8px;
+    color: var(--text-primary);
 }
 
-.settings-header p {
-    color: rgba(255, 255, 255, 0.6);
-    margin: 0;
-}
-
-/* Sections */
+/* ── Settings Section ── */
 .settings-section {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    margin-bottom: 16px;
-    overflow: hidden;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
 }
 
 .section-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 16px 20px;
-    background: transparent;
-    border: none;
-    color: #fff;
+    gap: 8px;
     cursor: pointer;
-    transition: background 0.2s;
-}
-
-.section-header:hover {
-    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 0;
+    user-select: none;
+    margin-bottom: 14px;
 }
 
 .section-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex: 1;
 }
 
+.section-header svg {
+    color: var(--text-muted);
+    transition: transform var(--transition-fast);
+}
+
+.section-header.open svg {
+    transform: rotate(180deg);
+}
+
+/* ── Section Content ── */
 .section-content {
-    padding: 0 20px 20px;
-    overflow: hidden;
-}
-
-/* Printers List */
-.printers-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
+/* ── Printers List ── */
+.printers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ── Empty State ── */
 .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.empty-state svg {
-    opacity: 0.3;
-    margin-bottom: 16px;
-}
-
-.empty-state button {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    background: #dc2626;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
-    margin-top: 16px;
+    gap: 10px;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-lg);
 }
 
-/* Printer Card */
+/* ── Printer Card ── */
 .printer-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    padding: 16px;
-    transition: all 0.2s;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all var(--transition-fast);
 }
 
-.printer-card.default {
-    border-color: rgba(220, 38, 38, 0.4);
-}
-
-.printer-card.inactive {
-    opacity: 0.6;
+.printer-card:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
 }
 
 .printer-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
 }
 
 .printer-icon {
-    width: 48px;
-    height: 48px;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(220, 38, 38, 0.15);
-    border-radius: 10px;
-    color: #dc2626;
+    color: var(--text-muted);
     flex-shrink: 0;
 }
 
 .printer-info {
     flex: 1;
+    min-width: 0;
 }
 
-.printer-info h3 {
-    margin: 0 0 4px;
-    font-size: 16px;
+.printer-info h4 {
+    font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .printer-type {
-    display: block;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
 .printer-address {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
     display: block;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
-    font-family: monospace;
-    margin-top: 4px;
 }
 
 .printer-badges {
     display: flex;
-    gap: 8px;
+    gap: 5px;
+    align-items: center;
 }
 
 .badge {
-    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
     border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .badge.default {
-    background: rgba(220, 38, 38, 0.2);
-    color: #dc2626;
+    background: var(--primary-glow);
+    color: var(--primary);
+    border: 1px solid rgba(249, 115, 22, 0.2);
 }
 
 .badge.inactive {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.5);
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-/* Printer Jobs */
+/* ── Printer Jobs ── */
 .printer-jobs {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
-.printer-jobs .label {
-    display: block;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
-    margin-bottom: 8px;
+.label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
 .job-tags {
     display: flex;
+    gap: 5px;
     flex-wrap: wrap;
-    gap: 8px;
 }
 
 .job-tag {
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    cursor: pointer;
-    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
 }
 
-.job-tag.active {
-    background: rgba(220, 38, 38, 0.15);
-    border-color: rgba(220, 38, 38, 0.3);
-    color: #dc2626;
-}
-
-.job-tag:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-/* Printer Actions */
+/* ── Printer Actions ── */
 .printer-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.printer-actions button {
-    display: flex;
-    align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
+    flex-wrap: wrap;
+}
+
+.test-btn, .toggle-btn, .default-btn, .delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-fast);
 }
 
-.printer-actions button:hover {
-    background: rgba(255, 255, 255, 0.1);
+.test-btn {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
 }
 
-.printer-actions .test-btn {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.3);
-    color: #22c55e;
+.test-btn:hover:not(:disabled) {
+    background: #3b82f6;
+    color: #fff;
 }
 
-.printer-actions .delete-btn {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    margin-left: auto;
+.toggle-btn {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
 }
 
-.printer-actions button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.toggle-btn:hover:not(:disabled) {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.default-btn {
+    background: var(--primary-glow);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    color: var(--primary);
+}
+
+.default-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+}
+
+.delete-btn {
+    background: var(--danger-bg);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+}
+
+.delete-btn:hover:not(:disabled) {
+    background: var(--danger);
+    color: #fff;
 }
 
 .spin {
-    animation: spin 1s linear infinite;
+    animation: ps-spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
+@keyframes ps-spin { to { transform: rotate(360deg); } }
 
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-/* Add Printer Button */
+/* ── Add Printer Button ── */
 .add-printer-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     width: 100%;
-    padding: 14px;
-    margin-top: 16px;
-    background: rgba(220, 38, 38, 0.1);
-    border: 1px dashed rgba(220, 38, 38, 0.3);
-    border-radius: 10px;
-    color: #dc2626;
-    font-size: 14px;
-    font-weight: 500;
+    padding: 10px;
+    background: none;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-fast);
 }
 
 .add-printer-btn:hover {
-    background: rgba(220, 38, 38, 0.15);
-    border-color: rgba(220, 38, 38, 0.5);
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-glow);
 }
 
-/* Settings Grid */
+/* ── Settings Grid (for toggles) ── */
 .settings-grid {
-    display: grid;
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-/* Toggle Setting */
 .setting-toggle {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.setting-toggle span:first-child {
-    font-size: 14px;
-    color: #fff;
-}
-
-.setting-toggle input {
-    display: none;
-}
-
-.toggle-slider {
-    position: relative;
-    width: 48px;
-    height: 26px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 13px;
-    transition: background 0.2s;
-}
-
-.toggle-slider::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s;
-}
-
-.setting-toggle input:checked+.toggle-slider {
-    background: #dc2626;
-}
-
-.setting-toggle input:checked+.toggle-slider::after {
-    transform: translateX(22px);
-}
-
-/* Setting Input */
-.setting-input {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.setting-input.full-width {
-    grid-column: 1 / -1;
-}
-
-.setting-input label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-.setting-input input,
-.setting-input textarea,
-.setting-input select {
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
-    resize: none;
-}
-
-.setting-input input:focus,
-.setting-input textarea:focus,
-.setting-input select:focus {
-    outline: none;
-    border-color: rgba(220, 38, 38, 0.5);
-}
-
-/* Logo Settings */
-.logo-settings {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.logo-preview {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    min-height: 120px;
-}
-
-.logo-preview img {
-    max-width: 200px;
-    max-height: 100px;
-    object-fit: contain;
-}
-
-.no-logo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    color: rgba(255, 255, 255, 0.3);
-}
-
-.logo-actions {
-    display: flex;
     gap: 12px;
-}
-
-.logo-actions button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: rgba(220, 38, 38, 0.15);
-    border: 1px solid rgba(220, 38, 38, 0.3);
-    border-radius: 8px;
-    color: #dc2626;
-    font-size: 14px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
-    transition: all 0.2s;
 }
 
-.logo-actions button:hover {
-    background: rgba(220, 38, 38, 0.25);
+.setting-toggle:last-child {
+    border-bottom: none;
 }
 
-.logo-actions .remove-logo {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-}
-
-.logo-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
-
-.logo-tip {
+.setting-toggle-info {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    background: rgba(251, 191, 36, 0.1);
-    border: 1px solid rgba(251, 191, 36, 0.2);
-    border-radius: 8px;
-    font-size: 13px;
-    color: #fbbf24;
+    flex-direction: column;
+    gap: 2px;
 }
 
-/* Modal */
+.setting-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.setting-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ── Modal ── */
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(11, 13, 17, 0.82);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
+    backdrop-filter: blur(5px);
 }
 
-.modal-content {
+.modal {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
     width: 100%;
-    max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-    background: #1a1a2e;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+    max-width: 460px;
+    overflow: hidden;
 }
 
 .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
-    margin: 0;
-    font-size: 20px;
-    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
 }
 
-.modal-header button {
+.modal-close {
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.6);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
     cursor: pointer;
+    transition: all var(--transition-fast);
 }
 
-.modal-body {
-    padding: 20px;
+.modal-close:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.modal-form {
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
 }
 
 .form-group label {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .form-group input,
 .form-group select {
-    padding: 12px 14px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color var(--transition-fast);
+    width: 100%;
 }
 
 .form-group input:focus,
 .form-group select:focus {
-    outline: none;
-    border-color: rgba(220, 38, 38, 0.5);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
+.form-group input::placeholder { color: var(--text-muted); }
 
-/* Type Options */
-.type-options {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-}
-
-.type-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    color: rgba(255, 255, 255, 0.6);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.type-option:hover {
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.type-option.active {
-    background: rgba(220, 38, 38, 0.15);
-    border-color: rgba(220, 38, 38, 0.4);
-    color: #dc2626;
-}
-
-.type-option span {
-    font-size: 12px;
-}
-
-/* Checkbox Group */
-.checkbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.checkbox-group.options {
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
-    cursor: pointer;
-}
-
-.checkbox-label input {
-    width: 18px;
-    height: 18px;
-    accent-color: #dc2626;
-}
-
-/* Modal Footer */
-.modal-footer {
+.modal-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.modal-footer .cancel-btn {
-    padding: 10px 20px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.modal-footer .save-btn {
-    display: flex;
-    align-items: center;
     gap: 8px;
-    padding: 10px 20px;
-    background: #dc2626;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 14px;
-    font-weight: 500;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
+    transition: all var(--transition-fast);
+    border: none;
+    white-space: nowrap;
 }
 
-.modal-footer .save-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-    .printer-settings-page {
-        padding: 16px;
-    }
-
-    .type-options {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-
-    .logo-options {
-        grid-template-columns: 1fr;
-    }
-
-    .printer-actions {
-        flex-direction: column;
-    }
-
-    .printer-actions button {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .printer-actions .delete-btn {
-        margin-left: 0;
-    }
-}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-secondary); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--border-light); color: var(--text-primary); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }

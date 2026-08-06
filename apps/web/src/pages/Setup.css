@@ -1,219 +1,305 @@
-/* First-Time Setup Page Styles */
+/* =======================================================
+   Setup / Onboarding Page — Multi-step wizard
+   ======================================================= */
 
 .setup-page {
     min-height: 100vh;
+    background: var(--bg-root);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    background: var(--bg-primary);
-    background-image:
-        radial-gradient(circle at 20% 30%, rgba(220, 38, 38, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 70%, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
+    padding: 24px;
 }
 
+.setup-page.loading-state {
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Card ── */
 .setup-card {
-    width: 100%;
-    max-width: 480px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
-    padding: 40px;
     box-shadow: var(--shadow-lg);
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
 
+/* ── Header ── */
 .setup-header {
-    text-align: center;
-    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 }
 
 .setup-logo {
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
     object-fit: contain;
-    margin-bottom: 20px;
-    background: var(--gradient-card);
-    border-radius: 16px;
-    padding: 8px;
 }
 
 .setup-header h1 {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 800;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 8px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    text-align: center;
 }
 
 .setup-header p {
-    color: var(--text-secondary);
-    font-size: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
 }
 
-/* Progress Steps */
+/* ── Progress Steps ── */
 .setup-progress {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 32px;
+    gap: 0;
 }
 
-.progress-step {
+.step-indicator {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-.progress-step.active {
-    color: var(--primary);
+    gap: 6px;
+    flex: 1;
+    position: relative;
 }
 
 .step-number {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    background: var(--bg-secondary);
-    font-weight: 600;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+    z-index: 1;
 }
 
-.progress-step.active .step-number {
+.step-indicator.active .step-number {
     background: var(--primary);
-    color: white;
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.step-indicator.done .step-number {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+
+.step-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-align: center;
+}
+
+.step-indicator.active .step-label {
+    color: var(--primary);
+    font-weight: 600;
 }
 
 .progress-line {
-    width: 40px;
+    flex: 1;
     height: 2px;
     background: var(--border);
+    margin-bottom: 18px;
+    position: relative;
 }
 
-/* Form */
+.progress-line.done {
+    background: var(--success);
+}
+
+/* ── Form ── */
 .setup-form {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 0;
 }
 
-.form-step h3 {
+.form-step {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 8px;
+    flex-direction: column;
+    gap: 14px;
 }
 
 .step-desc {
-    color: var(--text-secondary);
-    font-size: 14px;
-    margin-bottom: 20px;
-}
-
-.setup-form .form-group label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 4px;
 }
 
-.setup-form .btn-lg {
-    width: 100%;
-    margin-top: 12px;
+.form-group {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: 5px;
 }
 
-/* Review Box */
+.form-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    width: 100%;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.form-group input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-group select option {
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+}
+
+/* ── Review Box ── */
 .review-box {
-    background: var(--bg-secondary);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .review-item {
     display: flex;
     justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.review-item:last-child {
-    border-bottom: none;
+    align-items: center;
+    font-size: 13px;
+    gap: 8px;
 }
 
 .review-label {
     color: var(--text-muted);
-    font-size: 13px;
-}
-
-.review-value {
-    font-weight: 500;
-}
-
-.role-badge {
-    background: var(--gradient-primary);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 100px;
     font-size: 12px;
 }
 
-/* Info Box */
-.info-box {
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.2);
-    border-radius: var(--radius-md);
-    padding: 16px;
+.review-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    text-align: right;
+}
+
+.review-value.role-badge {
+    display: inline-flex;
+    padding: 2px 10px;
+    background: var(--primary-glow);
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    border-radius: 4px;
+    color: var(--primary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Buttons ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: none;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
     font-size: 14px;
 }
 
-.info-box p {
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: var(--success);
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
 }
 
-.info-box ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
+    font-size: 14px;
 }
 
-.info-box li {
-    padding: 4px 0;
-    padding-left: 20px;
-    position: relative;
+.btn-secondary:hover { border-color: var(--border-light); color: var(--text-primary); }
+
+.btn-lg {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
 }
 
-.info-box li::before {
-    content: '•';
-    position: absolute;
-    left: 6px;
-    color: var(--success);
+/* ── Spinner ── */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: setup-spin 0.7s linear infinite;
+    display: inline-block;
 }
 
-.form-actions {
+.spinner.dark {
+    border-color: var(--border);
+    border-top-color: var(--primary);
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+}
+
+@keyframes setup-spin { to { transform: rotate(360deg); } }
+
+/* ── Loading State ── */
+.loading-state {
     display: flex;
-    gap: 12px;
-    margin-top: 12px;
-}
-
-.form-actions .btn {
-    flex: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
 }
