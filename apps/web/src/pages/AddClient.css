@@ -22,15 +22,16 @@
 }
 
 .back-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
+    gap: 8px;
     background: none;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    padding: 6px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
     flex-shrink: 0;
@@ -58,18 +59,43 @@
     gap: 20px;
 }
 
-/* ── Quick Demo Info Banner ── */
+/* ── Quick Demo Card ── */
+.quick-demo-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-fast);
+}
+
+.quick-demo-card.active {
+    background: var(--primary-glow);
+    border-color: rgba(249, 115, 22, 0.3);
+}
+
 .quick-demo-info {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 16px;
-    background: var(--primary-glow);
-    border: 1px solid rgba(249, 115, 22, 0.2);
-    border-radius: var(--radius-lg);
     font-size: 13px;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+.quick-demo-info h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.quick-demo-info p {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .zap-icon {
@@ -155,7 +181,9 @@
     gap: 8px;
 }
 
-.tier-card {
+/* Support both .tier-card and .demo-tier-card class names */
+.tier-card,
+.demo-tier-card {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -169,11 +197,13 @@
     position: relative;
 }
 
-.tier-card:hover {
+.tier-card:hover,
+.demo-tier-card:hover {
     border-color: var(--primary);
 }
 
-.tier-card.selected {
+.tier-card.selected,
+.demo-tier-card.selected {
     border-color: var(--primary);
     background: var(--primary-glow);
 }
@@ -286,6 +316,19 @@
     padding: 9px 18px;
 }
 
+.btn-primary {
+    background: var(--gradient-primary);
+    color: #fff;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+}
+
 .btn-demo {
     background: var(--primary);
     color: #fff;
@@ -311,6 +354,163 @@
 .full-width { width: 100%; }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Plan cards */
+.plan-category {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+.demo-label {
+    color: var(--primary);
+}
+
+.plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.plan-card {
+    background: var(--bg-surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    cursor: pointer;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.plan-card:hover {
+    border-color: var(--primary);
+}
+
+.plan-card.selected {
+    background: var(--primary-glow);
+    border-color: var(--primary);
+}
+
+.plan-card.demo-plan {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.plan-card.has-badge {
+    padding-top: 28px;
+}
+
+.plan-card h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.plan-price {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--primary);
+    font-family: var(--font-mono);
+}
+
+.plan-price.free {
+    color: var(--success);
+}
+
+.plan-price.lifetime {
+    color: #a78bfa;
+}
+
+.plan-duration {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.plan-features {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.check-icon {
+    color: var(--primary);
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+.best-value-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: var(--gradient-primary);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 0 var(--radius-md) 0 var(--radius-md);
+}
+
+.use-case {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+    line-height: 1.4;
+}
+
+.plan-badge-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.plan-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.selected-plan {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.selected-plan strong {
+    color: var(--text-primary);
+}
+
+/* Plans section */
+.plans-section {
+    gap: 12px;
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.form-row.three-col {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
 
 /* ── Credentials Overlay ── */
 .credentials-overlay {
