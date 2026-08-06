@@ -240,15 +240,27 @@ export default function SuperAdminPage() {
             if (!checkExpressBackend()) {
                 const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
                 const expiryDays = quickDemo ? 3 : (licenseDuration * 30);
-                const { data: branch, error: branchErr } = await supabase.from('branches').insert([{
+                const basePayload: any = {
                     name: newCustomer.restaurantName,
                     address: newCustomer.address || (quickDemo ? 'Kasba, Vellore' : ''),
                     phone: newCustomer.phone,
                     subscription_plan: plan,
                     subscription_expiry: new Date(Date.now() + expiryDays * 86400000).toISOString(),
                     is_active: true,
-                    license_key: licenseKey,
-                }]).select().single();
+                };
+
+                let branch: any = null;
+                let branchErr: any = null;
+
+                const res1 = await supabase.from('branches').insert([{ ...basePayload, license_key: licenseKey }]).select().single();
+                if (res1.error && (res1.error.message?.includes('license_key') || res1.error.code === 'PGRST204')) {
+                    const res2 = await supabase.from('branches').insert([basePayload]).select().single();
+                    branch = res2.data;
+                    branchErr = res2.error;
+                } else {
+                    branch = res1.data;
+                    branchErr = res1.error;
+                }
 
                 if (branchErr) throw branchErr;
 
