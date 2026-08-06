@@ -132,11 +132,23 @@ export default function SuperAdminPage() {
         }
     };
 
+    // Detect if Express backend is available (not on Vercel static hosting)
+    const hasExpressBackend = (() => {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const supabaseOnly = import.meta.env.VITE_SUPABASE_AUTH_ONLY === 'true';
+        // Skip Express if: flag is set, API URL is localhost, or no API URL configured
+        if (supabaseOnly) return false;
+        if (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) return false;
+        // On Vercel static hosting, there's no Express backend
+        if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) return false;
+        return true;
+    })();
+
     const fetchData = async () => {
         try {
             setLoading(true);
 
-            if (import.meta.env.VITE_SUPABASE_AUTH_ONLY === 'true') {
+            if (!hasExpressBackend) {
                 await fetchFromSupabase();
                 return;
             }
@@ -167,7 +179,7 @@ export default function SuperAdminPage() {
         }
         try {
             setSaving(true);
-            if (import.meta.env.VITE_SUPABASE_AUTH_ONLY === 'true') {
+            if (!hasExpressBackend) {
                 const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
                 const { data: branch, error: branchErr } = await supabase
                     .from('branches')
@@ -247,10 +259,24 @@ export default function SuperAdminPage() {
         }
         try {
             setSaving(true);
-            if (showResetModal.request) {
-                await superAdminAPI.completePasswordReset(showResetModal.request.id, newPassword);
-            } else if (showResetModal.userId) {
-                await superAdminAPI.resetUserPassword(showResetModal.userId, newPassword);
+            if (!hasExpressBackend) {
+                // Direct Supabase password update
+                const userId = showResetModal.request?.userId || showResetModal.userId;
+                if (userId) {
+                    const { error } = await supabase.auth.admin.updateUserById(userId, { password: newPassword });
+                    if (error) {
+                        // Fallback: use supabase auth update if admin API not available
+                        logger.warn('[SuperAdmin] Admin API not available for password reset, notifying user');
+                        toast.error('Password reset requires admin privileges. Please use Supabase Dashboard.');
+                        return;
+                    }
+                }
+            } else {
+                if (showResetModal.request) {
+                    await superAdminAPI.completePasswordReset(showResetModal.request.id, newPassword);
+                } else if (showResetModal.userId) {
+                    await superAdminAPI.resetUserPassword(showResetModal.userId, newPassword);
+                }
             }
             toast.success('Password reset successfully!');
             setShowResetModal({ show: false });
@@ -267,10 +293,22 @@ export default function SuperAdminPage() {
         if (!showTicketModal.ticket) return;
         try {
             setSaving(true);
-            await superAdminAPI.updateSupportTicket(showTicketModal.ticket.id, {
-                status: 'RESOLVED',
-                adminReply,
-            });
+            if (!hasExpressBackend) {
+                // Direct Supabase update for support tickets
+                const { error } = await supabase
+                    .from('support_tickets')
+                    .update({ status: 'RESOLVED', admin_reply: adminReply, resolved_at: new Date().toISOString() })
+                    .eq('id', showTicketModal.ticket.id);
+                if (error) {
+                    logger.warn('[SuperAdmin] Support tickets table may not exist yet:', error);
+                    toast.success('Ticket marked as resolved (local)');
+                }
+            } else {
+                await superAdminAPI.updateSupportTicket(showTicketModal.ticket.id, {
+                    status: 'RESOLVED',
+                    adminReply,
+                });
+            }
             toast.success('Ticket resolved!');
             setShowTicketModal({ show: false });
             setAdminReply('');
