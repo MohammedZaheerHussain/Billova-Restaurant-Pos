@@ -1,10 +1,14 @@
-// Super Admin Dashboard - Multi-tenant Management
-import { useState, useEffect } from 'react';
+// Super Admin — SaaS Control Center
+// Architecture: Stripe Dashboard × Linear table density
+// Primary workspace: the table. Detail: slide-out drawer.
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-    Building2, Users, Shield, Plus, X,
-    Check, Key, MessageSquare, Clock, Send
+    Building2, Shield, Plus, X, Key,
+    MessageSquare, Clock, Send, Search, RefreshCw,
+    AlertCircle, CheckCircle2, Phone,
+    Calendar, Eye, ArrowUpRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
@@ -49,55 +53,56 @@ interface SupportTicket {
     user: { name: string; email: string; branch: { name: string } };
 }
 
-type TabType = 'customers' | 'password-resets' | 'support';
+type DrawerView = 'customer' | 'reset-password' | 'ticket' | null;
+type FilterType = 'all' | 'active' | 'inactive';
 
 export default function SuperAdminPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<TabType>('customers');
     const [stats, setStats] = useState({
-        totalCustomers: 0, activeLicenses: 0, expiredLicenses: 0,
-        totalRevenue: 0, pendingResets: 0, openTickets: 0
+        totalCustomers: 0, activeLicenses: 0,
+        pendingResets: 0, openTickets: 0
     });
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [passwordResets, setPasswordResets] = useState<PasswordResetRequest[]>([]);
     const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [showResetModal, setShowResetModal] = useState<{ show: boolean; request?: PasswordResetRequest; userId?: string; userName?: string }>({ show: false });
-    const [showTicketModal, setShowTicketModal] = useState<{ show: boolean; ticket?: SupportTicket }>({ show: false });
+    const [rlsBlocked, setRlsBlocked] = useState(false);
+
+    // Drawer state
+    const [drawer, setDrawer] = useState<{ view: DrawerView; data?: any }>({ view: null });
+
+    // Modal state for quick actions
+    const [resetModal, setResetModal] = useState<{ open: boolean; userId?: string; userName?: string; requestId?: string }>({ open: false });
+    const [ticketModal, setTicketModal] = useState<{ open: boolean; ticket?: SupportTicket }>({ open: false });
+    const [addModal, setAddModal] = useState(false);
+
     const [saving, setSaving] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [adminReply, setAdminReply] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const [activeSection, setActiveSection] = useState<'customers' | 'resets' | 'tickets'>('customers');
+
     const [newCustomer, setNewCustomer] = useState({
         restaurantName: '', address: '', phone: '', gstNumber: '',
         ownerName: '', ownerEmail: '', ownerPassword: '',
         plan: 'BASIC', licenseDuration: 12, isDemo: false,
     });
-    const [rlsBlocked, setRlsBlocked] = useState(false);
-    const [showSetupSQL, setShowSetupSQL] = useState(false);
 
     useEffect(() => { fetchData(); }, []);
 
+    const hasExpressBackend = checkExpressBackend();
+
     const fetchFromSupabase = async () => {
         try {
-            const { data: branchData, error: branchErr } = await supabase
-                .from('branches')
-                .select('*');
-
+            const { data: branchData, error: branchErr } = await supabase.from('branches').select('*');
             if (branchErr) {
-                logger.error('[SuperAdmin] branches query error:', branchErr.message, branchErr.code);
-                toast.error(`Database error: ${branchErr.message}. Please run the RLS fix migration.`);
+                logger.error('[SuperAdmin] branches query error:', branchErr.message);
+                toast.error(`Database error: ${branchErr.message}`);
             }
+            const { data: profileData, error: profileErr } = await supabase.from('profiles').select('*');
+            if (profileErr) logger.error('[SuperAdmin] profiles query error:', profileErr.message);
 
-            const { data: profileData, error: profileErr } = await supabase
-                .from('profiles')
-                .select('*');
-
-            if (profileErr) {
-                logger.error('[SuperAdmin] profiles query error:', profileErr.message);
-            }
-
-            // Fetch support tickets (may not exist yet)
             let ticketList: SupportTicket[] = [];
             let pendingResetCount = 0;
             try {
@@ -106,18 +111,10 @@ export default function SuperAdminPage() {
                     .select('*, user:profiles(name, email, branch:branches(name))');
                 if (ticketData) {
                     ticketList = ticketData.map((t: any) => ({
-                        id: t.id,
-                        subject: t.subject,
-                        message: t.message,
-                        status: t.status,
-                        priority: t.priority,
-                        adminReply: t.admin_reply,
+                        id: t.id, subject: t.subject, message: t.message,
+                        status: t.status, priority: t.priority, adminReply: t.admin_reply,
                         createdAt: t.created_at,
-                        user: {
-                            name: t.user?.name || 'Unknown',
-                            email: t.user?.email || '',
-                            branch: { name: t.user?.branch?.name || 'Unknown' },
-                        },
+                        user: { name: t.user?.name || 'Unknown', email: t.user?.email || '', branch: { name: t.user?.branch?.name || 'Unknown' } },
                     }));
                 }
             } catch { /* table may not exist */ }
@@ -130,15 +127,8 @@ export default function SuperAdminPage() {
                 if (resetData) {
                     pendingResetCount = resetData.length;
                     setPasswordResets(resetData.map((r: any) => ({
-                        id: r.id,
-                        userId: r.user_id,
-                        status: r.status,
-                        requestedAt: r.requested_at,
-                        user: {
-                            name: r.user?.name || 'Unknown',
-                            email: r.user?.email || '',
-                            branch: { name: r.user?.branch?.name || 'Unknown' },
-                        },
+                        id: r.id, userId: r.user_id, status: r.status, requestedAt: r.requested_at,
+                        user: { name: r.user?.name || 'Unknown', email: r.user?.email || '', branch: { name: r.user?.branch?.name || 'Unknown' } },
                     })));
                 }
             } catch { /* table may not exist */ }
@@ -148,25 +138,14 @@ export default function SuperAdminPage() {
                 restList = branchData.map((b: any) => {
                     const branchUsers = (profileData || [])
                         .filter((p: any) => p.branch_id === b.id)
-                        .map((p: any) => ({
-                            id: p.id,
-                            name: p.name || p.email?.split('@')[0] || 'User',
-                            email: p.email || '',
-                            lastLoginAt: p.updated_at,
-                        }));
-
+                        .map((p: any) => ({ id: p.id, name: p.name || p.email?.split('@')[0] || 'User', email: p.email || '', lastLoginAt: p.updated_at }));
                     return {
-                        id: b.id,
-                        name: b.name,
-                        address: b.address || '',
-                        phone: b.phone || '',
-                        isActive: b.is_active ?? true,
-                        createdAt: b.created_at || new Date().toISOString(),
+                        id: b.id, name: b.name, address: b.address || '', phone: b.phone || '',
+                        isActive: b.is_active ?? true, createdAt: b.created_at || new Date().toISOString(),
                         users: branchUsers,
                         license: {
                             licenseKey: b.license_key || `LIC-${b.id.slice(0, 8).toUpperCase()}`,
-                            plan: b.subscription_plan || 'PREMIUM',
-                            status: 'ACTIVE',
+                            plan: b.subscription_plan || 'PREMIUM', status: 'ACTIVE',
                             expiresAt: b.subscription_expiry || new Date(Date.now() + 365 * 86400000).toISOString(),
                         },
                         _count: { orders: 0, users: branchUsers.length },
@@ -179,51 +158,28 @@ export default function SuperAdminPage() {
             setStats({
                 totalCustomers: restList.length,
                 activeLicenses: restList.filter(r => r.isActive).length,
-                expiredLicenses: 0,
-                totalRevenue: restList.length * 9999,
                 pendingResets: pendingResetCount,
                 openTickets: ticketList.filter(t => t.status === 'OPEN').length,
             });
 
-            logger.info(`[SuperAdmin] Loaded ${restList.length} branches, ${(profileData || []).length} profiles`);
-
-            // Detect RLS blocking: if user is authenticated but branches return empty
             const { data: { user } } = await supabase.auth.getUser();
-            if (user && restList.length === 0 && !branchErr) {
-                // Check if branches table actually has data by testing RLS
-                logger.warn('[SuperAdmin] Authenticated but branches empty - likely RLS blocking');
-                setRlsBlocked(true);
-            } else {
-                setRlsBlocked(false);
-            }
+            setRlsBlocked(!!(user && restList.length === 0 && !branchErr));
         } catch (err) {
             logger.error('[SuperAdmin] Supabase fetch error:', err);
         }
     };
 
-    // Detect if Express backend is available (not on Vercel static hosting)
-    const hasExpressBackend = checkExpressBackend();
-
     const fetchData = async () => {
         try {
             setLoading(true);
-
-            if (!hasExpressBackend) {
-                await fetchFromSupabase();
-                return;
-            }
-
+            if (!hasExpressBackend) { await fetchFromSupabase(); return; }
             const [dashRes, restRes, resetRes, ticketRes] = await Promise.all([
-                superAdminAPI.dashboard(),
-                superAdminAPI.getRestaurants(),
-                superAdminAPI.getPasswordResets(),
-                superAdminAPI.getSupportTickets(),
+                superAdminAPI.dashboard(), superAdminAPI.getRestaurants(),
+                superAdminAPI.getPasswordResets(), superAdminAPI.getSupportTickets(),
             ]);
-            setStats(dashRes.data);
-            setRestaurants(restRes.data);
-            setPasswordResets(resetRes.data);
-            setSupportTickets(ticketRes.data);
-        } catch (error) {
+            setStats(dashRes.data); setRestaurants(restRes.data);
+            setPasswordResets(resetRes.data); setSupportTickets(ticketRes.data);
+        } catch {
             logger.warn('[SuperAdmin] Express API unavailable, using Supabase direct');
             await fetchFromSupabase();
         } finally {
@@ -234,150 +190,84 @@ export default function SuperAdminPage() {
     const handleAddCustomer = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCustomer.restaurantName || !newCustomer.ownerEmail || !newCustomer.ownerPassword) {
-            toast.error('Please fill required fields');
-            return;
+            toast.error('Please fill required fields'); return;
         }
         try {
             setSaving(true);
             if (!hasExpressBackend) {
                 const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-                const { data: branch, error: branchErr } = await supabase
-                    .from('branches')
-                    .insert([{
-                        name: newCustomer.restaurantName,
-                        address: newCustomer.address,
-                        phone: newCustomer.phone,
-                        subscription_plan: newCustomer.plan,
-                        subscription_expiry: new Date(Date.now() + newCustomer.licenseDuration * 30 * 86400000).toISOString(),
-                        is_active: true,
-                        license_key: licenseKey,
-                    }])
-                    .select()
-                    .single();
-
+                const { data: branch, error: branchErr } = await supabase.from('branches').insert([{
+                    name: newCustomer.restaurantName, address: newCustomer.address, phone: newCustomer.phone,
+                    subscription_plan: newCustomer.plan, subscription_expiry: new Date(Date.now() + newCustomer.licenseDuration * 30 * 86400000).toISOString(),
+                    is_active: true, license_key: licenseKey,
+                }]).select().single();
                 if (branchErr) throw branchErr;
-
                 const { data: authData, error: authErr } = await supabase.auth.signUp({
-                    email: newCustomer.ownerEmail,
-                    password: newCustomer.ownerPassword,
-                    options: {
-                        data: {
-                            name: newCustomer.ownerName || 'Restaurant Owner',
-                            role: 'OWNER',
-                            branch_id: branch.id,
-                        }
-                    }
+                    email: newCustomer.ownerEmail, password: newCustomer.ownerPassword,
+                    options: { data: { name: newCustomer.ownerName || 'Restaurant Owner', role: 'OWNER', branch_id: branch.id } }
                 });
-
                 if (authErr) throw authErr;
-
                 if (authData.user) {
                     await supabase.from('profiles').insert([{
-                        id: authData.user.id,
-                        name: newCustomer.ownerName || 'Restaurant Owner',
-                        email: newCustomer.ownerEmail,
-                        role: 'OWNER',
-                        branch_id: branch.id,
+                        id: authData.user.id, name: newCustomer.ownerName || 'Restaurant Owner',
+                        email: newCustomer.ownerEmail, role: 'OWNER', branch_id: branch.id,
                     }]);
                 }
-
-                toast.success('Customer created successfully!');
+                toast.success('Customer created!');
                 toast.success(`License Key: ${licenseKey}`, { duration: 10000 });
-                setShowAddModal(false);
-                setNewCustomer({
-                    restaurantName: '', address: '', phone: '', gstNumber: '',
-                    ownerName: '', ownerEmail: '', ownerPassword: '',
-                    plan: 'BASIC', licenseDuration: 12, isDemo: false,
-                });
-                fetchData();
-                return;
+            } else {
+                await superAdminAPI.createRestaurant(newCustomer);
+                toast.success('Customer created successfully!');
             }
-
-            const res = await superAdminAPI.createRestaurant(newCustomer);
-            toast.success('Customer created successfully!');
-            setShowAddModal(false);
-            setNewCustomer({
-                restaurantName: '', address: '', phone: '', gstNumber: '',
-                ownerName: '', ownerEmail: '', ownerPassword: '',
-                plan: 'BASIC', licenseDuration: 12, isDemo: false,
-            });
+            setAddModal(false);
+            setNewCustomer({ restaurantName: '', address: '', phone: '', gstNumber: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'BASIC', licenseDuration: 12, isDemo: false });
             fetchData();
-            if (res.data.restaurant?.license?.key) {
-                toast.success(`License Key: ${res.data.restaurant.license.key}`, { duration: 10000 });
-            }
         } catch (error: any) {
-            toast.error(error.message || error.response?.data?.error || 'Failed to create customer');
+            toast.error(error.message || 'Failed to create customer');
         } finally {
             setSaving(false);
         }
     };
 
     const handleResetPassword = async () => {
-        if (!newPassword) {
-            toast.error('Please enter a new password');
-            return;
-        }
+        if (!newPassword) { toast.error('Enter a new password'); return; }
         try {
             setSaving(true);
             if (!hasExpressBackend) {
-                // Direct Supabase password update
-                const userId = showResetModal.request?.userId || showResetModal.userId;
+                const userId = resetModal.userId;
                 if (userId) {
                     const { error } = await supabase.auth.admin.updateUserById(userId, { password: newPassword });
-                    if (error) {
-                        // Fallback: use supabase auth update if admin API not available
-                        logger.warn('[SuperAdmin] Admin API not available for password reset, notifying user');
-                        toast.error('Password reset requires admin privileges. Please use Supabase Dashboard.');
-                        return;
-                    }
+                    if (error) { toast.error('Requires admin privileges. Use Supabase Dashboard.'); return; }
                 }
             } else {
-                if (showResetModal.request) {
-                    await superAdminAPI.completePasswordReset(showResetModal.request.id, newPassword);
-                } else if (showResetModal.userId) {
-                    await superAdminAPI.resetUserPassword(showResetModal.userId, newPassword);
-                }
+                if (resetModal.requestId) await superAdminAPI.completePasswordReset(resetModal.requestId, newPassword);
+                else if (resetModal.userId) await superAdminAPI.resetUserPassword(resetModal.userId, newPassword);
             }
             toast.success('Password reset successfully!');
-            setShowResetModal({ show: false });
+            setResetModal({ open: false });
             setNewPassword('');
             fetchData();
-        } catch (error) {
-            toast.error('Failed to reset password');
-        } finally {
-            setSaving(false);
-        }
+        } catch { toast.error('Failed to reset password'); }
+        finally { setSaving(false); }
     };
 
     const handleReplyTicket = async () => {
-        if (!showTicketModal.ticket) return;
+        if (!ticketModal.ticket) return;
         try {
             setSaving(true);
             if (!hasExpressBackend) {
-                // Direct Supabase update for support tickets
-                const { error } = await supabase
-                    .from('support_tickets')
-                    .update({ status: 'RESOLVED', admin_reply: adminReply, resolved_at: new Date().toISOString() })
-                    .eq('id', showTicketModal.ticket.id);
-                if (error) {
-                    logger.warn('[SuperAdmin] Support tickets table may not exist yet:', error);
-                    toast.success('Ticket marked as resolved (local)');
-                }
+                await supabase.from('support_tickets').update({
+                    status: 'RESOLVED', admin_reply: adminReply, resolved_at: new Date().toISOString()
+                }).eq('id', ticketModal.ticket.id);
             } else {
-                await superAdminAPI.updateSupportTicket(showTicketModal.ticket.id, {
-                    status: 'RESOLVED',
-                    adminReply,
-                });
+                await superAdminAPI.updateSupportTicket(ticketModal.ticket.id, { status: 'RESOLVED', adminReply });
             }
             toast.success('Ticket resolved!');
-            setShowTicketModal({ show: false });
+            setTicketModal({ open: false });
             setAdminReply('');
             fetchData();
-        } catch (error) {
-            toast.error('Failed to update ticket');
-        } finally {
-            setSaving(false);
-        }
+        } catch { toast.error('Failed to update ticket'); }
+        finally { setSaving(false); }
     };
 
     const timeAgo = (date: string) => {
@@ -388,307 +278,286 @@ export default function SuperAdminPage() {
         return `${Math.floor(hours / 24)}d ago`;
     };
 
+    const expiresIn = (date: string) => {
+        const diff = new Date(date).getTime() - Date.now();
+        const days = Math.floor(diff / 86400000);
+        if (days < 0) return { label: 'Expired', urgent: true };
+        if (days < 30) return { label: `${days}d left`, urgent: true };
+        return { label: `${days}d left`, urgent: false };
+    };
+
+    const initials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+    const filteredRestaurants = useMemo(() => {
+        let list = restaurants;
+        if (activeFilter === 'active') list = list.filter(r => r.isActive);
+        if (activeFilter === 'inactive') list = list.filter(r => !r.isActive);
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            list = list.filter(r =>
+                r.name.toLowerCase().includes(q) ||
+                r.users[0]?.email.toLowerCase().includes(q) ||
+                r.users[0]?.name.toLowerCase().includes(q)
+            );
+        }
+        return list;
+    }, [restaurants, activeFilter, searchQuery]);
+
+    const selectedCustomer = drawer.view === 'customer' ? drawer.data as Restaurant : null;
+
+    if (loading) {
+        return (
+            <div className="sa-loading">
+                <div className="sa-spinner" />
+                <span>Loading control center…</span>
+            </div>
+        );
+    }
+
     return (
-        <div className="super-admin-page">
-            <div className="page-header">
-                <div>
-                    <h1>🔐 Super Admin</h1>
-                    <p>Manage customers, passwords & support</p>
+        <div className="sa-root">
+            {/* ── Top Toolbar ── */}
+            <header className="sa-toolbar">
+                <div className="sa-toolbar-left">
+                    <div className="sa-brand">
+                        <Shield size={18} style={{ color: 'var(--primary)' }} />
+                        <span>Control Center</span>
+                    </div>
+                    <nav className="sa-section-nav">
+                        <button
+                            className={`sa-nav-btn ${activeSection === 'customers' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('customers')}
+                        >
+                            <Building2 size={14} /> Customers
+                            <span className="sa-nav-count">{stats.totalCustomers}</span>
+                        </button>
+                        <button
+                            className={`sa-nav-btn ${activeSection === 'resets' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('resets')}
+                        >
+                            <Key size={14} /> Resets
+                            {stats.pendingResets > 0 && <span className="sa-nav-badge">{stats.pendingResets}</span>}
+                        </button>
+                        <button
+                            className={`sa-nav-btn ${activeSection === 'tickets' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('tickets')}
+                        >
+                            <MessageSquare size={14} /> Tickets
+                            {stats.openTickets > 0 && <span className="sa-nav-badge">{stats.openTickets}</span>}
+                        </button>
+                    </nav>
                 </div>
-                <button className="btn btn-primary" onClick={() => navigate('/super-admin/add-client')}>
-                    <Plus size={18} /> Add Customer
-                </button>
+                <div className="sa-toolbar-right">
+                    <button className="sa-icon-btn" onClick={fetchData} title="Refresh">
+                        <RefreshCw size={15} />
+                    </button>
+                    <button className="sa-btn-primary" onClick={() => setAddModal(true)}>
+                        <Plus size={15} /> New Customer
+                    </button>
+                </div>
+            </header>
+
+            {/* ── RLS Warning Banner ── */}
+            {rlsBlocked && (
+                <div className="sa-rls-banner">
+                    <AlertCircle size={16} />
+                    <span>RLS setup required — <strong>run the SQL migration</strong> in Supabase Dashboard, then refresh.</span>
+                    <button className="sa-rls-dismiss" onClick={() => { setRlsBlocked(false); fetchData(); }}>
+                        Refresh after fix
+                    </button>
+                </div>
+            )}
+
+            {/* ── Metric Strip ── */}
+            <div className="sa-metrics">
+                <div className="sa-metric">
+                    <span className="sa-metric-value">{stats.totalCustomers}</span>
+                    <span className="sa-metric-label">Total Accounts</span>
+                </div>
+                <div className="sa-metric-divider" />
+                <div className="sa-metric">
+                    <span className="sa-metric-value" style={{ color: 'var(--success)' }}>{stats.activeLicenses}</span>
+                    <span className="sa-metric-label">Active</span>
+                </div>
+                <div className="sa-metric-divider" />
+                <div className="sa-metric">
+                    <span className="sa-metric-value" style={{ color: stats.pendingResets > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                        {stats.pendingResets}
+                    </span>
+                    <span className="sa-metric-label">Pending Resets</span>
+                </div>
+                <div className="sa-metric-divider" />
+                <div className="sa-metric">
+                    <span className="sa-metric-value" style={{ color: stats.openTickets > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                        {stats.openTickets}
+                    </span>
+                    <span className="sa-metric-label">Open Tickets</span>
+                </div>
             </div>
 
-            {loading ? (
-                <div className="loading-state"><div className="spinner" /></div>
-            ) : (
-                <>
-                    {/* RLS Diagnostic Banner */}
-                    {rlsBlocked && (
-                        <motion.div
-                            className="rls-banner"
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            style={{
-                                background: 'linear-gradient(135deg, #ff6b3520, #ff990020)',
-                                border: '1px solid #ff6b3550',
-                                borderRadius: '12px',
-                                padding: '16px 20px',
-                                marginBottom: '20px',
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                <Shield size={20} style={{ color: '#ff6b35' }} />
-                                <strong style={{ color: '#ff6b35' }}>Database Setup Required</strong>
-                            </div>
-                            <p style={{ fontSize: '13px', color: '#ccc', margin: '0 0 12px 0' }}>
-                                Your SuperAdmin account needs RLS (Row Level Security) policies to access restaurant data.
-                                Run this SQL in your <strong>Supabase Dashboard → SQL Editor</strong>:
-                            </p>
-                            <button
-                                onClick={() => setShowSetupSQL(!showSetupSQL)}
-                                style={{
-                                    background: '#ff6b35', color: '#fff', border: 'none', borderRadius: '8px',
-                                    padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                                }}
-                            >
-                                {showSetupSQL ? 'Hide SQL' : '📋 Show SQL Fix'}
-                            </button>
-                            {showSetupSQL && (
-                                <div style={{ marginTop: '12px' }}>
-                                    <pre
-                                        style={{
-                                            background: '#0d0d0d', border: '1px solid #333', borderRadius: '8px',
-                                            padding: '12px', fontSize: '11px', color: '#4ade80', maxHeight: '300px',
-                                            overflow: 'auto', whiteSpace: 'pre-wrap',
-                                        }}
-                                    >{`-- Run this in Supabase SQL Editor
--- Step 1: Create helper function
-CREATE OR REPLACE FUNCTION is_super_admin() RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM profiles
-        WHERE id = auth.uid()
-        AND LOWER(role) = 'super_admin'
-    );
-$$ LANGUAGE sql SECURITY DEFINER;
+            {/* ── Main Workspace ── */}
+            <div className={`sa-workspace ${drawer.view ? 'drawer-open' : ''}`}>
 
--- Step 2: Fix branches policies
-DROP POLICY IF EXISTS "users_read_own_branch" ON branches;
-DROP POLICY IF EXISTS "super_admin_full_access_branches" ON branches;
-DROP POLICY IF EXISTS "super_admin_insert_branches" ON branches;
-DROP POLICY IF EXISTS "super_admin_update_branches" ON branches;
-DROP POLICY IF EXISTS "super_admin_delete_branches" ON branches;
-DROP POLICY IF EXISTS "users_read_own_branch_v2" ON branches;
+                {/* ── Left: Table Panel ── */}
+                <div className="sa-table-panel">
 
-CREATE POLICY "super_admin_full_access_branches" ON branches
-    FOR SELECT TO authenticated USING (is_super_admin());
-CREATE POLICY "super_admin_insert_branches" ON branches
-    FOR INSERT TO authenticated WITH CHECK (is_super_admin());
-CREATE POLICY "super_admin_update_branches" ON branches
-    FOR UPDATE TO authenticated USING (is_super_admin());
-CREATE POLICY "super_admin_delete_branches" ON branches
-    FOR DELETE TO authenticated USING (is_super_admin());
-CREATE POLICY "users_read_own_branch_v2" ON branches
-    FOR SELECT TO authenticated
-    USING (id = get_user_branch_id() OR get_user_role() = 'OWNER');
-
--- Step 3: Fix profiles policies
-DROP POLICY IF EXISTS "super_admin_insert_profiles" ON profiles;
-DROP POLICY IF EXISTS "super_admin_manage_profiles" ON profiles;
-CREATE POLICY "super_admin_insert_profiles" ON profiles
-    FOR INSERT TO authenticated WITH CHECK (is_super_admin());
-CREATE POLICY "super_admin_manage_profiles" ON profiles
-    FOR UPDATE TO authenticated USING (is_super_admin());
-
--- Step 4: Support tickets & password resets
-ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "super_admin_read_tickets" ON support_tickets;
-DROP POLICY IF EXISTS "super_admin_update_tickets" ON support_tickets;
-DROP POLICY IF EXISTS "users_create_tickets" ON support_tickets;
-DROP POLICY IF EXISTS "users_read_own_tickets" ON support_tickets;
-CREATE POLICY "super_admin_read_tickets" ON support_tickets
-    FOR SELECT TO authenticated USING (is_super_admin());
-CREATE POLICY "super_admin_update_tickets" ON support_tickets
-    FOR UPDATE TO authenticated USING (is_super_admin());
-CREATE POLICY "users_create_tickets" ON support_tickets
-    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY "users_read_own_tickets" ON support_tickets
-    FOR SELECT TO authenticated USING (user_id = auth.uid());
-
-ALTER TABLE password_reset_requests ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "super_admin_read_resets" ON password_reset_requests;
-DROP POLICY IF EXISTS "super_admin_update_resets" ON password_reset_requests;
-DROP POLICY IF EXISTS "users_create_resets" ON password_reset_requests;
-CREATE POLICY "super_admin_read_resets" ON password_reset_requests
-    FOR SELECT TO authenticated USING (is_super_admin());
-CREATE POLICY "super_admin_update_resets" ON password_reset_requests
-    FOR UPDATE TO authenticated USING (is_super_admin());
-CREATE POLICY "users_create_resets" ON password_reset_requests
-    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-
-SELECT 'Super Admin RLS fix applied!' AS status;`}</pre>
-                                    <button
-                                        onClick={() => {
-                                            const sql = document.querySelector('.rls-banner pre')?.textContent || '';
-                                            navigator.clipboard.writeText(sql);
-                                            toast.success('SQL copied to clipboard!');
-                                        }}
-                                        style={{
-                                            marginTop: '8px', background: '#333', color: '#fff', border: '1px solid #555',
-                                            borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px',
-                                        }}
-                                    >
-                                        📋 Copy SQL to Clipboard
-                                    </button>
-                                    <p style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
-                                        After running the SQL, click the button below to refresh:
-                                    </p>
-                                    <button
-                                        onClick={() => { setRlsBlocked(false); fetchData(); }}
-                                        style={{
-                                            background: '#4ade80', color: '#000', border: 'none', borderRadius: '6px',
-                                            padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                                        }}
-                                    >
-                                        ✅ I've run the SQL — Refresh Data
-                                    </button>
+                    {/* Section: Customers */}
+                    {activeSection === 'customers' && (
+                        <>
+                            {/* Table Toolbar */}
+                            <div className="sa-table-toolbar">
+                                <div className="sa-search-wrap">
+                                    <Search size={14} className="sa-search-icon" />
+                                    <input
+                                        className="sa-search"
+                                        placeholder="Search by name, email…"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                    />
                                 </div>
-                            )}
-                        </motion.div>
-                    )}
-                    {/* Stats Cards */}
-                    <div className="stats-row">
-                        <motion.div className="stat-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                            <Building2 size={24} className="stat-icon" />
-                            <div className="stat-content">
-                                <span className="stat-value">{stats.totalCustomers}</span>
-                                <span className="stat-label">Total Customers</span>
+                                <div className="sa-filters">
+                                    {(['all', 'active', 'inactive'] as FilterType[]).map(f => (
+                                        <button
+                                            key={f}
+                                            className={`sa-filter-pill ${activeFilter === f ? 'active' : ''}`}
+                                            onClick={() => setActiveFilter(f)}
+                                        >
+                                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="sa-result-count">{filteredRestaurants.length} accounts</span>
                             </div>
-                        </motion.div>
-                        <motion.div className="stat-card success" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                            <Check size={24} className="stat-icon" />
-                            <div className="stat-content">
-                                <span className="stat-value">{stats.activeLicenses}</span>
-                                <span className="stat-label">Active Licenses</span>
-                            </div>
-                        </motion.div>
-                        <motion.div className={`stat-card ${stats.pendingResets > 0 ? 'warning' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                            <Key size={24} className="stat-icon" />
-                            <div className="stat-content">
-                                <span className="stat-value">{stats.pendingResets}</span>
-                                <span className="stat-label">Password Resets</span>
-                            </div>
-                        </motion.div>
-                        <motion.div className={`stat-card ${stats.openTickets > 0 ? 'warning' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                            <MessageSquare size={24} className="stat-icon" />
-                            <div className="stat-content">
-                                <span className="stat-value">{stats.openTickets}</span>
-                                <span className="stat-label">Open Tickets</span>
-                            </div>
-                        </motion.div>
-                    </div>
 
-                    {/* Tabs */}
-                    <div className="admin-tabs">
-                        <button className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`} onClick={() => setActiveTab('customers')}>
-                            <Building2 size={16} /> Customers
-                        </button>
-                        <button className={`tab-btn ${activeTab === 'password-resets' ? 'active' : ''}`} onClick={() => setActiveTab('password-resets')}>
-                            <Key size={16} /> Password Resets {stats.pendingResets > 0 && <span className="badge">{stats.pendingResets}</span>}
-                        </button>
-                        <button className={`tab-btn ${activeTab === 'support' ? 'active' : ''}`} onClick={() => setActiveTab('support')}>
-                            <MessageSquare size={16} /> Support {stats.openTickets > 0 && <span className="badge">{stats.openTickets}</span>}
-                        </button>
-                    </div>
-
-                    {/* Tab Content */}
-                    {activeTab === 'customers' && (
-                        <div className="customers-card">
-                            <h3>👥 All Customers</h3>
-                            <div className="table-container">
-                                <table className="customers-table">
+                            {/* Customer Table */}
+                            <div className="sa-table-wrap">
+                                <table className="sa-table">
                                     <thead>
                                         <tr>
-                                            <th>Restaurant</th>
+                                            <th>Account</th>
                                             <th>Owner</th>
                                             <th>Plan</th>
-                                            <th>Status</th>
-                                            <th>Last Login</th>
-                                            <th>Actions</th>
+                                            <th>License</th>
+                                            <th>Last Active</th>
+                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {restaurants.map((rest) => (
-                                            <tr key={rest.id}>
-                                                <td>
-                                                    <div className="restaurant-cell">
-                                                        <span className="restaurant-name">{rest.name}</span>
-                                                        <span className="restaurant-phone">{rest.phone}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="owner-cell">
-                                                        <span>{rest.users[0]?.name || '-'}</span>
-                                                        <span className="owner-email">{rest.users[0]?.email}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className={`plan-badge ${rest.license?.plan?.toLowerCase()}`}>
-                                                        {rest.license?.plan || 'NONE'}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span className={`status-badge ${rest.license?.status?.toLowerCase() || 'none'}`}>
-                                                        {rest.license?.status || 'NO LICENSE'}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {rest.users[0]?.lastLoginAt ? timeAgo(rest.users[0].lastLoginAt) : 'Never'}
-                                                </td>
-                                                <td>
-                                                    <div className="action-buttons">
-                                                        <button
-                                                            className="btn btn-sm btn-secondary"
-                                                            onClick={() => setShowResetModal({ show: true, userId: rest.users[0]?.id, userName: rest.users[0]?.name })}
-                                                            title="Reset Password"
-                                                        >
-                                                            <Key size={14} />
-                                                        </button>
-                                                        <button
-                                                            className="btn btn-sm btn-primary"
-                                                            onClick={() => navigate(`/super-admin/client/${rest.id}`)}
-                                                        >
-                                                            👁️ View
-                                                        </button>
-                                                    </div>
+                                        {filteredRestaurants.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="sa-table-empty">
+                                                    <Building2 size={32} />
+                                                    <p>No customers found</p>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : filteredRestaurants.map((rest) => {
+                                            const exp = rest.license?.expiresAt ? expiresIn(rest.license.expiresAt) : null;
+                                            const isSelected = selectedCustomer?.id === rest.id;
+                                            return (
+                                                <tr
+                                                    key={rest.id}
+                                                    className={`sa-row ${isSelected ? 'selected' : ''}`}
+                                                    onClick={() => setDrawer({ view: 'customer', data: rest })}
+                                                >
+                                                    <td>
+                                                        <div className="sa-account-cell">
+                                                            <div className="sa-avatar">
+                                                                {initials(rest.name)}
+                                                            </div>
+                                                            <div>
+                                                                <div className="sa-account-name">{rest.name}</div>
+                                                                {rest.phone && <div className="sa-account-sub">{rest.phone}</div>}
+                                                            </div>
+                                                            {rest.isActive
+                                                                ? <span className="sa-dot active" title="Active" />
+                                                                : <span className="sa-dot inactive" title="Inactive" />
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div className="sa-owner-cell">
+                                                            <span>{rest.users[0]?.name || '—'}</span>
+                                                            <span className="sa-sub-text">{rest.users[0]?.email}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`sa-plan-badge ${(rest.license?.plan || 'none').toLowerCase()}`}>
+                                                            {rest.license?.plan || 'None'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {exp ? (
+                                                            <span className={`sa-expiry ${exp.urgent ? 'urgent' : ''}`}>
+                                                                <Calendar size={12} /> {exp.label}
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td className="sa-time-cell">
+                                                        {rest.users[0]?.lastLoginAt ? timeAgo(rest.users[0].lastLoginAt) : 'Never'}
+                                                    </td>
+                                                    <td>
+                                                        <button
+                                                            className="sa-row-action"
+                                                            onClick={e => { e.stopPropagation(); navigate(`/super-admin/client/${rest.id}`); }}
+                                                            title="Open full detail"
+                                                        >
+                                                            <ArrowUpRight size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </>
                     )}
 
-                    {activeTab === 'password-resets' && (
-                        <div className="customers-card">
-                            <h3>🔑 Password Reset Requests</h3>
+                    {/* Section: Password Resets */}
+                    {activeSection === 'resets' && (
+                        <div className="sa-section-wrap">
+                            <div className="sa-section-header">
+                                <Key size={16} />
+                                <h3>Password Reset Requests</h3>
+                                {stats.pendingResets > 0 && <span className="sa-section-badge">{stats.pendingResets} pending</span>}
+                            </div>
                             {passwordResets.filter(r => r.status === 'PENDING').length === 0 ? (
-                                <div className="empty-state">
-                                    <Key size={48} />
-                                    <p>No pending password reset requests</p>
+                                <div className="sa-empty-state">
+                                    <CheckCircle2 size={40} style={{ color: 'var(--success)' }} />
+                                    <p>All caught up — no pending resets</p>
                                 </div>
                             ) : (
-                                <div className="table-container">
-                                    <table className="customers-table">
+                                <div className="sa-table-wrap">
+                                    <table className="sa-table">
                                         <thead>
                                             <tr>
-                                                <th>Customer</th>
-                                                <th>Email</th>
+                                                <th>User</th>
                                                 <th>Restaurant</th>
                                                 <th>Requested</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {passwordResets.filter(r => r.status === 'PENDING').map((req) => (
-                                                <tr key={req.id}>
-                                                    <td>{req.user.name}</td>
-                                                    <td>{req.user.email}</td>
+                                            {passwordResets.filter(r => r.status === 'PENDING').map(req => (
+                                                <tr key={req.id} className="sa-row">
+                                                    <td>
+                                                        <div className="sa-owner-cell">
+                                                            <span>{req.user.name}</span>
+                                                            <span className="sa-sub-text">{req.user.email}</span>
+                                                        </div>
+                                                    </td>
                                                     <td>{req.user.branch.name}</td>
                                                     <td>
-                                                        <div className="time-cell">
-                                                            <Clock size={14} />
-                                                            {timeAgo(req.requestedAt)}
-                                                        </div>
+                                                        <span className="sa-time-cell">
+                                                            <Clock size={12} /> {timeAgo(req.requestedAt)}
+                                                        </span>
                                                     </td>
                                                     <td>
                                                         <button
-                                                            className="btn btn-sm btn-primary"
-                                                            onClick={() => setShowResetModal({ show: true, request: req })}
+                                                            className="sa-btn-outline"
+                                                            onClick={() => setResetModal({ open: true, requestId: req.id, userId: req.userId, userName: req.user.name })}
                                                         >
-                                                            Reset Password
+                                                            <Key size={13} /> Reset Password
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -700,155 +569,233 @@ SELECT 'Super Admin RLS fix applied!' AS status;`}</pre>
                         </div>
                     )}
 
-                    {activeTab === 'support' && (
-                        <div className="customers-card">
-                            <h3>💬 Support Tickets</h3>
+                    {/* Section: Support Tickets */}
+                    {activeSection === 'tickets' && (
+                        <div className="sa-section-wrap">
+                            <div className="sa-section-header">
+                                <MessageSquare size={16} />
+                                <h3>Support Tickets</h3>
+                                {stats.openTickets > 0 && <span className="sa-section-badge urgent">{stats.openTickets} open</span>}
+                            </div>
                             {supportTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length === 0 ? (
-                                <div className="empty-state">
-                                    <MessageSquare size={48} />
+                                <div className="sa-empty-state">
+                                    <CheckCircle2 size={40} style={{ color: 'var(--success)' }} />
                                     <p>No open support tickets</p>
                                 </div>
                             ) : (
-                                <div className="table-container">
-                                    <table className="customers-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Customer</th>
-                                                <th>Subject</th>
-                                                <th>Priority</th>
-                                                <th>Created</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {supportTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').map((ticket) => (
-                                                <tr key={ticket.id}>
-                                                    <td>
-                                                        <div className="owner-cell">
-                                                            <span>{ticket.user.name}</span>
-                                                            <span className="owner-email">{ticket.user.branch.name}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>{ticket.subject}</td>
-                                                    <td>
-                                                        <span className={`priority-badge ${ticket.priority.toLowerCase()}`}>
-                                                            {ticket.priority}
-                                                        </span>
-                                                    </td>
-                                                    <td>{timeAgo(ticket.createdAt)}</td>
-                                                    <td>
-                                                        <button
-                                                            className="btn btn-sm btn-primary"
-                                                            onClick={() => { setShowTicketModal({ show: true, ticket }); setAdminReply(''); }}
-                                                        >
-                                                            View & Reply
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                <div className="sa-ticket-list">
+                                    {supportTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').map(ticket => (
+                                        <div key={ticket.id} className="sa-ticket-row">
+                                            <div className="sa-ticket-left">
+                                                <span className={`sa-priority-dot ${ticket.priority.toLowerCase()}`} />
+                                                <div>
+                                                    <div className="sa-ticket-subject">{ticket.subject}</div>
+                                                    <div className="sa-ticket-meta">
+                                                        {ticket.user.name} · {ticket.user.branch.name} · {timeAgo(ticket.createdAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="sa-ticket-right">
+                                                <span className={`sa-priority-badge ${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
+                                                <button
+                                                    className="sa-btn-outline"
+                                                    onClick={() => { setTicketModal({ open: true, ticket }); setAdminReply(''); }}
+                                                >
+                                                    <Send size={13} /> Reply
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
                     )}
-                </>
-            )}
+                </div>
 
-            {/* Add Customer Modal */}
-            <AnimatePresence>
-                {showAddModal && (
-                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddModal(false)}>
-                        <motion.div className="modal add-customer-modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h2>Add New Customer</h2>
-                                <button className="modal-close" onClick={() => setShowAddModal(false)}><X size={20} /></button>
+                {/* ── Right: Slide-out Customer Drawer ── */}
+                <AnimatePresence>
+                    {drawer.view === 'customer' && selectedCustomer && (
+                        <motion.aside
+                            className="sa-drawer"
+                            initial={{ x: 40, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 40, opacity: 0 }}
+                            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                        >
+                            <div className="sa-drawer-header">
+                                <div className="sa-drawer-title">
+                                    <div className="sa-drawer-avatar">{initials(selectedCustomer.name)}</div>
+                                    <div>
+                                        <h3>{selectedCustomer.name}</h3>
+                                        <p>{selectedCustomer.isActive ? 'Active account' : 'Inactive account'}</p>
+                                    </div>
+                                </div>
+                                <button className="sa-icon-btn" onClick={() => setDrawer({ view: null })}>
+                                    <X size={16} />
+                                </button>
                             </div>
 
-                            <form onSubmit={handleAddCustomer} className="add-customer-form">
-                                <div className="form-section">
-                                    <h4><Building2 size={16} /> Restaurant Details</h4>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Restaurant Name *</label>
-                                            <input type="text" value={newCustomer.restaurantName} onChange={(e) => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="e.g., Pizza Palace" />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Phone</label>
-                                            <input type="text" value={newCustomer.phone} onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })} placeholder="+91 9876543210" />
-                                        </div>
+                            <div className="sa-drawer-body">
+                                {/* Quick Stats */}
+                                <div className="sa-drawer-stats">
+                                    <div className="sa-drawer-stat">
+                                        <span className="sa-drawer-stat-value">{selectedCustomer._count.users}</span>
+                                        <span className="sa-drawer-stat-label">Staff</span>
                                     </div>
-                                    <div className="form-group">
-                                        <label>Address</label>
-                                        <input type="text" value={newCustomer.address} onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Full address" />
+                                    <div className="sa-drawer-stat">
+                                        <span className={`sa-plan-badge ${(selectedCustomer.license?.plan || 'none').toLowerCase()}`}>
+                                            {selectedCustomer.license?.plan || 'None'}
+                                        </span>
+                                        <span className="sa-drawer-stat-label">Plan</span>
+                                    </div>
+                                    {selectedCustomer.license?.expiresAt && (
+                                        <div className="sa-drawer-stat">
+                                            {(() => {
+                                                const exp = expiresIn(selectedCustomer.license!.expiresAt);
+                                                return <span className={`sa-expiry ${exp.urgent ? 'urgent' : ''}`}>{exp.label}</span>;
+                                            })()}
+                                            <span className="sa-drawer-stat-label">License</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Info fields */}
+                                <div className="sa-drawer-section">
+                                    <div className="sa-drawer-field">
+                                        <Phone size={13} />
+                                        <span>{selectedCustomer.phone || 'No phone'}</span>
+                                    </div>
+                                    {selectedCustomer.address && (
+                                        <div className="sa-drawer-field">
+                                            <Building2 size={13} />
+                                            <span>{selectedCustomer.address}</span>
+                                        </div>
+                                    )}
+                                    <div className="sa-drawer-field">
+                                        <Calendar size={13} />
+                                        <span>Joined {new Date(selectedCustomer.createdAt).toLocaleDateString()}</span>
                                     </div>
                                 </div>
 
-                                <div className="form-section">
-                                    <h4><Users size={16} /> Owner Account</h4>
-                                    <div className="form-group">
-                                        <label>Owner Name *</label>
-                                        <input type="text" value={newCustomer.ownerName} onChange={(e) => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="John Doe" />
+                                {/* Owner info */}
+                                {selectedCustomer.users[0] && (
+                                    <div className="sa-drawer-section">
+                                        <div className="sa-drawer-section-title">Owner Account</div>
+                                        <div className="sa-drawer-owner">
+                                            <div className="sa-avatar small">{initials(selectedCustomer.users[0].name)}</div>
+                                            <div>
+                                                <div>{selectedCustomer.users[0].name}</div>
+                                                <div className="sa-sub-text">{selectedCustomer.users[0].email}</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Email *</label>
-                                            <input type="email" value={newCustomer.ownerEmail} onChange={(e) => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@restaurant.com" />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Password *</label>
-                                            <input type="text" value={newCustomer.ownerPassword} onChange={(e) => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Initial password" />
-                                        </div>
+                                )}
+
+                                {/* License key */}
+                                {selectedCustomer.license?.licenseKey && (
+                                    <div className="sa-drawer-section">
+                                        <div className="sa-drawer-section-title">License Key</div>
+                                        <div className="sa-license-key">{selectedCustomer.license.licenseKey}</div>
+                                    </div>
+                                )}
+
+                                {/* Quick Actions */}
+                                <div className="sa-drawer-actions">
+                                    <button
+                                        className="sa-drawer-action-btn"
+                                        onClick={() => setResetModal({ open: true, userId: selectedCustomer.users[0]?.id, userName: selectedCustomer.users[0]?.name })}
+                                    >
+                                        <Key size={14} /> Reset Password
+                                    </button>
+                                    <button
+                                        className="sa-drawer-action-btn"
+                                        onClick={() => navigate(`/super-admin/client/${selectedCustomer.id}`)}
+                                    >
+                                        <Eye size={14} /> Full Detail
+                                        <ArrowUpRight size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.aside>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* ── Add Customer Modal ── */}
+            <AnimatePresence>
+                {addModal && (
+                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAddModal(false)}>
+                        <motion.div className="sa-modal" initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
+                            <div className="sa-modal-header">
+                                <h3>New Customer Account</h3>
+                                <button className="sa-icon-btn" onClick={() => setAddModal(false)}><X size={16} /></button>
+                            </div>
+                            <form onSubmit={handleAddCustomer} className="sa-modal-form">
+                                <div className="sa-form-section-label">Restaurant</div>
+                                <div className="sa-form-row">
+                                    <div className="sa-form-group">
+                                        <label>Name <span className="sa-required">*</span></label>
+                                        <input type="text" value={newCustomer.restaurantName} onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="Pizza Palace" />
+                                    </div>
+                                    <div className="sa-form-group">
+                                        <label>Phone</label>
+                                        <input type="text" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} placeholder="+91 9876543210" />
+                                    </div>
+                                </div>
+                                <div className="sa-form-group">
+                                    <label>Address</label>
+                                    <input type="text" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Full address" />
+                                </div>
+
+                                <div className="sa-form-divider" />
+                                <div className="sa-form-section-label">Owner Account</div>
+                                <div className="sa-form-group">
+                                    <label>Name</label>
+                                    <input type="text" value={newCustomer.ownerName} onChange={e => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="John Doe" />
+                                </div>
+                                <div className="sa-form-row">
+                                    <div className="sa-form-group">
+                                        <label>Email <span className="sa-required">*</span></label>
+                                        <input type="email" value={newCustomer.ownerEmail} onChange={e => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@restaurant.com" />
+                                    </div>
+                                    <div className="sa-form-group">
+                                        <label>Password <span className="sa-required">*</span></label>
+                                        <input type="text" value={newCustomer.ownerPassword} onChange={e => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Initial password" />
                                     </div>
                                 </div>
 
-                                <div className="form-section">
-                                    <h4><Shield size={16} /> License</h4>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Subscription Plan</label>
-                                            <select value={newCustomer.plan} onChange={(e) => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                                <option value="BASIC">🟢 Basic - POS Only</option>
-                                                <option value="PLUS">🔵 Plus - Reports & Inventory</option>
-                                                <option value="PREMIUM">🟣 Premium - All Features</option>
-                                            </select>
-                                        </div>
-                                        <div className="form-group">
-                                            <label>Duration</label>
-                                            <select
-                                                value={newCustomer.licenseDuration}
-                                                onChange={(e) => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}
-                                                disabled={newCustomer.isDemo}
-                                            >
-                                                <option value={1}>1 Month</option>
-                                                <option value={3}>3 Months</option>
-                                                <option value={6}>6 Months</option>
-                                                <option value={12}>12 Months</option>
-                                            </select>
-                                            {newCustomer.isDemo && <span className="hint">Demo = 3 days (server-enforced)</span>}
-                                        </div>
-                                        <div className="form-group demo-toggle">
-                                            <label className="toggle-label">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={newCustomer.isDemo}
-                                                    onChange={(e) => setNewCustomer({ ...newCustomer, isDemo: e.target.checked })}
-                                                />
-                                                <span className="toggle-switch" />
-                                                Demo Account
-                                            </label>
-                                            {newCustomer.isDemo && (
-                                                <p className="demo-warning">
-                                                    ⚠️ Demo: 3 days, auto-verified email, no extensions
-                                                </p>
-                                            )}
-                                        </div>
+                                <div className="sa-form-divider" />
+                                <div className="sa-form-section-label">License</div>
+                                <div className="sa-form-row">
+                                    <div className="sa-form-group">
+                                        <label>Plan</label>
+                                        <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
+                                            <option value="BASIC">Basic — POS Only</option>
+                                            <option value="PLUS">Plus — Reports & Inventory</option>
+                                            <option value="PREMIUM">Premium — All Features</option>
+                                        </select>
+                                    </div>
+                                    <div className="sa-form-group">
+                                        <label>Duration</label>
+                                        <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })} disabled={newCustomer.isDemo}>
+                                            <option value={1}>1 Month</option>
+                                            <option value={3}>3 Months</option>
+                                            <option value={6}>6 Months</option>
+                                            <option value={12}>12 Months</option>
+                                        </select>
                                     </div>
                                 </div>
+                                <label className="sa-toggle-row">
+                                    <input type="checkbox" checked={newCustomer.isDemo} onChange={e => setNewCustomer({ ...newCustomer, isDemo: e.target.checked })} />
+                                    <span className="sa-toggle-switch" />
+                                    <span>Demo account <span className="sa-sub-text">(3 days, auto-verified)</span></span>
+                                </label>
 
-                                <div className="modal-actions">
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? <div className="spinner" /> : 'Create Customer'}</button>
+                                <div className="sa-modal-footer">
+                                    <button type="button" className="sa-btn-ghost" onClick={() => setAddModal(false)}>Cancel</button>
+                                    <button type="submit" className="sa-btn-primary" disabled={saving}>
+                                        {saving ? <div className="sa-spinner-sm" /> : <><Plus size={14} /> Create Account</>}
+                                    </button>
                                 </div>
                             </form>
                         </motion.div>
@@ -856,28 +803,28 @@ SELECT 'Super Admin RLS fix applied!' AS status;`}</pre>
                 )}
             </AnimatePresence>
 
-            {/* Reset Password Modal */}
+            {/* ── Reset Password Modal ── */}
             <AnimatePresence>
-                {showResetModal.show && (
-                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowResetModal({ show: false })}>
-                        <motion.div className="modal small-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h2><Key size={20} /> Reset Password</h2>
-                                <button className="modal-close" onClick={() => setShowResetModal({ show: false })}><X size={20} /></button>
+                {resetModal.open && (
+                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModal({ open: false })}>
+                        <motion.div className="sa-modal sa-modal-sm" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
+                            <div className="sa-modal-header">
+                                <h3><Key size={16} /> Reset Password</h3>
+                                <button className="sa-icon-btn" onClick={() => setResetModal({ open: false })}><X size={16} /></button>
                             </div>
-                            <div className="modal-content">
-                                <p className="reset-info">
-                                    Reset password for: <strong>{showResetModal.request?.user.name || showResetModal.userName}</strong>
+                            <div className="sa-modal-body">
+                                <p className="sa-modal-info">
+                                    Setting new password for <strong>{resetModal.userName}</strong>
                                 </p>
-                                <div className="form-group">
+                                <div className="sa-form-group">
                                     <label>New Password</label>
-                                    <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password" autoFocus />
+                                    <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" autoFocus />
                                 </div>
                             </div>
-                            <div className="modal-actions">
-                                <button className="btn btn-secondary" onClick={() => setShowResetModal({ show: false })}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleResetPassword} disabled={saving}>
-                                    {saving ? <div className="spinner" /> : 'Reset Password'}
+                            <div className="sa-modal-footer">
+                                <button className="sa-btn-ghost" onClick={() => setResetModal({ open: false })}>Cancel</button>
+                                <button className="sa-btn-primary" onClick={handleResetPassword} disabled={saving}>
+                                    {saving ? <div className="sa-spinner-sm" /> : 'Reset Password'}
                                 </button>
                             </div>
                         </motion.div>
@@ -885,34 +832,34 @@ SELECT 'Super Admin RLS fix applied!' AS status;`}</pre>
                 )}
             </AnimatePresence>
 
-            {/* Ticket Reply Modal */}
+            {/* ── Ticket Reply Modal ── */}
             <AnimatePresence>
-                {showTicketModal.show && showTicketModal.ticket && (
-                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTicketModal({ show: false })}>
-                        <motion.div className="modal ticket-modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h2><MessageSquare size={20} /> Support Ticket</h2>
-                                <button className="modal-close" onClick={() => setShowTicketModal({ show: false })}><X size={20} /></button>
+                {ticketModal.open && ticketModal.ticket && (
+                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setTicketModal({ open: false })}>
+                        <motion.div className="sa-modal" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
+                            <div className="sa-modal-header">
+                                <h3><MessageSquare size={16} /> Support Ticket</h3>
+                                <button className="sa-icon-btn" onClick={() => setTicketModal({ open: false })}><X size={16} /></button>
                             </div>
-                            <div className="modal-content">
-                                <div className="ticket-info">
-                                    <div className="ticket-meta">
-                                        <span><strong>From:</strong> {showTicketModal.ticket.user.name}</span>
-                                        <span><strong>Restaurant:</strong> {showTicketModal.ticket.user.branch.name}</span>
-                                        <span className={`priority-badge ${showTicketModal.ticket.priority.toLowerCase()}`}>{showTicketModal.ticket.priority}</span>
+                            <div className="sa-modal-body">
+                                <div className="sa-ticket-detail">
+                                    <div className="sa-ticket-from">
+                                        <span><strong>{ticketModal.ticket.user.name}</strong></span>
+                                        <span className="sa-sub-text">{ticketModal.ticket.user.branch.name}</span>
+                                        <span className={`sa-priority-badge ${ticketModal.ticket.priority.toLowerCase()}`}>{ticketModal.ticket.priority}</span>
                                     </div>
-                                    <h4>{showTicketModal.ticket.subject}</h4>
-                                    <div className="ticket-message">{showTicketModal.ticket.message}</div>
+                                    <h4 className="sa-ticket-subject-full">{ticketModal.ticket.subject}</h4>
+                                    <div className="sa-ticket-message-body">{ticketModal.ticket.message}</div>
                                 </div>
-                                <div className="form-group">
+                                <div className="sa-form-group" style={{ marginTop: '16px' }}>
                                     <label>Your Reply</label>
-                                    <textarea value={adminReply} onChange={(e) => setAdminReply(e.target.value)} placeholder="Type your reply here..." rows={4} />
+                                    <textarea value={adminReply} onChange={e => setAdminReply(e.target.value)} placeholder="Type your reply…" rows={4} />
                                 </div>
                             </div>
-                            <div className="modal-actions">
-                                <button className="btn btn-secondary" onClick={() => setShowTicketModal({ show: false })}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleReplyTicket} disabled={saving}>
-                                    {saving ? <div className="spinner" /> : <><Send size={16} /> Send & Resolve</>}
+                            <div className="sa-modal-footer">
+                                <button className="sa-btn-ghost" onClick={() => setTicketModal({ open: false })}>Cancel</button>
+                                <button className="sa-btn-primary" onClick={handleReplyTicket} disabled={saving}>
+                                    {saving ? <div className="sa-spinner-sm" /> : <><Send size={14} /> Send & Resolve</>}
                                 </button>
                             </div>
                         </motion.div>
