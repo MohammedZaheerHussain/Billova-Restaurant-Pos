@@ -72,6 +72,8 @@ export default function SuperAdminPage() {
         ownerName: '', ownerEmail: '', ownerPassword: '',
         plan: 'BASIC', licenseDuration: 12, isDemo: false,
     });
+    const [rlsBlocked, setRlsBlocked] = useState(false);
+    const [showSetupSQL, setShowSetupSQL] = useState(false);
 
     useEffect(() => { fetchData(); }, []);
 
@@ -183,6 +185,16 @@ export default function SuperAdminPage() {
             });
 
             logger.info(`[SuperAdmin] Loaded ${restList.length} branches, ${(profileData || []).length} profiles`);
+
+            // Detect RLS blocking: if user is authenticated but branches return empty
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user && restList.length === 0 && !branchErr) {
+                // Check if branches table actually has data by testing RLS
+                logger.warn('[SuperAdmin] Authenticated but branches empty - likely RLS blocking');
+                setRlsBlocked(true);
+            } else {
+                setRlsBlocked(false);
+            }
         } catch (err) {
             logger.error('[SuperAdmin] Supabase fetch error:', err);
         }
@@ -400,6 +412,139 @@ export default function SuperAdminPage() {
                 <div className="loading-state"><div className="spinner" /></div>
             ) : (
                 <>
+                    {/* RLS Diagnostic Banner */}
+                    {rlsBlocked && (
+                        <motion.div
+                            className="rls-banner"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            style={{
+                                background: 'linear-gradient(135deg, #ff6b3520, #ff990020)',
+                                border: '1px solid #ff6b3550',
+                                borderRadius: '12px',
+                                padding: '16px 20px',
+                                marginBottom: '20px',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                <Shield size={20} style={{ color: '#ff6b35' }} />
+                                <strong style={{ color: '#ff6b35' }}>Database Setup Required</strong>
+                            </div>
+                            <p style={{ fontSize: '13px', color: '#ccc', margin: '0 0 12px 0' }}>
+                                Your SuperAdmin account needs RLS (Row Level Security) policies to access restaurant data.
+                                Run this SQL in your <strong>Supabase Dashboard → SQL Editor</strong>:
+                            </p>
+                            <button
+                                onClick={() => setShowSetupSQL(!showSetupSQL)}
+                                style={{
+                                    background: '#ff6b35', color: '#fff', border: 'none', borderRadius: '8px',
+                                    padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                                }}
+                            >
+                                {showSetupSQL ? 'Hide SQL' : '📋 Show SQL Fix'}
+                            </button>
+                            {showSetupSQL && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <pre
+                                        style={{
+                                            background: '#0d0d0d', border: '1px solid #333', borderRadius: '8px',
+                                            padding: '12px', fontSize: '11px', color: '#4ade80', maxHeight: '300px',
+                                            overflow: 'auto', whiteSpace: 'pre-wrap',
+                                        }}
+                                    >{`-- Run this in Supabase SQL Editor
+-- Step 1: Create helper function
+CREATE OR REPLACE FUNCTION is_super_admin() RETURNS BOOLEAN AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND LOWER(role) = 'super_admin'
+    );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- Step 2: Fix branches policies
+DROP POLICY IF EXISTS "users_read_own_branch" ON branches;
+DROP POLICY IF EXISTS "super_admin_full_access_branches" ON branches;
+DROP POLICY IF EXISTS "super_admin_insert_branches" ON branches;
+DROP POLICY IF EXISTS "super_admin_update_branches" ON branches;
+DROP POLICY IF EXISTS "super_admin_delete_branches" ON branches;
+DROP POLICY IF EXISTS "users_read_own_branch_v2" ON branches;
+
+CREATE POLICY "super_admin_full_access_branches" ON branches
+    FOR SELECT TO authenticated USING (is_super_admin());
+CREATE POLICY "super_admin_insert_branches" ON branches
+    FOR INSERT TO authenticated WITH CHECK (is_super_admin());
+CREATE POLICY "super_admin_update_branches" ON branches
+    FOR UPDATE TO authenticated USING (is_super_admin());
+CREATE POLICY "super_admin_delete_branches" ON branches
+    FOR DELETE TO authenticated USING (is_super_admin());
+CREATE POLICY "users_read_own_branch_v2" ON branches
+    FOR SELECT TO authenticated
+    USING (id = get_user_branch_id() OR get_user_role() = 'OWNER');
+
+-- Step 3: Fix profiles policies
+DROP POLICY IF EXISTS "super_admin_insert_profiles" ON profiles;
+DROP POLICY IF EXISTS "super_admin_manage_profiles" ON profiles;
+CREATE POLICY "super_admin_insert_profiles" ON profiles
+    FOR INSERT TO authenticated WITH CHECK (is_super_admin());
+CREATE POLICY "super_admin_manage_profiles" ON profiles
+    FOR UPDATE TO authenticated USING (is_super_admin());
+
+-- Step 4: Support tickets & password resets
+ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "super_admin_read_tickets" ON support_tickets;
+DROP POLICY IF EXISTS "super_admin_update_tickets" ON support_tickets;
+DROP POLICY IF EXISTS "users_create_tickets" ON support_tickets;
+DROP POLICY IF EXISTS "users_read_own_tickets" ON support_tickets;
+CREATE POLICY "super_admin_read_tickets" ON support_tickets
+    FOR SELECT TO authenticated USING (is_super_admin());
+CREATE POLICY "super_admin_update_tickets" ON support_tickets
+    FOR UPDATE TO authenticated USING (is_super_admin());
+CREATE POLICY "users_create_tickets" ON support_tickets
+    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "users_read_own_tickets" ON support_tickets
+    FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+ALTER TABLE password_reset_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "super_admin_read_resets" ON password_reset_requests;
+DROP POLICY IF EXISTS "super_admin_update_resets" ON password_reset_requests;
+DROP POLICY IF EXISTS "users_create_resets" ON password_reset_requests;
+CREATE POLICY "super_admin_read_resets" ON password_reset_requests
+    FOR SELECT TO authenticated USING (is_super_admin());
+CREATE POLICY "super_admin_update_resets" ON password_reset_requests
+    FOR UPDATE TO authenticated USING (is_super_admin());
+CREATE POLICY "users_create_resets" ON password_reset_requests
+    FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+
+SELECT 'Super Admin RLS fix applied!' AS status;`}</pre>
+                                    <button
+                                        onClick={() => {
+                                            const sql = document.querySelector('.rls-banner pre')?.textContent || '';
+                                            navigator.clipboard.writeText(sql);
+                                            toast.success('SQL copied to clipboard!');
+                                        }}
+                                        style={{
+                                            marginTop: '8px', background: '#333', color: '#fff', border: '1px solid #555',
+                                            borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px',
+                                        }}
+                                    >
+                                        📋 Copy SQL to Clipboard
+                                    </button>
+                                    <p style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
+                                        After running the SQL, click the button below to refresh:
+                                    </p>
+                                    <button
+                                        onClick={() => { setRlsBlocked(false); fetchData(); }}
+                                        style={{
+                                            background: '#4ade80', color: '#000', border: 'none', borderRadius: '6px',
+                                            padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                                        }}
+                                    >
+                                        ✅ I've run the SQL — Refresh Data
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
                     {/* Stats Cards */}
                     <div className="stats-row">
                         <motion.div className="stat-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
