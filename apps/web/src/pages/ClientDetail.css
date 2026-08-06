@@ -1,418 +1,564 @@
 /* =======================================================
-   Client Detail Page — SuperAdmin restaurant view
+   Client Detail Page — SKYWALK Architecture (Billova Orange)
+   3-Column Enterprise SaaS Management Workspace
    ======================================================= */
 
-.client-detail-page {
-    display: flex;
-    flex-direction: column;
+.sky-client-root {
     min-height: 100vh;
     background: var(--bg-root);
-}
-
-/* ── Loading / Error states ── */
-.loading-state {
+    color: var(--text-primary);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 60vh;
+    flex-direction: column;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.error-state {
+.sky-client-loading {
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    min-height: 60vh;
+    gap: 16px;
+    background: var(--bg-root);
     color: var(--text-muted);
     font-size: 14px;
-    text-align: center;
 }
 
-/* ── Header ── */
-.client-header {
+.sky-client-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: sky-spin 0.8s linear infinite;
+}
+
+/* ── Top Header Toolbar ── */
+.sky-client-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
     padding: 0 24px;
-    height: 52px;
-    border-bottom: 1px solid var(--border);
+    height: 56px;
     background: var(--bg-canvas);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
-.back-btn {
-    display: flex;
+.sky-back-link {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
+    gap: 8px;
     background: none;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    padding: 6px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
-    flex-shrink: 0;
-    text-decoration: none;
 }
 
-.back-btn:hover {
+.sky-back-link:hover {
     border-color: var(--border-light);
     color: var(--text-primary);
 }
 
-/* ── Client Card ── */
-.client-card {
-    background: var(--bg-canvas);
-    border-bottom: 1px solid var(--border);
-    padding: 20px 24px;
+.sky-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.client-card-header {
+.sky-client-id {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.sky-status-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sky-status-pill.active { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+.sky-status-pill.suspended { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+/* ── Hero Identity Panel ── */
+.sky-hero-panel {
+    background: var(--bg-canvas);
+    border-bottom: 1px solid var(--border);
+    padding: 24px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.sky-hero-main {
+    display: flex;
+    align-items: center;
     gap: 16px;
 }
 
-.client-info {
+.sky-hero-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-lg);
+    background: var(--primary-glow);
+    border: 1.5px solid rgba(249, 115, 22, 0.3);
+    color: var(--primary);
+    font-size: 20px;
+    font-weight: 800;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 16px rgba(249, 115, 22, 0.2);
 }
 
-.client-info h1 {
-    font-size: 20px;
+.sky-hero-title {
+    font-size: 22px;
     font-weight: 800;
     color: var(--text-primary);
     letter-spacing: -0.02em;
 }
 
-.client-meta {
+.sky-hero-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.sky-hero-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.client-id {
-    font-size: 11px;
-    font-family: var(--font-mono);
-    color: var(--text-muted);
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    padding: 2px 8px;
-    border-radius: 4px;
-}
-
-/* ── Client Actions ── */
-.client-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-/* ── Tabs ── */
-.client-tabs {
-    display: flex;
-    gap: 3px;
-    padding: 0 24px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-canvas);
-    flex-shrink: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.client-tabs::-webkit-scrollbar { display: none; }
-
-.info-tab, .licenses-tab, .branding-tab {
-    padding: 10px 16px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    white-space: nowrap;
-}
-
-.info-tab:hover, .licenses-tab:hover, .branding-tab:hover {
-    color: var(--text-primary);
-}
-
-.info-tab.active, .licenses-tab.active, .branding-tab.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    font-weight: 600;
-}
-
-/* ── Tab Content ── */
-.tab-content {
+/* ── Main Content Workspace ── */
+.sky-client-content {
     padding: 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* 3 Column Grid */
+.sky-workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.sky-col-card {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-width: 900px;
+    box-shadow: var(--shadow-sm);
 }
 
-/* ── Info Grid ── */
-.info-grid {
+.sky-col-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+}
+
+.sky-col-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Field List */
+.sky-field-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
 }
 
-.info-item {
-    background: var(--bg-canvas);
-    border: 1px solid var(--border);
+.sky-field-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.sky-field-item.full {
+    grid-column: 1 / -1;
+}
+
+.sky-field-item label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+}
+
+.sky-field-item span {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.sky-field-item span.highlight {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+/* License Display */
+.sky-license-display {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sky-plan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sky-plan-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.sky-badge-status {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.sky-badge-status.active { background: var(--success-bg); color: var(--success); }
+.sky-badge-status.suspended { background: var(--danger-bg); color: var(--danger); }
+
+.sky-key-box {
+    background: var(--bg-surface);
+    border: 1.5px dashed var(--border);
     border-radius: var(--radius-md);
-    padding: 12px 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.info-item.full-width {
-    grid-column: 1 / -1;
-}
-
-.info-item label {
-    font-size: 10px;
-    font-weight: 600;
+.sky-key-box label {
+    font-size: 9px;
+    font-weight: 700;
     color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
 }
 
-.info-item span, .info-item p {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-/* ── License Card ── */
-.license-card {
-    background: var(--bg-canvas);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 16px 18px;
+.sky-key-row {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.license-row {
-    display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
     font-size: 13px;
-    gap: 8px;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border-subtle);
+    font-weight: 700;
+    color: var(--primary);
 }
 
-.license-row:last-child {
-    border-bottom: none;
-}
-
-.license-row span:first-child {
+.sky-key-row button {
+    background: none;
+    border: none;
     color: var(--text-muted);
-    font-weight: 500;
-}
-
-.license-row span:last-child {
-    color: var(--text-primary);
-    font-weight: 600;
-    font-family: var(--font-mono);
-}
-
-.no-license {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    padding: 40px;
-    color: var(--text-muted);
-    font-size: 13px;
-    text-align: center;
-    border: 1.5px dashed var(--border);
-    border-radius: var(--radius-lg);
-}
-
-/* ── Coming Soon ── */
-.coming-soon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 60px;
-    color: var(--text-muted);
-    font-size: 13px;
-    text-align: center;
-}
-
-/* ── Plan Options ── */
-.plan-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
-    padding: 16px 20px;
-}
-
-.plan-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 14px 12px;
-    background: var(--bg-surface);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all var(--transition-fast);
-    position: relative;
+    transition: color var(--transition-fast);
 }
 
-.plan-option:hover {
-    border-color: var(--primary);
+.sky-key-row button:hover {
+    color: var(--text-primary);
 }
 
-.plan-option.selected {
-    border-color: var(--primary);
-    background: var(--primary-glow);
+.sky-stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
 }
 
-.plan-name {
-    font-size: 13px;
+.sky-mini-stat {
+    background: var(--bg-surface);
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sky-mini-stat .label {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.sky-mini-stat .value {
+    font-size: 12px;
     font-weight: 700;
     color: var(--text-primary);
 }
 
-.plan-price {
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--primary);
-    font-family: var(--font-mono);
+/* Quick Actions List */
+.sky-quick-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.check {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    color: var(--primary);
-}
-
-/* ── Warning Icon ── */
-.warning-icon {
-    font-size: 36px;
-    text-align: center;
-    padding: 16px 0 4px;
-}
-
-/* ── Modals ── */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(11, 13, 17, 0.82);
+.sky-action-btn {
     display: flex;
     align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-    backdrop-filter: blur(5px);
-}
-
-.modal {
-    background: var(--bg-canvas);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-lg);
-    width: 100%;
-    overflow: hidden;
-}
-
-.upgrade-modal { max-width: 480px; }
-.deactivate-modal { max-width: 400px; }
-
-.modal-close {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    position: absolute;
-    top: 14px;
-    right: 14px;
-}
-
-.modal-close:hover {
-    border-color: var(--border-light);
-    color: var(--text-primary);
-}
-
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 14px 20px;
-    border-top: 1px solid var(--border);
-}
-
-/* ── Buttons ── */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.sky-action-btn:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+    background: var(--bg-surface-hover);
+}
+
+.sky-action-btn.danger {
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.sky-action-btn.danger:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
+/* ── Sub-Workspace Tabs ── */
+.sky-workspace-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.sky-wtab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.sky-wtab:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.sky-wtab.active {
+    background: var(--primary-glow);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* ── Tabbed Workspace Content Pane ── */
+.sky-wtab-content {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+}
+
+.sky-wtab-pane h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.sky-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.sky-info-tile {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sky-info-tile label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.sky-info-tile span {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sky-branch-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.sky-branch-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sky-branch-header .title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.sky-branch-header .sub { font-size: 12px; color: var(--text-muted); }
+
+.sky-license-card-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+}
+
+.sky-license-card-detail .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.sky-license-card-detail label { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+
+.empty-text { font-size: 13px; color: var(--text-muted); }
+
+/* Buttons */
+.sky-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: var(--gradient-primary);
+    color: #fff;
     border: none;
-    white-space: nowrap;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
 }
 
-.btn-cancel { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-secondary); }
-.btn-cancel:hover { border-color: var(--border-light); color: var(--text-primary); }
-.btn-upgrade, .btn-upgrade-action { background: var(--primary); color: #fff; }
-.btn-upgrade:hover:not(:disabled), .btn-upgrade-action:hover:not(:disabled) { background: var(--primary-hover); }
-.btn-danger, .btn-danger-action { background: var(--danger-bg); border: 1px solid rgba(239,68,68,.2); color: var(--danger); }
-.btn-danger:hover:not(:disabled), .btn-danger-action:hover:not(:disabled) { background: var(--danger); color: #fff; }
-.btn-reactivate { background: var(--success-bg); border: 1px solid rgba(16,185,129,.2); color: var(--success); }
-.btn-reactivate:hover:not(:disabled) { background: var(--success); color: #fff; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Spinner ── */
-.spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid var(--border);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: cd-spin 0.7s linear infinite;
+.sky-btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: var(--danger-bg);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
 }
 
-.spinner-sm {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255,255,255,.3);
-    border-top-color: currentColor;
-    border-radius: 50%;
-    animation: cd-spin 0.7s linear infinite;
-    display: inline-block;
+.sky-btn-danger:hover {
+    background: var(--danger);
+    color: #fff;
 }
 
-@keyframes cd-spin { to { transform: rotate(360deg); } }
+.sky-btn-success {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: var(--success-bg);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--success);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.sky-btn-success:hover {
+    background: var(--success);
+    color: #fff;
+}
+
+.sky-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.sky-plan-option {
+    background: var(--bg-surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.sky-plan-option:hover {
+    border-color: var(--primary);
+}
+
+.sky-plan-option.selected {
+    background: var(--primary-glow);
+    border-color: var(--primary);
+}
+
+.sky-plan-title { font-size: 12px; font-weight: 700; color: var(--text-primary); text-align: center; }
+.sky-plan-price { font-size: 14px; font-weight: 800; color: var(--primary); }
+.sky-plan-check { position: absolute; top: 6px; right: 6px; color: var(--primary); }

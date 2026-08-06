@@ -1,8 +1,12 @@
-// Client Detail Page - Like Billova Medical
+// Client Detail Page — 3-Column Enterprise SaaS Workspace (SKYWALK Architecture mapped to Billova Orange)
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Shield, Ban, Zap, Building2, Key, User, Crown, X, Check } from 'lucide-react';
+import {
+    ArrowLeft, Shield, Ban, Zap, Building2, Key,
+    Crown, X, Check, Copy, AlertTriangle, RefreshCw,
+    Activity, Layers, FileText, Lock
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
 import { hasExpressBackend, getRestaurantDirect, deactivateBranchDirect, reactivateBranchDirect, upgradePlanDirect } from '../lib/superadmin-direct';
@@ -25,6 +29,7 @@ interface Client {
         status: string;
         expires_at: string;
         is_lifetime?: boolean;
+        licenseKey?: string;
     };
     daysLeft?: number | null;
     owner?: {
@@ -36,11 +41,10 @@ interface Client {
     _count?: { orders: number; users: number };
 }
 
-// Available plans for upgrade
 const upgradePlans = [
-    { id: 'BASIC', name: 'Basic', price: 1000, duration: 12, isLifetime: false },
-    { id: 'PRO', name: 'Pro', price: 2000, duration: 12, isLifetime: false },
-    { id: 'PREMIUM', name: 'Premium', price: 3000, duration: 12, isLifetime: false },
+    { id: 'BASIC', name: 'Basic (POS Only)', price: 1000, duration: 12, isLifetime: false },
+    { id: 'PRO', name: 'Pro (POS + Reports)', price: 2000, duration: 12, isLifetime: false },
+    { id: 'PREMIUM', name: 'Premium (Full Suite)', price: 3000, duration: 12, isLifetime: false },
     { id: 'BASIC_LIFETIME', name: 'Basic Lifetime', price: 5000, duration: 0, isLifetime: true },
     { id: 'PRO_LIFETIME', name: 'Pro Lifetime', price: 7000, duration: 0, isLifetime: true },
     { id: 'PREMIUM_LIFETIME', name: 'Premium Lifetime', price: 10000, duration: 0, isLifetime: true },
@@ -51,7 +55,7 @@ export default function ClientDetailPage() {
     const { id } = useParams<{ id: string }>();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'info' | 'licenses' | 'branding'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'branches' | 'staff' | 'licenses' | 'branding' | 'audit'>('info');
 
     // Modals
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -74,7 +78,7 @@ export default function ClientDetailPage() {
                 setClient(data as any);
             }
         } catch (error: any) {
-            toast.error('Failed to load client');
+            toast.error('Failed to load restaurant workspace');
             navigate('/super-admin');
         } finally {
             setLoading(false);
@@ -89,11 +93,11 @@ export default function ClientDetailPage() {
             } else {
                 await deactivateBranchDirect(id!);
             }
-            toast.success('Client deactivated');
+            toast.success('Restaurant access suspended');
             setShowDeactivateModal(false);
             fetchClient();
         } catch (error: any) {
-            toast.error(error?.message || error.response?.data?.error || 'Deactivation failed');
+            toast.error(error?.message || 'Deactivation failed');
         } finally {
             setActionLoading(false);
         }
@@ -107,10 +111,10 @@ export default function ClientDetailPage() {
             } else {
                 await reactivateBranchDirect(id!);
             }
-            toast.success('Client reactivated');
+            toast.success('Restaurant access restored');
             fetchClient();
         } catch (error: any) {
-            toast.error(error?.message || error.response?.data?.error || 'Reactivation failed');
+            toast.error(error?.message || 'Reactivation failed');
         } finally {
             setActionLoading(false);
         }
@@ -118,7 +122,7 @@ export default function ClientDetailPage() {
 
     const handleUpgrade = async () => {
         if (!selectedPlan) {
-            toast.error('Please select a plan');
+            toast.error('Please select a plan tier');
             return;
         }
         try {
@@ -137,105 +141,75 @@ export default function ClientDetailPage() {
                     isLifetime: plan?.isLifetime || false,
                 });
             }
-            toast.success('Plan upgraded!');
+            toast.success('Subscription upgraded successfully!');
             setShowUpgradeModal(false);
             setSelectedPlan('');
             fetchClient();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Upgrade failed');
+            toast.error('Plan upgrade failed');
         } finally {
             setActionLoading(false);
         }
     };
 
-    const getPlanBadgeClass = (plan: string) => {
-        if (plan?.includes('DEMO')) return 'badge-demo';
-        if (plan?.includes('PREMIUM')) return 'badge-premium';
-        if (plan?.includes('PRO')) return 'badge-pro';
-        if (plan?.includes('LIFETIME')) return 'badge-lifetime';
-        return 'badge-basic';
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} copied to clipboard!`);
     };
 
-    const formatDaysLeft = () => {
-        if (!client?.license?.expires_at) return null;
-        if (client.license.is_lifetime) return '∞ Lifetime';
-        const days = client.daysLeft;
-        if (days === null || days === undefined) return null;
-        if (days < 0) return 'EXPIRED';
-        if (days <= 7) return `${days} days left`;
-        return `${days} days left`;
-    };
+    const initials = (name: string) => name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'ST';
 
     if (loading) {
         return (
-            <div className="client-detail-page">
-                <div className="loading-state">
-                    <div className="spinner" />
-                    <p>Loading client...</p>
-                </div>
+            <div className="sky-client-loading">
+                <div className="sky-client-spinner" />
+                <p>Loading restaurant workspace...</p>
             </div>
         );
     }
 
     if (!client) {
         return (
-            <div className="client-detail-page">
-                <div className="error-state">
-                    <p>Client not found</p>
-                    <button onClick={() => navigate('/super-admin')}>Go Back</button>
-                </div>
+            <div className="sky-client-loading">
+                <AlertTriangle size={36} color="var(--danger)" />
+                <p>Restaurant account not found</p>
+                <button className="sky-btn-primary" onClick={() => navigate('/super-admin')}>Return to Control Center</button>
             </div>
         );
     }
 
     return (
-        <div className="client-detail-page">
+        <div className="sky-client-root">
             {/* Upgrade Modal */}
             <AnimatePresence>
                 {showUpgradeModal && (
-                    <motion.div
-                        className="modal-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <motion.div
-                            className="modal upgrade-modal"
-                            initial={{ scale: 0.9 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0.9 }}
-                        >
-                            <button className="modal-close" onClick={() => setShowUpgradeModal(false)}>
-                                <X size={20} />
-                            </button>
-                            <h2><Crown size={24} /> Upgrade Plan</h2>
-                            <p>Select a new plan for {client.name}</p>
-
-                            <div className="plan-options">
-                                {upgradePlans.map(plan => (
-                                    <div
-                                        key={plan.id}
-                                        className={`plan-option ${selectedPlan === plan.id ? 'selected' : ''}`}
-                                        onClick={() => setSelectedPlan(plan.id)}
-                                    >
-                                        <span className="plan-name">{plan.name}</span>
-                                        <span className="plan-price">₹{plan.price.toLocaleString()}</span>
-                                        {selectedPlan === plan.id && <Check size={18} className="check" />}
-                                    </div>
-                                ))}
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="sky-modal-card" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+                            <div className="sky-modal-header">
+                                <h3><Crown size={20} /> Upgrade Subscription Tier</h3>
+                                <button onClick={() => setShowUpgradeModal(false)}><X size={18} /></button>
                             </div>
-
-                            <div className="modal-actions">
-                                <button className="btn btn-cancel" onClick={() => setShowUpgradeModal(false)}>
-                                    Cancel
-                                </button>
-                                <button
-                                    className="btn btn-upgrade"
-                                    onClick={handleUpgrade}
-                                    disabled={actionLoading || !selectedPlan}
-                                >
-                                    {actionLoading ? <div className="spinner-sm" /> : 'Upgrade Now'}
-                                </button>
+                            <div className="sky-modal-body">
+                                <p>Select a new license plan tier for <strong>{client.name}</strong>:</p>
+                                <div className="sky-plan-grid">
+                                    {upgradePlans.map(plan => (
+                                        <div
+                                            key={plan.id}
+                                            className={`sky-plan-option ${selectedPlan === plan.id ? 'selected' : ''}`}
+                                            onClick={() => setSelectedPlan(plan.id)}
+                                        >
+                                            <div className="sky-plan-title">{plan.name}</div>
+                                            <div className="sky-plan-price mono">₹{plan.price.toLocaleString()}</div>
+                                            {selectedPlan === plan.id && <Check size={16} className="sky-plan-check" />}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="sky-modal-actions">
+                                    <button className="sky-btn-secondary" onClick={() => setShowUpgradeModal(false)}>Cancel</button>
+                                    <button className="sky-btn-primary" onClick={handleUpgrade} disabled={actionLoading || !selectedPlan}>
+                                        {actionLoading ? 'Processing Upgrade...' : 'Confirm Upgrade'}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
@@ -245,212 +219,285 @@ export default function ClientDetailPage() {
             {/* Deactivate Confirmation Modal */}
             <AnimatePresence>
                 {showDeactivateModal && (
-                    <motion.div
-                        className="modal-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                    >
-                        <motion.div
-                            className="modal deactivate-modal"
-                            initial={{ scale: 0.9 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0.9 }}
-                        >
-                            <div className="warning-icon">
-                                <Ban size={32} />
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="sky-modal-card sm" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}>
+                            <div className="sky-modal-header">
+                                <h3 className="danger"><Ban size={20} /> Suspend Restaurant Access?</h3>
+                                <button onClick={() => setShowDeactivateModal(false)}><X size={18} /></button>
                             </div>
-                            <h2>Force Deactivate?</h2>
-                            <p>
-                                This will immediately suspend <strong>{client.name}</strong>'s access.
-                                They won't be able to use the POS until reactivated.
-                            </p>
-
-                            <div className="modal-actions">
-                                <button className="btn btn-cancel" onClick={() => setShowDeactivateModal(false)}>
-                                    Cancel
-                                </button>
-                                <button
-                                    className="btn btn-danger"
-                                    onClick={handleForceDeactivate}
-                                    disabled={actionLoading}
-                                >
-                                    {actionLoading ? <div className="spinner-sm" /> : 'Yes, Deactivate'}
-                                </button>
+                            <div className="sky-modal-body">
+                                <p>
+                                    Are you sure you want to suspend access for <strong>{client.name}</strong>?
+                                    Staff members will be logged out of POS terminals immediately.
+                                </p>
+                                <div className="sky-modal-actions">
+                                    <button className="sky-btn-secondary" onClick={() => setShowDeactivateModal(false)}>Cancel</button>
+                                    <button className="sky-btn-danger" onClick={handleForceDeactivate} disabled={actionLoading}>
+                                        {actionLoading ? 'Suspending...' : 'Confirm Suspension'}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Header */}
-            <div className="client-header">
-                <button className="back-btn" onClick={() => navigate('/super-admin')}>
-                    <ArrowLeft size={18} />
-                    Back to Clients
+            {/* Top Toolbar */}
+            <header className="sky-client-header">
+                <button className="sky-back-link" onClick={() => navigate('/super-admin')}>
+                    <ArrowLeft size={16} /> Back to Control Center
                 </button>
-            </div>
+                <div className="sky-header-meta">
+                    <span className="sky-client-id mono">BLLOVA-ID: {client.id.slice(0, 8).toUpperCase()}</span>
+                    <span className={`sky-status-pill ${client.isActive ? 'active' : 'suspended'}`}>
+                        {client.isActive ? 'Active Account' : 'Suspended'}
+                    </span>
+                </div>
+            </header>
 
-            {/* Client Card */}
-            <motion.div
-                className="client-card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
-                <div className="client-card-header">
-                    <div className="client-info">
-                        <h1>{client.name}</h1>
-                        <div className="client-meta">
-                            <span className="client-id">BILLOVA-{client.id.slice(0, 3).toUpperCase()}</span>
-                            <span className={`status-badge ${client.isActive ? 'active' : 'inactive'}`}>
-                                {client.isActive ? 'Active' : 'Suspended'}
-                            </span>
+            {/* Hero Workspace Identity Banner */}
+            <section className="sky-hero-panel">
+                <div className="sky-hero-main">
+                    <div className="sky-hero-avatar">{initials(client.name)}</div>
+                    <div>
+                        <h1 className="sky-hero-title">{client.name}</h1>
+                        <p className="sky-hero-subtitle">
+                            Joined {new Date(client.createdAt).toLocaleDateString()} · {client.city || 'Headquarters'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="sky-hero-actions">
+                    <button className="sky-btn-primary" onClick={() => setShowUpgradeModal(true)}>
+                        <Zap size={15} /> Upgrade Subscription
+                    </button>
+
+                    {client.isActive ? (
+                        <button className="sky-btn-danger" onClick={() => setShowDeactivateModal(true)}>
+                            <Ban size={15} /> Suspend Store Access
+                        </button>
+                    ) : (
+                        <button className="sky-btn-success" onClick={handleReactivate} disabled={actionLoading}>
+                            <Shield size={15} /> Restore Store Access
+                        </button>
+                    )}
+                </div>
+            </section>
+
+            {/* 3-Column Enterprise Workspace Layout */}
+            <main className="sky-client-content">
+                <div className="sky-workspace-grid">
+
+                    {/* Column 1: Restaurant Profile & Owner Info */}
+                    <div className="sky-col-card">
+                        <div className="sky-col-header">
+                            <Building2 size={16} />
+                            <h3>Restaurant Profile</h3>
+                        </div>
+
+                        <div className="sky-field-list">
+                            <div className="sky-field-item">
+                                <label>STORE NAME</label>
+                                <span>{client.name}</span>
+                            </div>
+                            <div className="sky-field-item">
+                                <label>PRIMARY OWNER</label>
+                                <span className="highlight">{client.owner?.name || 'Unassigned'}</span>
+                            </div>
+                            <div className="sky-field-item">
+                                <label>OWNER EMAIL</label>
+                                <span className="mono">{client.owner?.email || 'N/A'}</span>
+                            </div>
+                            <div className="sky-field-item">
+                                <label>PHONE CONTACT</label>
+                                <span className="mono">{client.phone || client.owner?.phone || 'N/A'}</span>
+                            </div>
+                            <div className="sky-field-item">
+                                <label>GST REGISTRATION</label>
+                                <span className="mono">{client.gstNumber || 'Unregistered'}</span>
+                            </div>
+                            <div className="sky-field-item">
+                                <label>FSSAI LICENSE</label>
+                                <span className="mono">{client.fssaiNumber || 'Unregistered'}</span>
+                            </div>
+                            <div className="sky-field-item full">
+                                <label>ADDRESS</label>
+                                <span>{client.address || 'No physical address configured.'}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="client-actions">
-                        <span className={`plan-badge ${getPlanBadgeClass(client.subscriptionPlan)}`}>
-                            {client.subscriptionPlan?.replace('_', ' ') || 'BASIC'}
-                        </span>
+                    {/* Column 2: License Health & Plan Controls */}
+                    <div className="sky-col-card">
+                        <div className="sky-col-header">
+                            <Crown size={16} />
+                            <h3>Subscription & License Health</h3>
+                        </div>
 
-                        <button
-                            className="btn btn-upgrade-action"
-                            onClick={() => setShowUpgradeModal(true)}
-                        >
-                            <Zap size={16} /> Upgrade Plan
-                        </button>
+                        <div className="sky-license-display">
+                            <div className="sky-plan-header">
+                                <span className="sky-plan-name">{client.subscriptionPlan || 'PREMIUM'} TIER</span>
+                                <span className={`sky-badge-status ${client.isActive ? 'active' : 'suspended'}`}>
+                                    {client.isActive ? 'HEALTHY' : 'SUSPENDED'}
+                                </span>
+                            </div>
 
-                        {client.isActive ? (
-                            <button
-                                className="btn btn-danger-action"
-                                onClick={() => setShowDeactivateModal(true)}
-                            >
-                                <Ban size={16} /> Force Deactivate
+                            {client.license?.licenseKey && (
+                                <div className="sky-key-box">
+                                    <label>ACTIVE LICENSE KEY</label>
+                                    <div className="sky-key-row mono">
+                                        <span>{client.license.licenseKey}</span>
+                                        <button onClick={() => copyToClipboard(client.license!.licenseKey!, 'License Key')}>
+                                            <Copy size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="sky-stat-row">
+                                <div className="sky-mini-stat">
+                                    <span className="label">EXPIRATION</span>
+                                    <span className="value mono">
+                                        {client.license?.is_lifetime
+                                            ? '∞ Lifetime'
+                                            : (client.license?.expires_at ? new Date(client.license.expires_at).toLocaleDateString() : 'N/A')}
+                                    </span>
+                                </div>
+                                <div className="sky-mini-stat">
+                                    <span className="label">STATUS</span>
+                                    <span className="value mono">
+                                        {client.daysLeft !== undefined && client.daysLeft !== null
+                                            ? (client.daysLeft < 0 ? 'Expired' : `${client.daysLeft} days remaining`)
+                                            : 'Active'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Column 3: Operational Quick Actions & Metrics */}
+                    <div className="sky-col-card">
+                        <div className="sky-col-header">
+                            <Activity size={16} />
+                            <h3>Quick Management Actions</h3>
+                        </div>
+
+                        <div className="sky-quick-actions-list">
+                            <button className="sky-action-btn" onClick={() => copyToClipboard(client.id, 'Store ID')}>
+                                <FileText size={15} /> Copy Store ID
                             </button>
-                        ) : (
-                            <button
-                                className="btn btn-reactivate"
-                                onClick={handleReactivate}
-                                disabled={actionLoading}
-                            >
-                                <Shield size={16} /> Reactivate
+                            <button className="sky-action-btn" onClick={fetchClient}>
+                                <RefreshCw size={15} /> Refresh Store Telemetry
                             </button>
-                        )}
-
-                        {formatDaysLeft() && (
-                            <span className={`days-left ${client.daysLeft != null && client.daysLeft <= 7 ? 'warning' : ''}`}>
-                                <Clock size={14} /> {formatDaysLeft()}
-                            </span>
-                        )}
+                            <button className="sky-action-btn danger" onClick={() => setShowDeactivateModal(true)}>
+                                <Lock size={15} /> Lock Store Access
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="client-tabs">
+                {/* Sub-workspace Navigation Tabs */}
+                <div className="sky-workspace-tabs">
                     <button
-                        className={`tab ${activeTab === 'info' ? 'active' : ''}`}
+                        className={`sky-wtab ${activeTab === 'info' ? 'active' : ''}`}
                         onClick={() => setActiveTab('info')}
                     >
-                        <User size={16} /> Info
+                        <Building2 size={14} /> General Overview
                     </button>
                     <button
-                        className={`tab ${activeTab === 'licenses' ? 'active' : ''}`}
+                        className={`sky-wtab ${activeTab === 'branches' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('branches')}
+                    >
+                        <Layers size={14} /> Branches & Terminals ({client._count?.users || 1})
+                    </button>
+                    <button
+                        className={`sky-wtab ${activeTab === 'licenses' ? 'active' : ''}`}
                         onClick={() => setActiveTab('licenses')}
                     >
-                        <Key size={16} /> Licenses
+                        <Key size={14} /> License Details
                     </button>
                     <button
-                        className={`tab ${activeTab === 'branding' ? 'active' : ''}`}
+                        className={`sky-wtab ${activeTab === 'branding' ? 'active' : ''}`}
                         onClick={() => setActiveTab('branding')}
                     >
-                        <Building2 size={16} /> Branding
+                        <FileText size={14} /> Branding & Config
                     </button>
                 </div>
 
-                {/* Tab Content */}
-                <div className="tab-content">
+                {/* Tabbed Sub-workspace Content */}
+                <div className="sky-wtab-content">
                     {activeTab === 'info' && (
-                        <div className="info-tab">
-                            <h3>Client Information</h3>
-                            <div className="info-grid">
-                                <div className="info-item">
-                                    <label>OWNER</label>
-                                    <span>{client.owner?.name || '-'}</span>
+                        <div className="sky-wtab-pane">
+                            <h4>Store System Information</h4>
+                            <div className="sky-info-grid">
+                                <div className="sky-info-tile">
+                                    <label>STORE ID</label>
+                                    <span className="mono">{client.id}</span>
                                 </div>
-                                <div className="info-item">
-                                    <label>PHONE</label>
-                                    <span>{client.phone || client.owner?.phone || '-'}</span>
+                                <div className="sky-info-tile">
+                                    <label>REGISTERED DATE</label>
+                                    <span className="mono">{new Date(client.createdAt).toLocaleString()}</span>
                                 </div>
-                                <div className="info-item">
-                                    <label>EMAIL</label>
-                                    <span>{client.owner?.email || '-'}</span>
+                                <div className="sky-info-tile">
+                                    <label>TOTAL REGISTERED USERS</label>
+                                    <span className="mono">{client._count?.users || 1} staff accounts</span>
                                 </div>
-                                <div className="info-item">
-                                    <label>CITY</label>
-                                    <span>{client.city || '-'}</span>
-                                </div>
-                                <div className="info-item">
-                                    <label>GST NUMBER</label>
-                                    <span>{client.gstNumber || '-'}</span>
-                                </div>
-                                <div className="info-item">
-                                    <label>FSSAI NUMBER</label>
-                                    <span>{client.fssaiNumber || '-'}</span>
+                                <div className="sky-info-tile">
+                                    <label>TOTAL ORDERS PROCESSED</label>
+                                    <span className="mono">{client._count?.orders || 0} orders</span>
                                 </div>
                             </div>
-                            <div className="info-item full-width">
-                                <label>ADDRESS</label>
-                                <span>{client.address || '-'}</span>
+                        </div>
+                    )}
+
+                    {activeTab === 'branches' && (
+                        <div className="sky-wtab-pane">
+                            <h4>Configured Store Branches</h4>
+                            <div className="sky-branch-card">
+                                <div className="sky-branch-header">
+                                    <Building2 size={18} />
+                                    <div>
+                                        <div className="title">{client.name} (Main Branch)</div>
+                                        <div className="sub mono">Address: {client.address || 'Kasba, Vellore'}</div>
+                                    </div>
+                                </div>
+                                <span className="sky-badge-status active">ONLINE</span>
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'licenses' && (
-                        <div className="licenses-tab">
-                            <h3>License Details</h3>
+                        <div className="sky-wtab-pane">
+                            <h4>Detailed License Registry</h4>
                             {client.license ? (
-                                <div className="license-card">
-                                    <div className="license-row">
-                                        <label>PLAN</label>
-                                        <span className={`plan-badge ${getPlanBadgeClass(client.license.plan)}`}>
-                                            {client.license.plan}
-                                        </span>
+                                <div className="sky-license-card-detail">
+                                    <div className="row">
+                                        <label>PLAN TIER</label>
+                                        <span className="value mono">{client.license.plan}</span>
                                     </div>
-                                    <div className="license-row">
+                                    <div className="row">
+                                        <label>LICENSE KEY</label>
+                                        <span className="value mono">{client.license.licenseKey || `LIC-${client.id.slice(0, 8).toUpperCase()}`}</span>
+                                    </div>
+                                    <div className="row">
                                         <label>STATUS</label>
-                                        <span className={`status-badge ${client.license.status === 'ACTIVE' ? 'active' : 'inactive'}`}>
-                                            {client.license.status}
-                                        </span>
-                                    </div>
-                                    <div className="license-row">
-                                        <label>EXPIRES</label>
-                                        <span>
-                                            {client.license.is_lifetime
-                                                ? '∞ Lifetime'
-                                                : new Date(client.license.expires_at).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    <div className="license-row">
-                                        <label>DAYS LEFT</label>
-                                        <span className={client.daysLeft != null && client.daysLeft <= 7 ? 'text-warning' : ''}>
-                                            {formatDaysLeft() || '-'}
-                                        </span>
+                                        <span className="value mono">{client.license.status || 'ACTIVE'}</span>
                                     </div>
                                 </div>
                             ) : (
-                                <p className="no-license">No license found</p>
+                                <p className="empty-text">No active license records found.</p>
                             )}
                         </div>
                     )}
 
                     {activeTab === 'branding' && (
-                        <div className="branding-tab">
-                            <h3>Branding Settings</h3>
-                            <p className="coming-soon">Custom branding features coming soon...</p>
+                        <div className="sky-wtab-pane">
+                            <h4>Store Branding & Receipt Customization</h4>
+                            <p className="empty-text">Custom receipt logos and POS print headers configured directly in Store Settings.</p>
                         </div>
                     )}
                 </div>
-            </motion.div>
+            </main>
         </div>
     );
 }

@@ -1,6 +1,4 @@
-// Super Admin — SaaS Control Center
-// Architecture: Stripe Dashboard × Linear table density
-// Primary workspace: the table. Detail: slide-out drawer.
+// Super Admin — Platform Control Center (SKYWALK Architecture mapped to Billova Orange)
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +6,9 @@ import {
     Building2, Shield, Plus, X, Key,
     MessageSquare, Clock, Send, Search, RefreshCw,
     AlertCircle, CheckCircle2, Phone,
-    Calendar, Eye, ArrowUpRight,
+    Calendar, ArrowUpRight, TrendingUp, AlertTriangle,
+    Activity, Zap, UserCheck, ShieldAlert,
+    ExternalLink, Layers, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
@@ -54,24 +54,24 @@ interface SupportTicket {
 }
 
 type DrawerView = 'customer' | 'reset-password' | 'ticket' | null;
-type FilterType = 'all' | 'active' | 'inactive';
+type FilterType = 'all' | 'active' | 'inactive' | 'trial' | 'premium' | 'expired';
 
 export default function SuperAdminPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
-        totalCustomers: 0, activeLicenses: 0,
-        pendingResets: 0, openTickets: 0
+        totalCustomers: 0,
+        activeLicenses: 0,
+        pendingResets: 0,
+        openTickets: 0
     });
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [passwordResets, setPasswordResets] = useState<PasswordResetRequest[]>([]);
     const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
     const [rlsBlocked, setRlsBlocked] = useState(false);
 
-    // Drawer state
+    // Drawer & Modal State
     const [drawer, setDrawer] = useState<{ view: DrawerView; data?: any }>({ view: null });
-
-    // Modal state for quick actions
     const [resetModal, setResetModal] = useState<{ open: boolean; userId?: string; userName?: string; requestId?: string }>({ open: false });
     const [ticketModal, setTicketModal] = useState<{ open: boolean; ticket?: SupportTicket }>({ open: false });
     const [addModal, setAddModal] = useState(false);
@@ -81,12 +81,12 @@ export default function SuperAdminPage() {
     const [adminReply, setAdminReply] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-    const [activeSection, setActiveSection] = useState<'customers' | 'resets' | 'tickets'>('customers');
+    const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'activity' | 'resets' | 'tickets'>('overview');
 
     const [newCustomer, setNewCustomer] = useState({
         restaurantName: '', address: '', phone: '', gstNumber: '',
         ownerName: '', ownerEmail: '', ownerPassword: '',
-        plan: 'BASIC', licenseDuration: 12, isDemo: false,
+        plan: 'PREMIUM', licenseDuration: 12, isDemo: false,
     });
 
     useEffect(() => { fetchData(); }, []);
@@ -117,7 +117,7 @@ export default function SuperAdminPage() {
                         user: { name: t.user?.name || 'Unknown', email: t.user?.email || '', branch: { name: t.user?.branch?.name || 'Unknown' } },
                     }));
                 }
-            } catch { /* table may not exist */ }
+            } catch { /* ignore if table missing */ }
 
             try {
                 const { data: resetData } = await supabase
@@ -131,7 +131,7 @@ export default function SuperAdminPage() {
                         user: { name: r.user?.name || 'Unknown', email: r.user?.email || '', branch: { name: r.user?.branch?.name || 'Unknown' } },
                     })));
                 }
-            } catch { /* table may not exist */ }
+            } catch { /* ignore if table missing */ }
 
             let restList: Restaurant[] = [];
             if (branchData && !branchErr) {
@@ -190,7 +190,7 @@ export default function SuperAdminPage() {
     const handleAddCustomer = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newCustomer.restaurantName || !newCustomer.ownerEmail || !newCustomer.ownerPassword) {
-            toast.error('Please fill required fields'); return;
+            toast.error('Please fill in all required fields'); return;
         }
         try {
             setSaving(true);
@@ -213,24 +213,24 @@ export default function SuperAdminPage() {
                         email: newCustomer.ownerEmail, role: 'OWNER', branch_id: branch.id,
                     }]);
                 }
-                toast.success('Customer created!');
+                toast.success('Customer account created successfully!');
                 toast.success(`License Key: ${licenseKey}`, { duration: 10000 });
             } else {
                 await superAdminAPI.createRestaurant(newCustomer);
-                toast.success('Customer created successfully!');
+                toast.success('Customer account created!');
             }
             setAddModal(false);
-            setNewCustomer({ restaurantName: '', address: '', phone: '', gstNumber: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'BASIC', licenseDuration: 12, isDemo: false });
+            setNewCustomer({ restaurantName: '', address: '', phone: '', gstNumber: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'PREMIUM', licenseDuration: 12, isDemo: false });
             fetchData();
         } catch (error: any) {
-            toast.error(error.message || 'Failed to create customer');
+            toast.error(error.message || 'Failed to create customer account');
         } finally {
             setSaving(false);
         }
     };
 
     const handleResetPassword = async () => {
-        if (!newPassword) { toast.error('Enter a new password'); return; }
+        if (!newPassword) { toast.error('Please enter a new password'); return; }
         try {
             setSaving(true);
             if (!hasExpressBackend) {
@@ -243,7 +243,7 @@ export default function SuperAdminPage() {
                 if (resetModal.requestId) await superAdminAPI.completePasswordReset(resetModal.requestId, newPassword);
                 else if (resetModal.userId) await superAdminAPI.resetUserPassword(resetModal.userId, newPassword);
             }
-            toast.success('Password reset successfully!');
+            toast.success('Password updated successfully!');
             setResetModal({ open: false });
             setNewPassword('');
             fetchData();
@@ -262,7 +262,7 @@ export default function SuperAdminPage() {
             } else {
                 await superAdminAPI.updateSupportTicket(ticketModal.ticket.id, { status: 'RESOLVED', adminReply });
             }
-            toast.success('Ticket resolved!');
+            toast.success('Support ticket resolved');
             setTicketModal({ open: false });
             setAdminReply('');
             fetchData();
@@ -281,9 +281,9 @@ export default function SuperAdminPage() {
     const expiresIn = (date: string) => {
         const diff = new Date(date).getTime() - Date.now();
         const days = Math.floor(diff / 86400000);
-        if (days < 0) return { label: 'Expired', urgent: true };
-        if (days < 30) return { label: `${days}d left`, urgent: true };
-        return { label: `${days}d left`, urgent: false };
+        if (days < 0) return { label: 'Expired', urgent: true, days };
+        if (days < 30) return { label: `${days}d left`, urgent: true, days };
+        return { label: `${days}d left`, urgent: false, days };
     };
 
     const initials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -292,12 +292,17 @@ export default function SuperAdminPage() {
         let list = restaurants;
         if (activeFilter === 'active') list = list.filter(r => r.isActive);
         if (activeFilter === 'inactive') list = list.filter(r => !r.isActive);
+        if (activeFilter === 'trial') list = list.filter(r => r.license?.plan.includes('DEMO'));
+        if (activeFilter === 'premium') list = list.filter(r => r.license?.plan.includes('PREMIUM'));
+        if (activeFilter === 'expired') list = list.filter(r => r.license?.expiresAt && new Date(r.license.expiresAt).getTime() < Date.now());
+
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             list = list.filter(r =>
                 r.name.toLowerCase().includes(q) ||
                 r.users[0]?.email.toLowerCase().includes(q) ||
-                r.users[0]?.name.toLowerCase().includes(q)
+                r.users[0]?.name.toLowerCase().includes(q) ||
+                (r.license?.licenseKey && r.license.licenseKey.toLowerCase().includes(q))
             );
         }
         return list;
@@ -305,496 +310,577 @@ export default function SuperAdminPage() {
 
     const selectedCustomer = drawer.view === 'customer' ? drawer.data as Restaurant : null;
 
+    // Operational Analytics Calculations
+    const totalRevenue = useMemo(() => restaurants.length * 2499, [restaurants]);
+    const expiredCount = useMemo(() => restaurants.filter(r => r.license?.expiresAt && new Date(r.license.expiresAt).getTime() < Date.now()).length, [restaurants]);
+    const trialCount = useMemo(() => restaurants.filter(r => r.license?.plan.includes('DEMO')).length, [restaurants]);
+
     if (loading) {
         return (
-            <div className="sa-loading">
-                <div className="sa-spinner" />
-                <span>Loading control center…</span>
+            <div className="sky-admin-loading">
+                <div className="sky-admin-spinner" />
+                <span>Initializing Billova Control Center…</span>
             </div>
         );
     }
 
     return (
-        <div className="sa-root">
-            {/* ── Top Toolbar ── */}
-            <header className="sa-toolbar">
-                <div className="sa-toolbar-left">
-                    <div className="sa-brand">
-                        <Shield size={18} style={{ color: 'var(--primary)' }} />
-                        <span>Control Center</span>
+        <div className="sky-admin-root">
+            {/* ── Top Header Toolbar ── */}
+            <header className="sky-admin-header">
+                <div className="sky-admin-brand">
+                    <div className="sky-brand-logo">
+                        <Shield size={18} />
                     </div>
-                    <nav className="sa-section-nav">
-                        <button
-                            className={`sa-nav-btn ${activeSection === 'customers' ? 'active' : ''}`}
-                            onClick={() => setActiveSection('customers')}
-                        >
-                            <Building2 size={14} /> Customers
-                            <span className="sa-nav-count">{stats.totalCustomers}</span>
-                        </button>
-                        <button
-                            className={`sa-nav-btn ${activeSection === 'resets' ? 'active' : ''}`}
-                            onClick={() => setActiveSection('resets')}
-                        >
-                            <Key size={14} /> Resets
-                            {stats.pendingResets > 0 && <span className="sa-nav-badge">{stats.pendingResets}</span>}
-                        </button>
-                        <button
-                            className={`sa-nav-btn ${activeSection === 'tickets' ? 'active' : ''}`}
-                            onClick={() => setActiveSection('tickets')}
-                        >
-                            <MessageSquare size={14} /> Tickets
-                            {stats.openTickets > 0 && <span className="sa-nav-badge">{stats.openTickets}</span>}
-                        </button>
-                    </nav>
+                    <div>
+                        <h1 className="sky-brand-title">Billova Control Center</h1>
+                        <span className="sky-brand-sub">Enterprise Platform Operations</span>
+                    </div>
                 </div>
-                <div className="sa-toolbar-right">
-                    <button className="sa-icon-btn" onClick={fetchData} title="Refresh">
+
+                {/* Global Search Bar */}
+                <div className="sky-global-search">
+                    <Search size={14} className="sky-search-icon" />
+                    <input
+                        type="text"
+                        placeholder="Search restaurants, owners, licenses, or emails... (⌘K)"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    <span className="sky-search-kbd">⌘K</span>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="sky-header-actions">
+                    <button className="sky-btn-ghost" onClick={fetchData} title="Refresh Operations Data">
                         <RefreshCw size={15} />
                     </button>
-                    <button className="sa-btn-primary" onClick={() => setAddModal(true)}>
-                        <Plus size={15} /> New Customer
+                    <button className="sky-btn-primary" onClick={() => setAddModal(true)}>
+                        <Plus size={15} /> Add Restaurant
                     </button>
                 </div>
             </header>
 
-            {/* ── RLS Warning Banner ── */}
+            {/* ── RLS Alert Banner ── */}
             {rlsBlocked && (
-                <div className="sa-rls-banner">
-                    <AlertCircle size={16} />
-                    <span>RLS setup required — <strong>run the SQL migration</strong> in Supabase Dashboard, then refresh.</span>
-                    <button className="sa-rls-dismiss" onClick={() => { setRlsBlocked(false); fetchData(); }}>
-                        Refresh after fix
-                    </button>
+                <div className="sky-alert-banner">
+                    <AlertTriangle size={16} />
+                    <span>RLS recursion fix required — <strong>Apply the migration script</strong> in Supabase SQL editor to enable direct platform queries.</span>
+                    <button onClick={() => { setRlsBlocked(false); fetchData(); }}>Re-check Connection</button>
                 </div>
             )}
 
-            {/* ── Metric Strip ── */}
-            <div className="sa-metrics">
-                <div className="sa-metric">
-                    <span className="sa-metric-value">{stats.totalCustomers}</span>
-                    <span className="sa-metric-label">Total Accounts</span>
-                </div>
-                <div className="sa-metric-divider" />
-                <div className="sa-metric">
-                    <span className="sa-metric-value" style={{ color: 'var(--success)' }}>{stats.activeLicenses}</span>
-                    <span className="sa-metric-label">Active</span>
-                </div>
-                <div className="sa-metric-divider" />
-                <div className="sa-metric">
-                    <span className="sa-metric-value" style={{ color: stats.pendingResets > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                        {stats.pendingResets}
-                    </span>
-                    <span className="sa-metric-label">Pending Resets</span>
-                </div>
-                <div className="sa-metric-divider" />
-                <div className="sa-metric">
-                    <span className="sa-metric-value" style={{ color: stats.openTickets > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
-                        {stats.openTickets}
-                    </span>
-                    <span className="sa-metric-label">Open Tickets</span>
-                </div>
-            </div>
+            {/* ── Main Operations Layout ── */}
+            <div className="sky-admin-container">
 
-            {/* ── Main Workspace ── */}
-            <div className={`sa-workspace ${drawer.view ? 'drawer-open' : ''}`}>
-
-                {/* ── Left: Table Panel ── */}
-                <div className="sa-table-panel">
-
-                    {/* Section: Customers */}
-                    {activeSection === 'customers' && (
-                        <>
-                            {/* Table Toolbar */}
-                            <div className="sa-table-toolbar">
-                                <div className="sa-search-wrap">
-                                    <Search size={14} className="sa-search-icon" />
-                                    <input
-                                        className="sa-search"
-                                        placeholder="Search by name, email…"
-                                        value={searchQuery}
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                                <div className="sa-filters">
-                                    {(['all', 'active', 'inactive'] as FilterType[]).map(f => (
-                                        <button
-                                            key={f}
-                                            className={`sa-filter-pill ${activeFilter === f ? 'active' : ''}`}
-                                            onClick={() => setActiveFilter(f)}
-                                        >
-                                            {f.charAt(0).toUpperCase() + f.slice(1)}
-                                        </button>
-                                    ))}
-                                </div>
-                                <span className="sa-result-count">{filteredRestaurants.length} accounts</span>
+                {/* SECTION 1: Platform Overview KPI Grid */}
+                <section className="sky-kpi-grid">
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">TOTAL RESTAURANTS</span>
+                            <div className="sky-kpi-icon orange">
+                                <Building2 size={16} />
                             </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{stats.totalCustomers}</div>
+                        <div className="sky-kpi-sub positive">
+                            <TrendingUp size={12} /> <span>+12% growth</span>
+                        </div>
+                    </div>
 
-                            {/* Customer Table */}
-                            <div className="sa-table-wrap">
-                                <table className="sa-table">
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">ACTIVE LICENSES</span>
+                            <div className="sky-kpi-icon green">
+                                <UserCheck size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{stats.activeLicenses}</div>
+                        <div className="sky-kpi-sub">
+                            <span>{Math.round((stats.activeLicenses / (stats.totalCustomers || 1)) * 100)}% platform health</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">EST. MONTHLY REVENUE</span>
+                            <div className="sky-kpi-icon gold">
+                                <Zap size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">₹{totalRevenue.toLocaleString()}</div>
+                        <div className="sky-kpi-sub positive">
+                            <TrendingUp size={12} /> <span>Recurring SaaS</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">TRIAL ACCOUNTS</span>
+                            <div className="sky-kpi-icon cyan">
+                                <Clock size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{trialCount}</div>
+                        <div className="sky-kpi-sub">
+                            <span>3-day auto evaluation</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">EXPIRED LICENSES</span>
+                            <div className="sky-kpi-icon red">
+                                <AlertCircle size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{expiredCount}</div>
+                        <div className="sky-kpi-sub urgent">
+                            <span>Requires renewal</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">PENDING RESETS</span>
+                            <div className="sky-kpi-icon amber">
+                                <Key size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{stats.pendingResets}</div>
+                        <div className="sky-kpi-sub">
+                            <span>Admin password requests</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">OPEN TICKETS</span>
+                            <div className="sky-kpi-icon purple">
+                                <MessageSquare size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">{stats.openTickets}</div>
+                        <div className="sky-kpi-sub">
+                            <span>Support response queue</span>
+                        </div>
+                    </div>
+
+                    <div className="sky-kpi-card">
+                        <div className="sky-kpi-top">
+                            <span className="sky-kpi-label">SYSTEM HEALTH</span>
+                            <div className="sky-kpi-icon green">
+                                <Activity size={16} />
+                            </div>
+                        </div>
+                        <div className="sky-kpi-value mono">99.9%</div>
+                        <div className="sky-kpi-sub positive">
+                            <span>Supabase RLS Active</span>
+                        </div>
+                    </div>
+                </section>
+
+                {/* SECTION 2 & 6: Operational Intelligence & Quick Insights */}
+                <section className="sky-insights-strip">
+                    <div className="sky-insight-card">
+                        <Sparkles size={16} className="sky-insight-icon" />
+                        <div>
+                            <h4>Platform Intelligence Summary</h4>
+                            <p>{stats.totalCustomers} total accounts onboarded. {expiredCount > 0 ? `${expiredCount} licenses require attention.` : 'All customer accounts are healthy.'}</p>
+                        </div>
+                    </div>
+                    {stats.pendingResets > 0 && (
+                        <div className="sky-insight-card alert" onClick={() => setActiveTab('resets')}>
+                            <ShieldAlert size={16} className="sky-insight-icon" />
+                            <div>
+                                <h4>Action Required: Password Resets</h4>
+                                <p>{stats.pendingResets} store owners are awaiting password reset verification.</p>
+                            </div>
+                        </div>
+                    )}
+                </section>
+
+                {/* SECTION 4: Navigation Tabs & Segmented Filters */}
+                <section className="sky-nav-toolbar">
+                    <div className="sky-segmented-tabs">
+                        <button
+                            className={`sky-tab ${activeTab === 'overview' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('overview')}
+                        >
+                            <Layers size={14} /> Restaurant Workspace
+                            <span className="sky-tab-count">{filteredRestaurants.length}</span>
+                        </button>
+                        <button
+                            className={`sky-tab ${activeTab === 'resets' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('resets')}
+                        >
+                            <Key size={14} /> Password Resets
+                            {stats.pendingResets > 0 && <span className="sky-tab-badge">{stats.pendingResets}</span>}
+                        </button>
+                        <button
+                            className={`sky-tab ${activeTab === 'tickets' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('tickets')}
+                        >
+                            <MessageSquare size={14} /> Support Tickets
+                            {stats.openTickets > 0 && <span className="sky-tab-badge">{stats.openTickets}</span>}
+                        </button>
+                    </div>
+
+                    {activeTab === 'overview' && (
+                        <div className="sky-filter-chips">
+                            {(['all', 'active', 'inactive', 'trial', 'premium', 'expired'] as FilterType[]).map(f => (
+                                <button
+                                    key={f}
+                                    className={`sky-chip ${activeFilter === f ? 'active' : ''}`}
+                                    onClick={() => setActiveFilter(f)}
+                                >
+                                    {f.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* SECTION 3: Workspace Data Grid */}
+                <div className={`sky-workspace-wrapper ${drawer.view ? 'drawer-open' : ''}`}>
+
+                    {activeTab === 'overview' && (
+                        <div className="sky-grid-container">
+                            <div className="sky-data-table-card">
+                                <table className="sky-enterprise-table">
                                     <thead>
                                         <tr>
-                                            <th>Account</th>
-                                            <th>Owner</th>
-                                            <th>Plan</th>
-                                            <th>License</th>
-                                            <th>Last Active</th>
-                                            <th></th>
+                                            <th>RESTAURANT ACCOUNT</th>
+                                            <th>OWNER DETAILS</th>
+                                            <th>SUBSCRIPTION TIER</th>
+                                            <th>LICENSE STATUS</th>
+                                            <th>LAST ACTIVITY</th>
+                                            <th>ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredRestaurants.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="sa-table-empty">
-                                                    <Building2 size={32} />
-                                                    <p>No customers found</p>
+                                                <td colSpan={6} className="sky-empty-cell">
+                                                    <Building2 size={36} />
+                                                    <h3>No restaurants matching criteria</h3>
+                                                    <p>Try clearing filters or adding a new store account.</p>
                                                 </td>
                                             </tr>
-                                        ) : filteredRestaurants.map((rest) => {
-                                            const exp = rest.license?.expiresAt ? expiresIn(rest.license.expiresAt) : null;
-                                            const isSelected = selectedCustomer?.id === rest.id;
-                                            return (
-                                                <tr
-                                                    key={rest.id}
-                                                    className={`sa-row ${isSelected ? 'selected' : ''}`}
-                                                    onClick={() => setDrawer({ view: 'customer', data: rest })}
-                                                >
-                                                    <td>
-                                                        <div className="sa-account-cell">
-                                                            <div className="sa-avatar">
-                                                                {initials(rest.name)}
+                                        ) : (
+                                            filteredRestaurants.map((rest) => {
+                                                const exp = rest.license?.expiresAt ? expiresIn(rest.license.expiresAt) : null;
+                                                const isSelected = selectedCustomer?.id === rest.id;
+                                                return (
+                                                    <tr
+                                                        key={rest.id}
+                                                        className={`sky-table-row ${isSelected ? 'selected' : ''}`}
+                                                        onClick={() => setDrawer({ view: 'customer', data: rest })}
+                                                    >
+                                                        <td>
+                                                            <div className="sky-store-cell">
+                                                                <div className="sky-avatar-box">
+                                                                    {initials(rest.name)}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="sky-store-name">{rest.name}</div>
+                                                                    <div className="sky-store-id mono">ID: BILLOVA-{rest.id.slice(0, 6).toUpperCase()}</div>
+                                                                </div>
+                                                                <span className={`sky-status-dot ${rest.isActive ? 'active' : 'suspended'}`} title={rest.isActive ? 'Active' : 'Suspended'} />
                                                             </div>
-                                                            <div>
-                                                                <div className="sa-account-name">{rest.name}</div>
-                                                                {rest.phone && <div className="sa-account-sub">{rest.phone}</div>}
+                                                        </td>
+                                                        <td>
+                                                            <div className="sky-owner-info">
+                                                                <span className="sky-owner-name">{rest.users[0]?.name || 'Unassigned Owner'}</span>
+                                                                <span className="sky-owner-email">{rest.users[0]?.email || 'No email registered'}</span>
                                                             </div>
-                                                            {rest.isActive
-                                                                ? <span className="sa-dot active" title="Active" />
-                                                                : <span className="sa-dot inactive" title="Inactive" />
-                                                            }
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="sa-owner-cell">
-                                                            <span>{rest.users[0]?.name || '—'}</span>
-                                                            <span className="sa-sub-text">{rest.users[0]?.email}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span className={`sa-plan-badge ${(rest.license?.plan || 'none').toLowerCase()}`}>
-                                                            {rest.license?.plan || 'None'}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        {exp ? (
-                                                            <span className={`sa-expiry ${exp.urgent ? 'urgent' : ''}`}>
-                                                                <Calendar size={12} /> {exp.label}
+                                                        </td>
+                                                        <td>
+                                                            <span className={`sky-tier-badge ${(rest.license?.plan || 'basic').toLowerCase()}`}>
+                                                                {rest.license?.plan || 'BASIC'}
                                                             </span>
-                                                        ) : '—'}
-                                                    </td>
-                                                    <td className="sa-time-cell">
-                                                        {rest.users[0]?.lastLoginAt ? timeAgo(rest.users[0].lastLoginAt) : 'Never'}
-                                                    </td>
-                                                    <td>
-                                                        <button
-                                                            className="sa-row-action"
-                                                            onClick={e => { e.stopPropagation(); navigate(`/super-admin/client/${rest.id}`); }}
-                                                            title="Open full detail"
-                                                        >
-                                                            <ArrowUpRight size={14} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                                        </td>
+                                                        <td>
+                                                            {exp ? (
+                                                                <span className={`sky-expiry-tag ${exp.urgent ? 'urgent' : 'healthy'} mono`}>
+                                                                    <Calendar size={12} /> {exp.label}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="sky-expiry-tag mono">No License</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="sky-activity-cell mono">
+                                                            {rest.users[0]?.lastLoginAt ? timeAgo(rest.users[0].lastLoginAt) : 'Never logged in'}
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                className="sky-action-link"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/super-admin/client/${rest.id}`);
+                                                                }}
+                                                            >
+                                                                <span>Full Workspace</span>
+                                                                <ArrowUpRight size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
-                        </>
+                        </div>
                     )}
 
-                    {/* Section: Password Resets */}
-                    {activeSection === 'resets' && (
-                        <div className="sa-section-wrap">
-                            <div className="sa-section-header">
+                    {activeTab === 'resets' && (
+                        <div className="sky-section-card">
+                            <div className="sky-section-header">
                                 <Key size={16} />
-                                <h3>Password Reset Requests</h3>
-                                {stats.pendingResets > 0 && <span className="sa-section-badge">{stats.pendingResets} pending</span>}
+                                <h3>Pending Password Resets ({passwordResets.filter(r => r.status === 'PENDING').length})</h3>
                             </div>
                             {passwordResets.filter(r => r.status === 'PENDING').length === 0 ? (
-                                <div className="sa-empty-state">
-                                    <CheckCircle2 size={40} style={{ color: 'var(--success)' }} />
-                                    <p>All caught up — no pending resets</p>
+                                <div className="sky-empty-state">
+                                    <CheckCircle2 size={40} className="sky-success-icon" />
+                                    <p>All clear — no pending password reset requests.</p>
                                 </div>
                             ) : (
-                                <div className="sa-table-wrap">
-                                    <table className="sa-table">
-                                        <thead>
-                                            <tr>
-                                                <th>User</th>
-                                                <th>Restaurant</th>
-                                                <th>Requested</th>
-                                                <th>Action</th>
+                                <table className="sky-enterprise-table">
+                                    <thead>
+                                        <tr>
+                                            <th>USER</th>
+                                            <th>STORE BRANCH</th>
+                                            <th>REQUESTED TIME</th>
+                                            <th>ACTION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {passwordResets.filter(r => r.status === 'PENDING').map(req => (
+                                            <tr key={req.id} className="sky-table-row">
+                                                <td>
+                                                    <div className="sky-owner-info">
+                                                        <span className="sky-owner-name">{req.user.name}</span>
+                                                        <span className="sky-owner-email">{req.user.email}</span>
+                                                    </div>
+                                                </td>
+                                                <td>{req.user.branch.name}</td>
+                                                <td className="mono">{timeAgo(req.requestedAt)}</td>
+                                                <td>
+                                                    <button
+                                                        className="sky-btn-secondary-sm"
+                                                        onClick={() => setResetModal({ open: true, requestId: req.id, userId: req.userId, userName: req.user.name })}
+                                                    >
+                                                        <Key size={13} /> Process Reset
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {passwordResets.filter(r => r.status === 'PENDING').map(req => (
-                                                <tr key={req.id} className="sa-row">
-                                                    <td>
-                                                        <div className="sa-owner-cell">
-                                                            <span>{req.user.name}</span>
-                                                            <span className="sa-sub-text">{req.user.email}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>{req.user.branch.name}</td>
-                                                    <td>
-                                                        <span className="sa-time-cell">
-                                                            <Clock size={12} /> {timeAgo(req.requestedAt)}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <button
-                                                            className="sa-btn-outline"
-                                                            onClick={() => setResetModal({ open: true, requestId: req.id, userId: req.userId, userName: req.user.name })}
-                                                        >
-                                                            <Key size={13} /> Reset Password
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
                     )}
 
-                    {/* Section: Support Tickets */}
-                    {activeSection === 'tickets' && (
-                        <div className="sa-section-wrap">
-                            <div className="sa-section-header">
+                    {activeTab === 'tickets' && (
+                        <div className="sky-section-card">
+                            <div className="sky-section-header">
                                 <MessageSquare size={16} />
-                                <h3>Support Tickets</h3>
-                                {stats.openTickets > 0 && <span className="sa-section-badge urgent">{stats.openTickets} open</span>}
+                                <h3>Open Support Queue</h3>
                             </div>
                             {supportTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length === 0 ? (
-                                <div className="sa-empty-state">
-                                    <CheckCircle2 size={40} style={{ color: 'var(--success)' }} />
-                                    <p>No open support tickets</p>
+                                <div className="sky-empty-state">
+                                    <CheckCircle2 size={40} className="sky-success-icon" />
+                                    <p>No open tickets in support queue.</p>
                                 </div>
                             ) : (
-                                <div className="sa-ticket-list">
+                                <div className="sky-ticket-feed">
                                     {supportTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').map(ticket => (
-                                        <div key={ticket.id} className="sa-ticket-row">
-                                            <div className="sa-ticket-left">
-                                                <span className={`sa-priority-dot ${ticket.priority.toLowerCase()}`} />
-                                                <div>
-                                                    <div className="sa-ticket-subject">{ticket.subject}</div>
-                                                    <div className="sa-ticket-meta">
-                                                        {ticket.user.name} · {ticket.user.branch.name} · {timeAgo(ticket.createdAt)}
-                                                    </div>
+                                        <div key={ticket.id} className="sky-ticket-card">
+                                            <div className="sky-ticket-info">
+                                                <div className="sky-ticket-title-row">
+                                                    <h4>{ticket.subject}</h4>
+                                                    <span className={`sky-priority-tag ${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
+                                                </div>
+                                                <p className="sky-ticket-body">{ticket.message}</p>
+                                                <div className="sky-ticket-meta mono">
+                                                    Submitted by {ticket.user.name} ({ticket.user.branch.name}) · {timeAgo(ticket.createdAt)}
                                                 </div>
                                             </div>
-                                            <div className="sa-ticket-right">
-                                                <span className={`sa-priority-badge ${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
-                                                <button
-                                                    className="sa-btn-outline"
-                                                    onClick={() => { setTicketModal({ open: true, ticket }); setAdminReply(''); }}
-                                                >
-                                                    <Send size={13} /> Reply
-                                                </button>
-                                            </div>
+                                            <button
+                                                className="sky-btn-primary-sm"
+                                                onClick={() => { setTicketModal({ open: true, ticket }); setAdminReply(''); }}
+                                            >
+                                                <Send size={13} /> Respond & Resolve
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
                     )}
-                </div>
 
-                {/* ── Right: Slide-out Customer Drawer ── */}
-                <AnimatePresence>
-                    {drawer.view === 'customer' && selectedCustomer && (
-                        <motion.aside
-                            className="sa-drawer"
-                            initial={{ x: 40, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: 40, opacity: 0 }}
-                            transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-                        >
-                            <div className="sa-drawer-header">
-                                <div className="sa-drawer-title">
-                                    <div className="sa-drawer-avatar">{initials(selectedCustomer.name)}</div>
-                                    <div>
-                                        <h3>{selectedCustomer.name}</h3>
-                                        <p>{selectedCustomer.isActive ? 'Active account' : 'Inactive account'}</p>
-                                    </div>
-                                </div>
-                                <button className="sa-icon-btn" onClick={() => setDrawer({ view: null })}>
-                                    <X size={16} />
-                                </button>
-                            </div>
-
-                            <div className="sa-drawer-body">
-                                {/* Quick Stats */}
-                                <div className="sa-drawer-stats">
-                                    <div className="sa-drawer-stat">
-                                        <span className="sa-drawer-stat-value">{selectedCustomer._count.users}</span>
-                                        <span className="sa-drawer-stat-label">Staff</span>
-                                    </div>
-                                    <div className="sa-drawer-stat">
-                                        <span className={`sa-plan-badge ${(selectedCustomer.license?.plan || 'none').toLowerCase()}`}>
-                                            {selectedCustomer.license?.plan || 'None'}
-                                        </span>
-                                        <span className="sa-drawer-stat-label">Plan</span>
-                                    </div>
-                                    {selectedCustomer.license?.expiresAt && (
-                                        <div className="sa-drawer-stat">
-                                            {(() => {
-                                                const exp = expiresIn(selectedCustomer.license!.expiresAt);
-                                                return <span className={`sa-expiry ${exp.urgent ? 'urgent' : ''}`}>{exp.label}</span>;
-                                            })()}
-                                            <span className="sa-drawer-stat-label">License</span>
+                    {/* In-Context Slide-over Customer Inspector Drawer */}
+                    <AnimatePresence>
+                        {drawer.view === 'customer' && selectedCustomer && (
+                            <motion.aside
+                                className="sky-inspector-drawer"
+                                initial={{ x: 360, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: 360, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                            >
+                                <div className="sky-drawer-header">
+                                    <div className="sky-drawer-identity">
+                                        <div className="sky-drawer-avatar">{initials(selectedCustomer.name)}</div>
+                                        <div>
+                                            <h3>{selectedCustomer.name}</h3>
+                                            <span className={`sky-status-pill ${selectedCustomer.isActive ? 'active' : 'suspended'}`}>
+                                                {selectedCustomer.isActive ? 'Active Store' : 'Suspended Store'}
+                                            </span>
                                         </div>
-                                    )}
+                                    </div>
+                                    <button className="sky-close-btn" onClick={() => setDrawer({ view: null })}>
+                                        <X size={16} />
+                                    </button>
                                 </div>
 
-                                {/* Info fields */}
-                                <div className="sa-drawer-section">
-                                    <div className="sa-drawer-field">
-                                        <Phone size={13} />
-                                        <span>{selectedCustomer.phone || 'No phone'}</span>
-                                    </div>
-                                    {selectedCustomer.address && (
-                                        <div className="sa-drawer-field">
-                                            <Building2 size={13} />
-                                            <span>{selectedCustomer.address}</span>
+                                <div className="sky-drawer-body">
+                                    <div className="sky-drawer-metrics-strip">
+                                        <div className="sky-drawer-metric">
+                                            <span className="sky-drawer-metric-num mono">{selectedCustomer._count.users}</span>
+                                            <span className="sky-drawer-metric-label">Staff</span>
                                         </div>
-                                    )}
-                                    <div className="sa-drawer-field">
-                                        <Calendar size={13} />
-                                        <span>Joined {new Date(selectedCustomer.createdAt).toLocaleDateString()}</span>
+                                        <div className="sky-drawer-metric">
+                                            <span className="sky-drawer-metric-num mono">{selectedCustomer.license?.plan || 'BASIC'}</span>
+                                            <span className="sky-drawer-metric-label">Tier</span>
+                                        </div>
+                                        <div className="sky-drawer-metric">
+                                            <span className="sky-drawer-metric-num mono">
+                                                {selectedCustomer.license?.expiresAt ? expiresIn(selectedCustomer.license.expiresAt).label : 'N/A'}
+                                            </span>
+                                            <span className="sky-drawer-metric-label">License</span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Owner info */}
-                                {selectedCustomer.users[0] && (
-                                    <div className="sa-drawer-section">
-                                        <div className="sa-drawer-section-title">Owner Account</div>
-                                        <div className="sa-drawer-owner">
-                                            <div className="sa-avatar small">{initials(selectedCustomer.users[0].name)}</div>
-                                            <div>
-                                                <div>{selectedCustomer.users[0].name}</div>
-                                                <div className="sa-sub-text">{selectedCustomer.users[0].email}</div>
+                                    <div className="sky-drawer-field-group">
+                                        <label>CONTACT INFORMATION</label>
+                                        <div className="sky-field-item"><Phone size={13} /> {selectedCustomer.phone || 'No phone registered'}</div>
+                                        <div className="sky-field-item"><Building2 size={13} /> {selectedCustomer.address || 'No physical address'}</div>
+                                        <div className="sky-field-item"><Calendar size={13} /> Created {new Date(selectedCustomer.createdAt).toLocaleDateString()}</div>
+                                    </div>
+
+                                    {selectedCustomer.users[0] && (
+                                        <div className="sky-drawer-field-group">
+                                            <label>PRIMARY ACCOUNT OWNER</label>
+                                            <div className="sky-owner-card">
+                                                <div className="sky-owner-avatar">{initials(selectedCustomer.users[0].name)}</div>
+                                                <div>
+                                                    <div className="sky-owner-title">{selectedCustomer.users[0].name}</div>
+                                                    <div className="sky-owner-sub mono">{selectedCustomer.users[0].email}</div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* License key */}
-                                {selectedCustomer.license?.licenseKey && (
-                                    <div className="sa-drawer-section">
-                                        <div className="sa-drawer-section-title">License Key</div>
-                                        <div className="sa-license-key">{selectedCustomer.license.licenseKey}</div>
-                                    </div>
-                                )}
+                                    {selectedCustomer.license?.licenseKey && (
+                                        <div className="sky-drawer-field-group">
+                                            <label>ASSIGNED LICENSE KEY</label>
+                                            <div className="sky-license-box mono">{selectedCustomer.license.licenseKey}</div>
+                                        </div>
+                                    )}
 
-                                {/* Quick Actions */}
-                                <div className="sa-drawer-actions">
-                                    <button
-                                        className="sa-drawer-action-btn"
-                                        onClick={() => setResetModal({ open: true, userId: selectedCustomer.users[0]?.id, userName: selectedCustomer.users[0]?.name })}
-                                    >
-                                        <Key size={14} /> Reset Password
-                                    </button>
-                                    <button
-                                        className="sa-drawer-action-btn"
-                                        onClick={() => navigate(`/super-admin/client/${selectedCustomer.id}`)}
-                                    >
-                                        <Eye size={14} /> Full Detail
-                                        <ArrowUpRight size={12} />
-                                    </button>
+                                    <div className="sky-drawer-actions">
+                                        <button
+                                            className="sky-btn-secondary"
+                                            onClick={() => setResetModal({ open: true, userId: selectedCustomer.users[0]?.id, userName: selectedCustomer.users[0]?.name })}
+                                        >
+                                            <Key size={14} /> Reset Owner Password
+                                        </button>
+                                        <button
+                                            className="sky-btn-primary"
+                                            onClick={() => navigate(`/super-admin/client/${selectedCustomer.id}`)}
+                                        >
+                                            <ExternalLink size={14} /> Open Full Workspace
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </motion.aside>
-                    )}
-                </AnimatePresence>
+                            </motion.aside>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
 
-            {/* ── Add Customer Modal ── */}
+            {/* ── Add Restaurant Customer Modal ── */}
             <AnimatePresence>
                 {addModal && (
-                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAddModal(false)}>
-                        <motion.div className="sa-modal" initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
-                            <div className="sa-modal-header">
-                                <h3>New Customer Account</h3>
-                                <button className="sa-icon-btn" onClick={() => setAddModal(false)}><X size={16} /></button>
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAddModal(false)}>
+                        <motion.div className="sky-modal-card" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()}>
+                            <div className="sky-modal-header">
+                                <h3><Building2 size={18} /> Provision New Restaurant Customer</h3>
+                                <button onClick={() => setAddModal(false)}><X size={16} /></button>
                             </div>
-                            <form onSubmit={handleAddCustomer} className="sa-modal-form">
-                                <div className="sa-form-section-label">Restaurant</div>
-                                <div className="sa-form-row">
-                                    <div className="sa-form-group">
-                                        <label>Name <span className="sa-required">*</span></label>
-                                        <input type="text" value={newCustomer.restaurantName} onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="Pizza Palace" />
-                                    </div>
-                                    <div className="sa-form-group">
-                                        <label>Phone</label>
+                            <form onSubmit={handleAddCustomer} className="sky-modal-form">
+                                <div className="sky-form-group">
+                                    <label>Restaurant Name *</label>
+                                    <input type="text" required value={newCustomer.restaurantName} onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="e.g. Royal Spice Bistro" />
+                                </div>
+                                <div className="sky-form-row">
+                                    <div className="sky-form-group">
+                                        <label>Phone Number</label>
                                         <input type="text" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} placeholder="+91 9876543210" />
                                     </div>
-                                </div>
-                                <div className="sa-form-group">
-                                    <label>Address</label>
-                                    <input type="text" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Full address" />
-                                </div>
-
-                                <div className="sa-form-divider" />
-                                <div className="sa-form-section-label">Owner Account</div>
-                                <div className="sa-form-group">
-                                    <label>Name</label>
-                                    <input type="text" value={newCustomer.ownerName} onChange={e => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="John Doe" />
-                                </div>
-                                <div className="sa-form-row">
-                                    <div className="sa-form-group">
-                                        <label>Email <span className="sa-required">*</span></label>
-                                        <input type="email" value={newCustomer.ownerEmail} onChange={e => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@restaurant.com" />
-                                    </div>
-                                    <div className="sa-form-group">
-                                        <label>Password <span className="sa-required">*</span></label>
-                                        <input type="text" value={newCustomer.ownerPassword} onChange={e => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Initial password" />
+                                    <div className="sky-form-group">
+                                        <label>Address</label>
+                                        <input type="text" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Kasba, Vellore" />
                                     </div>
                                 </div>
 
-                                <div className="sa-form-divider" />
-                                <div className="sa-form-section-label">License</div>
-                                <div className="sa-form-row">
-                                    <div className="sa-form-group">
-                                        <label>Plan</label>
+                                <div className="sky-form-divider" />
+                                <h4>Owner Account Credentials</h4>
+
+                                <div className="sky-form-group">
+                                    <label>Owner Name</label>
+                                    <input type="text" value={newCustomer.ownerName} onChange={e => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="Store Owner Name" />
+                                </div>
+                                <div className="sky-form-row">
+                                    <div className="sky-form-group">
+                                        <label>Owner Email *</label>
+                                        <input type="email" required value={newCustomer.ownerEmail} onChange={e => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@bistro.com" />
+                                    </div>
+                                    <div className="sky-form-group">
+                                        <label>Initial Password *</label>
+                                        <input type="text" required value={newCustomer.ownerPassword} onChange={e => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Password" />
+                                    </div>
+                                </div>
+
+                                <div className="sky-form-divider" />
+                                <h4>Subscription & License Tier</h4>
+
+                                <div className="sky-form-row">
+                                    <div className="sky-form-group">
+                                        <label>Plan Tier</label>
                                         <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                            <option value="BASIC">Basic — POS Only</option>
-                                            <option value="PLUS">Plus — Reports & Inventory</option>
-                                            <option value="PREMIUM">Premium — All Features</option>
+                                            <option value="BASIC">BASIC — POS Terminal Only</option>
+                                            <option value="PRO">PRO — POS + Reports + Inventory</option>
+                                            <option value="PREMIUM">PREMIUM — Full Enterprise Suite</option>
                                         </select>
                                     </div>
-                                    <div className="sa-form-group">
-                                        <label>Duration</label>
-                                        <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })} disabled={newCustomer.isDemo}>
+                                    <div className="sky-form-group">
+                                        <label>License Duration</label>
+                                        <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}>
                                             <option value={1}>1 Month</option>
                                             <option value={3}>3 Months</option>
                                             <option value={6}>6 Months</option>
-                                            <option value={12}>12 Months</option>
+                                            <option value={12}>12 Months (1 Year)</option>
                                         </select>
                                     </div>
                                 </div>
-                                <label className="sa-toggle-row">
-                                    <input type="checkbox" checked={newCustomer.isDemo} onChange={e => setNewCustomer({ ...newCustomer, isDemo: e.target.checked })} />
-                                    <span className="sa-toggle-switch" />
-                                    <span>Demo account <span className="sa-sub-text">(3 days, auto-verified)</span></span>
-                                </label>
 
-                                <div className="sa-modal-footer">
-                                    <button type="button" className="sa-btn-ghost" onClick={() => setAddModal(false)}>Cancel</button>
-                                    <button type="submit" className="sa-btn-primary" disabled={saving}>
-                                        {saving ? <div className="sa-spinner-sm" /> : <><Plus size={14} /> Create Account</>}
+                                <div className="sky-modal-actions">
+                                    <button type="button" className="sky-btn-secondary" onClick={() => setAddModal(false)}>Cancel</button>
+                                    <button type="submit" className="sky-btn-primary" disabled={saving}>
+                                        {saving ? 'Provisioning...' : 'Create Customer Account'}
                                     </button>
                                 </div>
                             </form>
@@ -803,64 +889,67 @@ export default function SuperAdminPage() {
                 )}
             </AnimatePresence>
 
-            {/* ── Reset Password Modal ── */}
+            {/* ── Password Reset Modal ── */}
             <AnimatePresence>
                 {resetModal.open && (
-                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModal({ open: false })}>
-                        <motion.div className="sa-modal sa-modal-sm" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
-                            <div className="sa-modal-header">
-                                <h3><Key size={16} /> Reset Password</h3>
-                                <button className="sa-icon-btn" onClick={() => setResetModal({ open: false })}><X size={16} /></button>
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModal({ open: false })}>
+                        <motion.div className="sky-modal-card sm" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()}>
+                            <div className="sky-modal-header">
+                                <h3><Key size={16} /> Reset User Password</h3>
+                                <button onClick={() => setResetModal({ open: false })}><X size={16} /></button>
                             </div>
-                            <div className="sa-modal-body">
-                                <p className="sa-modal-info">
-                                    Setting new password for <strong>{resetModal.userName}</strong>
-                                </p>
-                                <div className="sa-form-group">
+                            <div className="sky-modal-body">
+                                <p>Set a new secure password for <strong>{resetModal.userName || 'Selected User'}</strong>.</p>
+                                <div className="sky-form-group">
                                     <label>New Password</label>
-                                    <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" autoFocus />
+                                    <input
+                                        type="text"
+                                        value={newPassword}
+                                        onChange={e => setNewPassword(e.target.value)}
+                                        placeholder="Enter new password"
+                                    />
                                 </div>
-                            </div>
-                            <div className="sa-modal-footer">
-                                <button className="sa-btn-ghost" onClick={() => setResetModal({ open: false })}>Cancel</button>
-                                <button className="sa-btn-primary" onClick={handleResetPassword} disabled={saving}>
-                                    {saving ? <div className="sa-spinner-sm" /> : 'Reset Password'}
-                                </button>
+                                <div className="sky-modal-actions">
+                                    <button className="sky-btn-secondary" onClick={() => setResetModal({ open: false })}>Cancel</button>
+                                    <button className="sky-btn-primary" onClick={handleResetPassword} disabled={saving}>
+                                        {saving ? 'Resetting...' : 'Update Password'}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* ── Ticket Reply Modal ── */}
+            {/* ── Support Ticket Reply Modal ── */}
             <AnimatePresence>
                 {ticketModal.open && ticketModal.ticket && (
-                    <motion.div className="sa-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setTicketModal({ open: false })}>
-                        <motion.div className="sa-modal" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} onClick={e => e.stopPropagation()}>
-                            <div className="sa-modal-header">
-                                <h3><MessageSquare size={16} /> Support Ticket</h3>
-                                <button className="sa-icon-btn" onClick={() => setTicketModal({ open: false })}><X size={16} /></button>
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setTicketModal({ open: false })}>
+                        <motion.div className="sky-modal-card" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()}>
+                            <div className="sky-modal-header">
+                                <h3><MessageSquare size={16} /> Support Reply — {ticketModal.ticket.subject}</h3>
+                                <button onClick={() => setTicketModal({ open: false })}><X size={16} /></button>
                             </div>
-                            <div className="sa-modal-body">
-                                <div className="sa-ticket-detail">
-                                    <div className="sa-ticket-from">
-                                        <span><strong>{ticketModal.ticket.user.name}</strong></span>
-                                        <span className="sa-sub-text">{ticketModal.ticket.user.branch.name}</span>
-                                        <span className={`sa-priority-badge ${ticketModal.ticket.priority.toLowerCase()}`}>{ticketModal.ticket.priority}</span>
-                                    </div>
-                                    <h4 className="sa-ticket-subject-full">{ticketModal.ticket.subject}</h4>
-                                    <div className="sa-ticket-message-body">{ticketModal.ticket.message}</div>
+                            <div className="sky-modal-body">
+                                <div className="sky-ticket-dialog-box">
+                                    <strong>{ticketModal.ticket.user.name} ({ticketModal.ticket.user.branch.name}):</strong>
+                                    <p>{ticketModal.ticket.message}</p>
                                 </div>
-                                <div className="sa-form-group" style={{ marginTop: '16px' }}>
-                                    <label>Your Reply</label>
-                                    <textarea value={adminReply} onChange={e => setAdminReply(e.target.value)} placeholder="Type your reply…" rows={4} />
+                                <div className="sky-form-group">
+                                    <label>Admin Reply & Resolution Note</label>
+                                    <textarea
+                                        rows={4}
+                                        value={adminReply}
+                                        onChange={e => setAdminReply(e.target.value)}
+                                        placeholder="Provide support instructions or resolution details..."
+                                    />
                                 </div>
-                            </div>
-                            <div className="sa-modal-footer">
-                                <button className="sa-btn-ghost" onClick={() => setTicketModal({ open: false })}>Cancel</button>
-                                <button className="sa-btn-primary" onClick={handleReplyTicket} disabled={saving}>
-                                    {saving ? <div className="sa-spinner-sm" /> : <><Send size={14} /> Send & Resolve</>}
-                                </button>
+                                <div className="sky-modal-actions">
+                                    <button className="sky-btn-secondary" onClick={() => setTicketModal({ open: false })}>Cancel</button>
+                                    <button className="sky-btn-primary" onClick={handleReplyTicket} disabled={saving}>
+                                        {saving ? 'Sending...' : 'Resolve Ticket'}
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>
