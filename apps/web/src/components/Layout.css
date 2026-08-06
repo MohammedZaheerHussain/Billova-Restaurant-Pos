@@ -391,6 +391,73 @@
     color: var(--warning);
 }
 
+/* ── Collapsed Sidebar Layout (Rail State 70px) ── */
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 16px 8px;
+}
+
+.sidebar.collapsed .logo {
+    justify-content: center;
+    gap: 0;
+}
+
+.sidebar.collapsed .sidebar-nav {
+    padding: 12px 4px;
+}
+
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 10px 0;
+    margin: 0;
+    border-left: none;
+    border-radius: var(--radius-md);
+}
+
+.sidebar.collapsed .nav-item.active {
+    background: var(--primary-glow);
+    color: var(--primary);
+}
+
+.sidebar.collapsed .notification-bell {
+    justify-content: center;
+    margin: 6px 4px;
+    padding: 10px 0;
+}
+
+.sidebar.collapsed .sync-controls {
+    margin: 6px 4px;
+    padding: 6px;
+    align-items: center;
+}
+
+.sidebar.collapsed .sidebar-footer {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 4px;
+    gap: 8px;
+}
+
+.sidebar.collapsed .user-info {
+    justify-content: center;
+    width: 100%;
+}
+
+.sidebar.collapsed .sidebar-footer-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.sidebar.collapsed .theme-toggle-btn,
+.sidebar.collapsed .logout-btn {
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+}
+
 /* Main Content */
 .main-content {
     flex: 1;

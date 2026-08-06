@@ -307,8 +307,26 @@ export const useUIStore = create<UIStore>()(
             name: 'billova-ui',
             partialize: (state) => ({ theme: state.theme }),
             onRehydrateStorage: () => (state) => {
-                if (state?.theme) applyTheme(state.theme);
+                if (state?.theme) {
+                    applyTheme(state.theme);
+                }
             },
         }
     )
 );
+
+// Apply saved theme immediately on load
+if (typeof window !== 'undefined') {
+    try {
+        const stored = localStorage.getItem('billova-ui');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed?.state?.theme) {
+                applyTheme(parsed.state.theme);
+            }
+        }
+    } catch {
+        // Fallback to default
+    }
+}
+
