@@ -39,7 +39,7 @@
     color: var(--text-secondary);
     font-weight: 500;
     font-size: 14px;
-    transition: all var(--transition-normal);
+    transition: all var(--transition-fast);
 }
 
 .order-type-tab:hover {
@@ -51,8 +51,8 @@
 .order-type-tab.active {
     background: var(--primary);
     border-color: var(--primary);
-    color: white;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+    color: #ffffff;
+    font-weight: 600;
 }
 
 /* Search */

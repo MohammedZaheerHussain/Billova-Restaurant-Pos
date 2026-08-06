@@ -1,0 +1,55 @@
+.ui-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.ui-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.ui-badge-success {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.ui-badge-warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.ui-badge-danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.25);
+}
+
+.ui-badge-info {
+    background: var(--info-bg);
+    color: var(--info);
+    border-color: rgba(59, 130, 246, 0.25);
+}
+
+.ui-badge-orange {
+    background: rgba(249, 115, 22, 0.12);
+    color: var(--primary);
+    border-color: rgba(249, 115, 22, 0.25);
+}
+
+.ui-badge-neutral {
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border-color: var(--border);
+}

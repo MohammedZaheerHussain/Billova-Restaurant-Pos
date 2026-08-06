@@ -155,12 +155,14 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 14px;
+    padding: 10px 14px;
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     text-decoration: none;
     font-weight: 500;
-    transition: all var(--transition-normal);
+    font-size: 14px;
+    transition: all var(--transition-fast);
+    border-left: 3px solid transparent;
 }
 
 .nav-item:hover {
@@ -169,9 +171,10 @@
 }
 
 .nav-item.active {
-    background: var(--primary);
-    color: white;
-    box-shadow: var(--shadow-glow);
+    background: var(--bg-active);
+    color: var(--text-primary);
+    border-left-color: var(--primary);
+    font-weight: 600;
 }
 
 /* Super Admin Nav Item */

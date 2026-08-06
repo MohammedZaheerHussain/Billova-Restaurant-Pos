@@ -1,82 +1,94 @@
-/* Billova POS - Premium Black & Red Theme */
+/* Billova POS - Commercial POS Orange & Dark Slate Theme */
 
 :root {
-  /* Colors */
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #111111;
-  --bg-card: #1a1a1a;
-  --bg-card-hover: #222222;
+  /* Surface Palette (Deep Dark Slate - Usability First) */
+  --bg-primary: #0f1117;
+  --bg-secondary: #161922;
+  --bg-card: #1e2230;
+  --bg-card-hover: #262b3d;
+  --bg-input: #141720;
+  --bg-active: #2b3145;
 
-  --primary: #dc2626;
-  --primary-hover: #ef4444;
-  --primary-glow: rgba(220, 38, 38, 0.3);
-  --accent: #f97316;
-  --accent-hover: #fb923c;
+  /* Brand Primary (Crisp Warm Orange) */
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --primary-active: #c2410c;
+  --primary-glow: rgba(249, 115, 22, 0.15);
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
-  --gradient-dark: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-  --gradient-card: linear-gradient(135deg, #1a1a1a 0%, #111111 100%);
+  --gradient-primary: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  --gradient-dark: linear-gradient(180deg, #0f1117 0%, #161922 100%);
+  --gradient-card: linear-gradient(180deg, #1e2230 0%, #181b26 100%);
 
-  --success: #22c55e;
+  /* Status Colors */
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.12);
   --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.12);
   --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.12);
 
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  /* High Contrast Typography */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
 
-  --border: #2d2d2d;
-  --border-light: #3d3d3d;
+  /* Borders & Dividers */
+  --border: #2a2f42;
+  --border-light: #3b425c;
+  --border-focus: #f97316;
 
-  /* Spacing */
+  /* Radii */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px var(--primary-glow);
+  /* Elevation Shadows (Subtle, Clean) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 16px var(--primary-glow);
 
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
-  --transition-slow: 300ms ease;
+  /* Snappy Commercial POS Timings */
+  --ease-fast: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 120ms var(--ease-fast);
+  --transition-normal: 160ms var(--ease-fast);
+  --transition-slow: 220ms var(--ease-fast);
 }
 
-/* Light Theme Overrides */
+/* Light Theme Overrides (High-contrast Slate light mode) */
 [data-theme="light"] {
-  --bg-primary: #f5f5f5;
+  --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-card: #ffffff;
-  --bg-card-hover: #f0f0f0;
+  --bg-card-hover: #f1f5f9;
+  --bg-input: #f8fafc;
+  --bg-active: #e2e8f0;
 
-  --primary: #dc2626;
-  --primary-hover: #b91c1c;
-  --primary-glow: rgba(220, 38, 38, 0.15);
+  --primary: #ea580c;
+  --primary-hover: #c2410c;
+  --primary-active: #9a3412;
+  --primary-glow: rgba(234, 88, 12, 0.12);
 
-  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
-  --gradient-dark: linear-gradient(135deg, #f5f5f5 0%, #e5e5e5 100%);
-  --gradient-card: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  --gradient-primary: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  --gradient-dark: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --gradient-card: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 
-  --success: #16a34a;
-  --warning: #d97706;
-  --info: #2563eb;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
 
-  --text-primary: #111111;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
+  --border: #e2e8f0;
+  --border-light: #cbd5e1;
 
-  --border: #e5e5e5;
-  --border-light: #d4d4d4;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
-  --shadow-glow: 0 0 20px var(--primary-glow);
 }
 
 * {

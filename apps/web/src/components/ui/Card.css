@@ -1,0 +1,54 @@
+.ui-card {
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-fast);
+    overflow: hidden;
+}
+
+.ui-card-solid {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.ui-card-glass {
+    background: rgba(30, 34, 48, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ui-card-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+}
+
+.ui-card-flat {
+    background: var(--bg-secondary);
+    border: none;
+}
+
+.ui-card-hoverable:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-light);
+    transform: translateY(-1px);
+}
+
+.ui-card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ui-card-body {
+    padding: 20px;
+}
+
+.ui-card-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}

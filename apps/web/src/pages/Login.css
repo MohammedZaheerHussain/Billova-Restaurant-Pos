@@ -8,14 +8,16 @@
     padding: 20px;
     background: var(--bg-primary);
     background-image:
-        radial-gradient(circle at 20% 50%, rgba(220, 38, 38, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
+        radial-gradient(circle at 20% 50%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(234, 88, 12, 0.05) 0%, transparent 50%);
 }
 
 .login-card {
     width: 100%;
     max-width: 420px;
-    background: var(--bg-card);
+    background: rgba(30, 34, 48, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     padding: 40px;
@@ -34,12 +36,11 @@
 }
 
 .login-logo-img {
-    width: 100px;
-    height: 100px;
+    width: 90px;
+    height: 90px;
     object-fit: contain;
-    margin-bottom: 20px;
-    filter: drop-shadow(0 0 30px rgba(220, 38, 38, 0.4)) drop-shadow(0 0 60px rgba(249, 115, 22, 0.2));
-    animation: logoFloat 3s ease-in-out infinite;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 0 24px rgba(249, 115, 22, 0.35));
 }
 
 @keyframes logoFloat {
