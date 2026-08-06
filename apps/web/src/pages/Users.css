@@ -1,68 +1,363 @@
-/* Users Page Styles */
+/* =======================================================
+   Users / Employees Page
+   ======================================================= */
 
 .users-page {
-    padding: 24px;
-    height: calc(100vh - 70px);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 52px);
     overflow-y: auto;
+    background: var(--bg-root);
 }
 
-.users-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-}
-
-.user-card {
+/* ── Page Header ── */
+.page-header {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 20px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-canvas);
+    flex-shrink: 0;
+    gap: 12px;
 }
 
+.page-header h1 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Users Grid ── */
+.users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    padding: 20px 24px;
+    align-content: start;
+}
+
+/* ── User Card ── */
+.user-card {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all var(--transition-fast);
+}
+
+.user-card:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
+}
+
+/* ── User Avatar ── */
 .user-avatar {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary-glow);
+    border: 1.5px solid rgba(249, 115, 22, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--primary);
-    border-radius: var(--radius-md);
-    color: white;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
+    color: var(--primary);
+    flex-shrink: 0;
+    text-transform: uppercase;
 }
 
+/* ── User Info ── */
 .user-info {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .user-info h3 {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
-    margin-bottom: 2px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .user-info p {
-    font-size: 13px;
+    font-size: 11px;
     color: var(--text-muted);
-    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .role-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    width: fit-content;
 }
 
+.role-badge[data-role="OWNER"] {
+    background: var(--primary-glow);
+    color: var(--primary);
+}
+
+.role-badge[data-role="MANAGER"] {
+    background: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+}
+
+.role-badge[data-role="CASHIER"] {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.role-badge[data-role="WAITER"] {
+    background: rgba(139, 92, 246, 0.1);
+    color: #a78bfa;
+}
+
+/* ── User Actions ── */
 .user-actions {
     display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.btn-icon-sm {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-icon-sm:hover {
+    background: var(--bg-surface-hover);
+    color: var(--text-primary);
+}
+
+.btn-icon-sm.danger:hover {
+    background: var(--danger-bg);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+}
+
+/* ── Loading / Empty ── */
+.loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+}
+
+.empty-state {
+    display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 60px;
+}
+
+/* ── Shared Buttons ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: none;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+}
+
+.btn-secondary {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Spinner ── */
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: usr-spin 0.7s linear infinite;
+    display: inline-block;
+}
+
+@keyframes usr-spin { to { transform: rotate(360deg); } }
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 13, 17, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    backdrop-filter: blur(5px);
+}
+
+.modal {
+    background: var(--bg-canvas);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 440px;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
     gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+}
+
+/* ── Modal Form ── */
+.modal-form {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.form-group input,
+.form-group select {
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color var(--transition-fast);
+    width: 100%;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.form-group input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-group select option {
+    background: var(--bg-canvas);
+    color: var(--text-primary);
 }
