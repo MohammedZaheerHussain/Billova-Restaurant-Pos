@@ -1,7 +1,7 @@
 // Subscription Hook - Check feature access based on plan
 import { useAuthStore } from '../store';
 
-export type SubscriptionPlan = 'BASIC' | 'PLUS' | 'PREMIUM';
+export type SubscriptionPlan = 'BASIC' | 'PLUS' | 'PREMIUM' | 'DEMO_PREMIUM';
 
 // Feature limits per plan - Staff creation is Premium only
 export const PLAN_LIMITS = {
@@ -56,6 +56,23 @@ export const PLAN_LIMITS = {
             staffManagement: true, // Can add staff
         },
     },
+    DEMO_PREMIUM: {
+        name: 'Demo Premium',
+        menuItems: Infinity,
+        orderHistoryDays: Infinity,
+        maxUsers: Infinity,
+        features: {
+            pos: true,
+            menuManagement: true,
+            orderHistory: true,
+            reports: true,
+            inventory: true,
+            tables: true,
+            aiExtraction: true,
+            exportPdf: true,
+            staffManagement: true,
+        },
+    },
 };
 
 export type FeatureKey = keyof typeof PLAN_LIMITS.BASIC.features;
@@ -90,6 +107,7 @@ export function useSubscription() {
             case 'BASIC': return '#22c55e'; // green
             case 'PLUS': return '#3b82f6';  // blue
             case 'PREMIUM': return '#a855f7'; // purple
+            case 'DEMO_PREMIUM': return '#f97316'; // orange for demo premium
             default: return '#22c55e';
         }
     };

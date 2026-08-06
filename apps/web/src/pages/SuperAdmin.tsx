@@ -229,7 +229,7 @@ export default function SuperAdminPage() {
                 ownerEmail = `demo_${cleanName || 'user'}_${phoneDigits || timestamp}@billova.test`;
                 ownerPassword = generatePassword();
                 ownerName = `${newCustomer.restaurantName} (Demo)`;
-                plan = 'DEMO_PREMIUM';
+                plan = newCustomer.plan === 'BASIC' ? 'BASIC' : (newCustomer.plan === 'PRO' ? 'PLUS' : 'DEMO_PREMIUM');
                 licenseDuration = 1;
             }
 
@@ -952,6 +952,14 @@ export default function SuperAdminPage() {
                                                 onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                                                 placeholder="e.g. 9876543210"
                                             />
+                                        </div>
+                                        <div className="sky-form-group">
+                                            <label>Account Tier Type *</label>
+                                            <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
+                                                <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Recommended)</option>
+                                                <option value="PRO">PRO — POS + Reports + Inventory</option>
+                                                <option value="BASIC">BASIC — POS Terminal Only</option>
+                                            </select>
                                         </div>
                                     </>
                                 ) : (
