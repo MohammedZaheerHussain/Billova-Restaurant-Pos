@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-    Building2, Shield, Plus, X, Key,
+    Building2, Shield, Plus, X, Key, Copy,
     MessageSquare, Clock, Send, Search, RefreshCw,
     AlertCircle, CheckCircle2, Phone,
     Calendar, ArrowUpRight, TrendingUp, AlertTriangle,
@@ -187,40 +187,118 @@ export default function SuperAdminPage() {
         }
     };
 
+    const [quickDemo, setQuickDemo] = useState(false);
+    const [credentialsModal, setCredentialsModal] = useState<{ open: boolean; email: string; password: string; restaurantName: string }>({
+        open: false, email: '', password: '', restaurantName: ''
+    });
+
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} copied to clipboard!`);
+    };
+
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        const special = '@#$%&*';
+        let password = '';
+        for (let i = 0; i < 6; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
+        password += special.charAt(Math.floor(Math.random() * special.length));
+        password += Math.floor(Math.random() * 90 + 10);
+        return password;
+    };
+
     const handleAddCustomer = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newCustomer.restaurantName || !newCustomer.ownerEmail || !newCustomer.ownerPassword) {
-            toast.error('Please fill in all required fields'); return;
+        if (!newCustomer.restaurantName) {
+            toast.error('Please enter restaurant name'); return;
         }
+
         try {
             setSaving(true);
-            if (!hasExpressBackend) {
+            const timestamp = Date.now();
+            const cleanName = newCustomer.restaurantName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const phoneDigits = newCustomer.phone.replace(/[^0-9]/g, '');
+
+            let ownerEmail = newCustomer.ownerEmail;
+            let ownerPassword = newCustomer.ownerPassword;
+            let ownerName = newCustomer.ownerName || newCustomer.restaurantName;
+            let plan = newCustomer.plan || 'PREMIUM';
+            let licenseDuration = newCustomer.licenseDuration || 12;
+
+            if (quickDemo) {
+                ownerEmail = `demo_${cleanName || 'user'}_${phoneDigits || timestamp}@billova.test`;
+                ownerPassword = generatePassword();
+                ownerName = `${newCustomer.restaurantName} (Demo)`;
+                plan = 'DEMO_PREMIUM';
+                licenseDuration = 1;
+            }
+
+            if (!ownerEmail || !ownerPassword) {
+                toast.error('Owner Email and password required'); return;
+            }
+
+            if (!checkExpressBackend()) {
                 const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+                const expiryDays = quickDemo ? 3 : (licenseDuration * 30);
                 const { data: branch, error: branchErr } = await supabase.from('branches').insert([{
-                    name: newCustomer.restaurantName, address: newCustomer.address, phone: newCustomer.phone,
-                    subscription_plan: newCustomer.plan, subscription_expiry: new Date(Date.now() + newCustomer.licenseDuration * 30 * 86400000).toISOString(),
-                    is_active: true, license_key: licenseKey,
+                    name: newCustomer.restaurantName,
+                    address: newCustomer.address || (quickDemo ? 'Kasba, Vellore' : ''),
+                    phone: newCustomer.phone,
+                    subscription_plan: plan,
+                    subscription_expiry: new Date(Date.now() + expiryDays * 86400000).toISOString(),
+                    is_active: true,
+                    license_key: licenseKey,
                 }]).select().single();
+
                 if (branchErr) throw branchErr;
+
                 const { data: authData, error: authErr } = await supabase.auth.signUp({
-                    email: newCustomer.ownerEmail, password: newCustomer.ownerPassword,
-                    options: { data: { name: newCustomer.ownerName || 'Restaurant Owner', role: 'OWNER', branch_id: branch.id } }
+                    email: ownerEmail,
+                    password: ownerPassword,
+                    options: { data: { name: ownerName, role: 'OWNER', branch_id: branch.id } }
                 });
+
                 if (authErr) throw authErr;
+
                 if (authData.user) {
                     await supabase.from('profiles').insert([{
-                        id: authData.user.id, name: newCustomer.ownerName || 'Restaurant Owner',
-                        email: newCustomer.ownerEmail, role: 'OWNER', branch_id: branch.id,
+                        id: authData.user.id,
+                        name: ownerName,
+                        email: ownerEmail,
+                        role: 'OWNER',
+                        branch_id: branch.id,
                     }]);
                 }
-                toast.success('Customer account created successfully!');
-                toast.success(`License Key: ${licenseKey}`, { duration: 10000 });
+
+                toast.success('Customer account created!');
             } else {
-                await superAdminAPI.createRestaurant(newCustomer);
+                await superAdminAPI.createRestaurant({
+                    restaurantName: newCustomer.restaurantName,
+                    ownerName,
+                    ownerEmail,
+                    ownerPassword,
+                    phone: newCustomer.phone,
+                    address: newCustomer.address || 'Demo Account',
+                    plan,
+                    licenseDuration: quickDemo ? 0 : licenseDuration,
+                    isDemo: quickDemo,
+                });
                 toast.success('Customer account created!');
             }
+
             setAddModal(false);
-            setNewCustomer({ restaurantName: '', address: '', phone: '', gstNumber: '', ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'PREMIUM', licenseDuration: 12, isDemo: false });
+            setCredentialsModal({
+                open: true,
+                email: ownerEmail,
+                password: ownerPassword,
+                restaurantName: newCustomer.restaurantName,
+            });
+
+            setNewCustomer({
+                restaurantName: '', address: '', phone: '', gstNumber: '',
+                ownerName: '', ownerEmail: '', ownerPassword: '', plan: 'PREMIUM',
+                licenseDuration: 12, isDemo: false
+            });
             fetchData();
         } catch (error: any) {
             toast.error(error.message || 'Failed to create customer account');
@@ -821,69 +899,164 @@ export default function SuperAdminPage() {
                                 <button onClick={() => setAddModal(false)}><X size={16} /></button>
                             </div>
                             <form onSubmit={handleAddCustomer} className="sky-modal-form">
-                                <div className="sky-form-group">
-                                    <label>Restaurant Name *</label>
-                                    <input type="text" required value={newCustomer.restaurantName} onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="e.g. Royal Spice Bistro" />
-                                </div>
-                                <div className="sky-form-row">
-                                    <div className="sky-form-group">
-                                        <label>Phone Number</label>
-                                        <input type="text" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} placeholder="+91 9876543210" />
+                                {/* Quick Demo Toggle Card */}
+                                <div className={`sky-demo-card ${quickDemo ? 'active' : ''}`}>
+                                    <div className="sky-demo-info">
+                                        <Zap size={18} className="sky-zap-icon" />
+                                        <div>
+                                            <div className="sky-demo-title">Quick Demo Mode</div>
+                                            <div className="sky-demo-sub">Instant 3-day test account — asks only for Client Name & Phone</div>
+                                        </div>
                                     </div>
-                                    <div className="sky-form-group">
-                                        <label>Address</label>
-                                        <input type="text" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Kasba, Vellore" />
-                                    </div>
-                                </div>
-
-                                <div className="sky-form-divider" />
-                                <h4>Owner Account Credentials</h4>
-
-                                <div className="sky-form-group">
-                                    <label>Owner Name</label>
-                                    <input type="text" value={newCustomer.ownerName} onChange={e => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="Store Owner Name" />
-                                </div>
-                                <div className="sky-form-row">
-                                    <div className="sky-form-group">
-                                        <label>Owner Email *</label>
-                                        <input type="email" required value={newCustomer.ownerEmail} onChange={e => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@bistro.com" />
-                                    </div>
-                                    <div className="sky-form-group">
-                                        <label>Initial Password *</label>
-                                        <input type="text" required value={newCustomer.ownerPassword} onChange={e => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Password" />
-                                    </div>
+                                    <label className="sky-switch">
+                                        <input
+                                            type="checkbox"
+                                            checked={quickDemo}
+                                            onChange={(e) => setQuickDemo(e.target.checked)}
+                                        />
+                                        <span className="sky-slider"></span>
+                                    </label>
                                 </div>
 
-                                <div className="sky-form-divider" />
-                                <h4>Subscription & License Tier</h4>
+                                {quickDemo ? (
+                                    /* Quick Demo Form: ONLY 2 Input Fields */
+                                    <>
+                                        <div className="sky-form-group">
+                                            <label>Client Name / Restaurant Name *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={newCustomer.restaurantName}
+                                                onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })}
+                                                placeholder="e.g. Abid Bistro"
+                                            />
+                                        </div>
+                                        <div className="sky-form-group">
+                                            <label>Phone Number *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={newCustomer.phone}
+                                                onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                                                placeholder="e.g. 9876543210"
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* Full Form Fields */
+                                    <>
+                                        <div className="sky-form-group">
+                                            <label>Restaurant Name *</label>
+                                            <input type="text" required value={newCustomer.restaurantName} onChange={e => setNewCustomer({ ...newCustomer, restaurantName: e.target.value })} placeholder="e.g. Royal Spice Bistro" />
+                                        </div>
+                                        <div className="sky-form-row">
+                                            <div className="sky-form-group">
+                                                <label>Phone Number</label>
+                                                <input type="text" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} placeholder="+91 9876543210" />
+                                            </div>
+                                            <div className="sky-form-group">
+                                                <label>Address</label>
+                                                <input type="text" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} placeholder="Kasba, Vellore" />
+                                            </div>
+                                        </div>
 
-                                <div className="sky-form-row">
-                                    <div className="sky-form-group">
-                                        <label>Plan Tier</label>
-                                        <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                            <option value="BASIC">BASIC — POS Terminal Only</option>
-                                            <option value="PRO">PRO — POS + Reports + Inventory</option>
-                                            <option value="PREMIUM">PREMIUM — Full Enterprise Suite</option>
-                                        </select>
-                                    </div>
-                                    <div className="sky-form-group">
-                                        <label>License Duration</label>
-                                        <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}>
-                                            <option value={1}>1 Month</option>
-                                            <option value={3}>3 Months</option>
-                                            <option value={6}>6 Months</option>
-                                            <option value={12}>12 Months (1 Year)</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                        <div className="sky-form-divider" />
+                                        <h4>Owner Account Credentials</h4>
+
+                                        <div className="sky-form-group">
+                                            <label>Owner Name</label>
+                                            <input type="text" value={newCustomer.ownerName} onChange={e => setNewCustomer({ ...newCustomer, ownerName: e.target.value })} placeholder="Store Owner Name" />
+                                        </div>
+                                        <div className="sky-form-row">
+                                            <div className="sky-form-group">
+                                                <label>Owner Email *</label>
+                                                <input type="email" required value={newCustomer.ownerEmail} onChange={e => setNewCustomer({ ...newCustomer, ownerEmail: e.target.value })} placeholder="owner@bistro.com" />
+                                            </div>
+                                            <div className="sky-form-group">
+                                                <label>Initial Password *</label>
+                                                <input type="text" required value={newCustomer.ownerPassword} onChange={e => setNewCustomer({ ...newCustomer, ownerPassword: e.target.value })} placeholder="Password" />
+                                            </div>
+                                        </div>
+
+                                        <div className="sky-form-divider" />
+                                        <h4>Subscription & License Tier</h4>
+
+                                        <div className="sky-form-row">
+                                            <div className="sky-form-group">
+                                                <label>Plan Tier</label>
+                                                <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
+                                                    <option value="BASIC">BASIC — POS Terminal Only</option>
+                                                    <option value="PRO">PRO — POS + Reports + Inventory</option>
+                                                    <option value="PREMIUM">PREMIUM — Full Enterprise Suite</option>
+                                                </select>
+                                            </div>
+                                            <div className="sky-form-group">
+                                                <label>License Duration</label>
+                                                <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}>
+                                                    <option value={1}>1 Month</option>
+                                                    <option value={3}>3 Months</option>
+                                                    <option value={6}>6 Months</option>
+                                                    <option value={12}>12 Months (1 Year)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 <div className="sky-modal-actions">
                                     <button type="button" className="sky-btn-secondary" onClick={() => setAddModal(false)}>Cancel</button>
                                     <button type="submit" className="sky-btn-primary" disabled={saving}>
-                                        {saving ? 'Provisioning...' : 'Create Customer Account'}
+                                        {saving ? 'Provisioning...' : (quickDemo ? 'Create Demo Account' : 'Create Customer Account')}
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ── Credentials Success Modal ── */}
+            <AnimatePresence>
+                {credentialsModal.open && (
+                    <motion.div className="sky-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setCredentialsModal({ ...credentialsModal, open: false })}>
+                        <motion.div className="sky-modal-card sm" initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()}>
+                            <div className="sky-modal-header">
+                                <h3><Key size={18} /> Account Created 🎉</h3>
+                                <button onClick={() => setCredentialsModal({ ...credentialsModal, open: false })}><X size={16} /></button>
+                            </div>
+                            <div className="sky-modal-body">
+                                <p className="sky-cred-subtitle">Login credentials generated for <strong>{credentialsModal.restaurantName}</strong>:</p>
+
+                                <div className="sky-cred-field">
+                                    <label>EMAIL LOGIN</label>
+                                    <div className="sky-cred-box">
+                                        <span className="mono">{credentialsModal.email}</span>
+                                        <button type="button" onClick={() => copyToClipboard(credentialsModal.email, 'Email')}>
+                                            <Copy size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="sky-cred-field">
+                                    <label>PASSWORD</label>
+                                    <div className="sky-cred-box">
+                                        <span className="mono">{credentialsModal.password}</span>
+                                        <button type="button" onClick={() => copyToClipboard(credentialsModal.password, 'Password')}>
+                                            <Copy size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="sky-cred-warning">
+                                    ⚠️ Save or copy these credentials now to share with the client!
+                                </div>
+
+                                <div className="sky-modal-actions">
+                                    <button type="button" className="sky-btn-primary full-width" onClick={() => setCredentialsModal({ ...credentialsModal, open: false })}>
+                                        Done - Back to Workspaces
+                                    </button>
+                                </div>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}
