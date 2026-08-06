@@ -209,6 +209,18 @@ export default function LoginPage() {
 
     return (
         <div className="login-page">
+            <video
+                className="login-bg-video"
+                autoPlay
+                loop
+                muted
+                playsInline
+            >
+                <source src="/1786010883001336.mp4" type="video/mp4" />
+            </video>
+
+            <div className="login-hero-overlay" />
+
             <motion.div
                 className="login-card"
                 initial={{ opacity: 0, y: 20 }}
@@ -291,7 +303,7 @@ export default function LoginPage() {
                     <p className="forgot-hint">Contact your restaurant admin if you forgot your password</p>
                 </form>
 
-                {/* Contact Panel - Like Billova Medical */}
+                {/* Contact Panel */}
                 <div className="license-panel">
                     <h4>New User? Need a License?</h4>
                     <p>For subscriptions, licensing, or more details contact us:</p>
@@ -301,7 +313,18 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <p className="powered-by">Powered by Billova</p>
+                <a
+                    href="https://www.barakahtechnologies.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="barakah-credit"
+                >
+                    <span>Developed by</span>
+                    <span className="barakah-badge">
+                        <img src="/BARAKAH LOGO.png" alt="Barakah Tech Logo" className="barakah-logo" />
+                    </span>
+                    <strong>BARAKAH TECH</strong>
+                </a>
             </motion.div>
         </div>
     );
