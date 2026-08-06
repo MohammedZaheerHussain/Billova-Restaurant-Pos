@@ -321,7 +321,7 @@ export default function LoginPage() {
                 >
                     <span>Developed by</span>
                     <span className="barakah-badge">
-                        <img src="/BARAKAH LOGO.png" alt="Barakah Tech Logo" className="barakah-logo" />
+                        <img src="/barakah-logo.png" alt="Barakah Tech Logo" className="barakah-logo" />
                     </span>
                     <strong>BARAKAH TECH</strong>
                 </a>
