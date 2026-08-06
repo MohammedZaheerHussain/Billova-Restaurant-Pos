@@ -395,8 +395,61 @@
 .main-content {
     flex: 1;
     height: 100vh;
+    overflow-y: auto;
+    background: var(--bg-root);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Top Command Bar */
+.top-command-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: var(--bg-canvas);
+    border-bottom: 1px solid var(--border);
+    min-height: 52px;
+}
+
+.cmd-trigger-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    max-width: 380px;
+    width: 100%;
+}
+
+.cmd-trigger-btn:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
+    color: var(--text-primary);
+}
+
+.cmd-trigger-btn span {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
     overflow: hidden;
-    background: var(--bg-primary);
+    text-overflow: ellipsis;
+}
+
+.cmd-trigger-btn kbd {
+    padding: 2px 5px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
 }
 
 /* Mobile menu button - hidden on desktop */

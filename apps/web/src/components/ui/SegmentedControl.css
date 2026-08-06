@@ -1,0 +1,61 @@
+.ui-segmented-control {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    gap: 2px;
+}
+
+.ui-segment-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.ui-segment-btn:hover {
+    color: var(--text-primary);
+}
+
+.ui-segment-btn.is-active {
+    background: var(--bg-surface-active);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.ui-segmented-sm .ui-segment-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.ui-segmented-lg .ui-segment-btn {
+    padding: 8px 18px;
+    font-size: 14px;
+}
+
+.ui-segment-badge {
+    padding: 1px 6px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+}
+
+.ui-segment-badge.badge-active {
+    background: var(--primary);
+    color: #ffffff;
+}

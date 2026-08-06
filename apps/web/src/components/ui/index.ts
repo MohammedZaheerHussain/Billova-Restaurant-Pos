@@ -5,3 +5,5 @@ export * from './Input';
 export * from './StatCard';
 export * from './EmptyState';
 export * from './Switch';
+export * from './CommandPalette';
+export * from './SegmentedControl';

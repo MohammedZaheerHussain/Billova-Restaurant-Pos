@@ -1,11 +1,10 @@
-// Main Layout with Sidebar
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
     BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Bell, Warehouse, RefreshCw,
-    Puzzle, LayoutDashboard, Sun, Moon,
+    Puzzle, LayoutDashboard, Sun, Moon, Search,
     Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
@@ -14,6 +13,7 @@ import { ordersAPI } from '../api';
 import { useSync, useSyncInit } from '../hooks/useSync';
 import { SyncStatusBadge, OfflineIndicator } from './sync';
 import SyncIndicator from './SyncIndicator';
+import { CommandPalette } from './ui/CommandPalette';
 import { supabase } from '../lib/supabase';
 import './Layout.css';
 import { logger } from '../utils/logger';
@@ -41,11 +41,12 @@ const navItems: NavItem[] = [
 ];
 
 export default function Layout() {
-
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
     const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
     const { hasFeature, currentPlan, getPlanColor } = useSubscription();
+
+    const [cmdOpen, setCmdOpen] = useState(false);
 
     // Initialize offline sync
     useSyncInit();
@@ -282,16 +283,31 @@ export default function Layout() {
 
             {/* Main Content */}
             <main className="main-content" id="main-content" role="main" aria-label="Page content">
-                {/* Mobile hamburger */}
-                <button
-                    className="mobile-menu-btn"
-                    onClick={toggleSidebar}
-                    aria-label="Open menu"
-                >
-                    <MenuIcon size={22} />
-                </button>
+                {/* Top Command Bar */}
+                <header className="top-command-bar">
+                    <button
+                        className="mobile-menu-btn"
+                        onClick={toggleSidebar}
+                        aria-label="Open menu"
+                    >
+                        <MenuIcon size={20} />
+                    </button>
+                    <button
+                        className="cmd-trigger-btn"
+                        onClick={() => setCmdOpen(true)}
+                        title="Open command palette (Cmd + K)"
+                    >
+                        <Search size={15} />
+                        <span>Search commands or pages...</span>
+                        <kbd>⌘K</kbd>
+                    </button>
+                </header>
+
                 <Outlet />
             </main>
+
+            {/* Global Command Palette */}
+            <CommandPalette isOpen={cmdOpen} onClose={() => setCmdOpen(false)} />
         </div>
     );
 }
