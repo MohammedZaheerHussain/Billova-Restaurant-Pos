@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 
 async function getSupabaseOrders() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return [];
     try {
         const { data, error } = await supabase.from('orders').select('*');
         if (error) return [];

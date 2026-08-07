@@ -91,15 +91,16 @@ export default function Layout() {
         if (isSuperAdmin) return;
 
         const fetchPendingOrders = async () => {
+            if (typeof navigator !== 'undefined' && !navigator.onLine) return;
             try {
                 const res = await ordersAPI.getAll();
-                const pending = res.data.filter((o: any) =>
+                const pending = (res.data || []).filter((o: any) =>
                     (o.orderType === 'DELIVERY' || o.orderType === 'TAKEAWAY') &&
                     o.status === 'PENDING'
                 ).length;
                 setPendingOnlineOrders(pending);
             } catch (e) {
-                logger.error('Error fetching pending orders:', e);
+                // Ignore offline errors when waking from laptop sleep
             }
         };
 
