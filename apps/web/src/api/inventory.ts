@@ -90,9 +90,18 @@ export const inventoryAPI = {
             try { return await api.get('/inventory/alerts/list'); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('inventory_alerts').select('*').limit(20);
-            if (error) return { data: [] };
-            return { data: data || [] };
+            const { data } = await supabase.from('inventory_items').select('*');
+            const items = data || [];
+            const lowStockItems = items.filter((i: any) => Number(i.quantity ?? i.current_stock ?? 0) <= Number(i.minStock ?? i.min_stock ?? 0));
+            const alerts = lowStockItems.map((item: any) => ({
+                id: `alert-${item.id}`,
+                alertType: 'LOW_STOCK',
+                message: `${item.name} is running low on stock (${item.quantity ?? item.current_stock ?? 0} ${item.unit || 'pcs'} left)`,
+                isRead: false,
+                createdAt: new Date().toISOString(),
+                inventoryItem: { id: item.id, name: item.name, quantity: Number(item.quantity ?? item.current_stock ?? 0), unit: item.unit || 'pcs' },
+            }));
+            return { data: alerts };
         } catch {
             return { data: [] };
         }
