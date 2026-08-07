@@ -51,20 +51,22 @@
 .date-picker {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
+    gap: 8px;
+    padding: 6px 12px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     transition: border-color var(--transition-fast);
+    cursor: pointer;
 }
 
-.date-picker:focus-within {
+.date-picker:focus-within,
+.date-picker:hover {
     border-color: var(--primary);
 }
 
 .date-picker svg {
-    color: var(--text-muted);
+    color: var(--primary);
     flex-shrink: 0;
 }
 
@@ -73,10 +75,17 @@
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 500;
     font-family: 'Inter', sans-serif;
     cursor: pointer;
-    width: 110px;
+    width: 135px;
+    color-scheme: dark;
+}
+
+.date-picker input::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
 }
 
 /* ── Filter Tabs ── */

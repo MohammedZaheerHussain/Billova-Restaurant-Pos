@@ -1,5 +1,5 @@
 // Orders Page - View and manage orders with full bill details
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Clock, Calendar, X, User, Phone, CreditCard,
@@ -72,6 +72,7 @@ export default function OrdersPage() {
         const day = String(now.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
+    const dateInputRef = useRef<HTMLInputElement>(null);
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
@@ -370,9 +371,10 @@ export default function OrdersPage() {
                     <p>{filteredOrders.length} orders · ₹{totalSales.toFixed(2)} sales</p>
                 </div>
                 <div className="header-actions">
-                    <div className="date-picker">
+                    <div className="date-picker" onClick={() => dateInputRef.current?.showPicker?.()}>
                         <Calendar size={18} />
                         <input
+                            ref={dateInputRef}
                             type="date"
                             value={selectedDate}
                             onChange={(e) => setSelectedDate(e.target.value)}
