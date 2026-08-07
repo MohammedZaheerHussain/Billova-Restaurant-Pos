@@ -135,10 +135,42 @@ export default function SuperAdminPage() {
 
             let restList: Restaurant[] = [];
             if (branchData && !branchErr) {
-                // Use profiles.updated_at for last activity (updated on each login via Layout.tsx)
+                const profiles = profileData || [];
 
-                restList = branchData.map((b: any) => {
-                    const branchProfiles = (profileData || []).filter((p: any) => p.branch_id === b.id);
+                // Deduplicate branches sharing the same name (e.g., duplicate provision entries)
+                const validBranches: any[] = [];
+                const nameMap = new Map<string, any[]>();
+
+                for (const b of branchData) {
+                    const normName = (b.name || '').trim().toLowerCase();
+                    if (!nameMap.has(normName)) nameMap.set(normName, []);
+                    nameMap.get(normName)!.push(b);
+                }
+
+                for (const [_, branchGroup] of nameMap.entries()) {
+                    if (branchGroup.length === 1) {
+                        validBranches.push(branchGroup[0]);
+                    } else {
+                        // Multiple branches with identical name
+                        const withProfiles = branchGroup.filter(b => profiles.some((p: any) => p.branch_id === b.id));
+                        if (withProfiles.length > 0) {
+                            // Keep branches with profiles, auto-delete empty duplicate orphan branches
+                            const orphans = branchGroup.filter(b => !profiles.some((p: any) => p.branch_id === b.id));
+                            for (const orphan of orphans) {
+                                supabase.from('branches').delete().eq('id', orphan.id).then(() => {
+                                    logger.info(`[SuperAdmin] Auto-cleaned duplicate orphan branch ${orphan.id}`);
+                                });
+                            }
+                            validBranches.push(...withProfiles);
+                        } else {
+                            // If none have profiles, keep the most recent branch entry
+                            validBranches.push(branchGroup[branchGroup.length - 1]);
+                        }
+                    }
+                }
+
+                restList = validBranches.map((b: any) => {
+                    const branchProfiles = profiles.filter((p: any) => p.branch_id === b.id);
                     const branchUsers = branchProfiles.map((p: any) => ({
                         id: p.id,
                         name: p.name || p.email?.split('@')[0] || 'User',
@@ -327,20 +359,7 @@ export default function SuperAdminPage() {
         }
     };
 
-    const handleDeleteBranch = async (branchId: string, branchName: string) => {
-        if (!confirm(`⚠️ Are you sure you want to permanently delete "${branchName}"?\n\nThis will remove the branch and all associated user profiles. This action cannot be undone.`)) return;
-        try {
-            // Delete profiles associated with this branch first
-            await supabase.from('profiles').delete().eq('branch_id', branchId);
-            // Delete the branch
-            const { error } = await supabase.from('branches').delete().eq('id', branchId);
-            if (error) throw error;
-            toast.success(`"${branchName}" deleted successfully`);
-            fetchData();
-        } catch (err: any) {
-            toast.error(err.message || 'Failed to delete branch');
-        }
-    };
+
 
     const handleResetPassword = async () => {
         if (!newPassword) { toast.error('Please enter a new password'); return; }
@@ -738,29 +757,16 @@ export default function SuperAdminPage() {
                                                                     : 'No users assigned'}
                                                         </td>
                                                         <td>
-                                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                <button
-                                                                    className="sky-action-link"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        navigate(`/super-admin/client/${rest.id}`);
-                                                                    }}
-                                                                >
-                                                                    <span>Full Workspace</span>
-                                                                    <ArrowUpRight size={14} />
-                                                                </button>
-                                                                <button
-                                                                    className="sky-action-link"
-                                                                    style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleDeleteBranch(rest.id, rest.name);
-                                                                    }}
-                                                                    title="Delete this branch"
-                                                                >
-                                                                    <X size={14} />
-                                                                </button>
-                                                            </div>
+                                                            <button
+                                                                className="sky-action-link"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/super-admin/client/${rest.id}`);
+                                                                }}
+                                                            >
+                                                                <span>Full Workspace</span>
+                                                                <ArrowUpRight size={14} />
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 );
