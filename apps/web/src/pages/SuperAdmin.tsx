@@ -135,26 +135,16 @@ export default function SuperAdminPage() {
 
             let restList: Restaurant[] = [];
             if (branchData && !branchErr) {
-                // Fetch auth user data to get real last_sign_in_at
-                let authUsers: any[] = [];
-                try {
-                    const { data: authUsersData } = await supabase.auth.admin?.listUsers?.() || { data: { users: [] } };
-                    if (authUsersData?.users) authUsers = authUsersData.users;
-                } catch { /* admin API may not be available in client mode */ }
+                // Use profiles.updated_at for last activity (updated on each login via Layout.tsx)
 
                 restList = branchData.map((b: any) => {
                     const branchProfiles = (profileData || []).filter((p: any) => p.branch_id === b.id);
-                    const branchUsers = branchProfiles.map((p: any) => {
-                        // Try to find matching auth user for real last_sign_in_at
-                        const authUser = authUsers.find((u: any) => u.id === p.id);
-                        const lastLoginAt = authUser?.last_sign_in_at || p.updated_at || null;
-                        return {
-                            id: p.id,
-                            name: p.name || p.email?.split('@')[0] || 'User',
-                            email: p.email || '',
-                            lastLoginAt,
-                        };
-                    });
+                    const branchUsers = branchProfiles.map((p: any) => ({
+                        id: p.id,
+                        name: p.name || p.email?.split('@')[0] || 'User',
+                        email: p.email || '',
+                        lastLoginAt: p.updated_at || null,
+                    }));
                     return {
                         id: b.id, name: b.name, address: b.address || '', phone: b.phone || '',
                         isActive: b.is_active ?? true, createdAt: b.created_at || new Date().toISOString(),
@@ -268,14 +258,16 @@ export default function SuperAdminPage() {
                 let branch: any = null;
                 let branchErr: any = null;
 
-                const res1 = await supabase.from('branches').insert([{ ...basePayload, license_key: licenseKey }]).select().single();
-                if (res1.error && (res1.error.message?.includes('license_key') || res1.error.code === 'PGRST204')) {
+                // Single insert — no fallback retry to prevent duplicates
+                const res = await supabase.from('branches').insert([{ ...basePayload, license_key: licenseKey }]).select().single();
+                branch = res.data;
+                branchErr = res.error;
+
+                // If license_key column doesn't exist, retry once without it
+                if (branchErr && branchErr.message?.includes('license_key')) {
                     const res2 = await supabase.from('branches').insert([basePayload]).select().single();
                     branch = res2.data;
                     branchErr = res2.error;
-                } else {
-                    branch = res1.data;
-                    branchErr = res1.error;
                 }
 
                 if (branchErr) throw branchErr;
@@ -332,6 +324,21 @@ export default function SuperAdminPage() {
             toast.error(error.message || 'Failed to create customer account');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDeleteBranch = async (branchId: string, branchName: string) => {
+        if (!confirm(`⚠️ Are you sure you want to permanently delete "${branchName}"?\n\nThis will remove the branch and all associated user profiles. This action cannot be undone.`)) return;
+        try {
+            // Delete profiles associated with this branch first
+            await supabase.from('profiles').delete().eq('branch_id', branchId);
+            // Delete the branch
+            const { error } = await supabase.from('branches').delete().eq('id', branchId);
+            if (error) throw error;
+            toast.success(`"${branchName}" deleted successfully`);
+            fetchData();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to delete branch');
         }
     };
 
@@ -731,16 +738,29 @@ export default function SuperAdminPage() {
                                                                     : 'No users assigned'}
                                                         </td>
                                                         <td>
-                                                            <button
-                                                                className="sky-action-link"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    navigate(`/super-admin/client/${rest.id}`);
-                                                                }}
-                                                            >
-                                                                <span>Full Workspace</span>
-                                                                <ArrowUpRight size={14} />
-                                                            </button>
+                                                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                <button
+                                                                    className="sky-action-link"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigate(`/super-admin/client/${rest.id}`);
+                                                                    }}
+                                                                >
+                                                                    <span>Full Workspace</span>
+                                                                    <ArrowUpRight size={14} />
+                                                                </button>
+                                                                <button
+                                                                    className="sky-action-link"
+                                                                    style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteBranch(rest.id, rest.name);
+                                                                    }}
+                                                                    title="Delete this branch"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
