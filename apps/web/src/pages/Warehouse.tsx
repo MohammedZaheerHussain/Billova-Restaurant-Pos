@@ -7,7 +7,7 @@ import {
     Users, AlertTriangle, Grid3X3
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import api from '../api';
+import api, { inventoryAPI } from '../api';
 import './Warehouse.css';
 import { logger } from '../utils/logger';
 
@@ -104,27 +104,27 @@ export default function WarehousePage() {
         try {
             setLoading(true);
             const [whRes, trRes, invRes] = await Promise.all([
-                api.get('/warehouses'),
-                api.get('/warehouses/transfers'),
-                api.get('/inventory')
+                api.get('/warehouses').catch(() => ({ data: [] })),
+                api.get('/warehouses/transfers').catch(() => ({ data: [] })),
+                inventoryAPI.getAll().catch(() => ({ data: [] }))
             ]);
-            setWarehouses(whRes.data);
-            setTransfers(trRes.data);
-            setInventoryItems(invRes.data);
+            setWarehouses(whRes.data || []);
+            setTransfers(trRes.data || []);
+            setInventoryItems(invRes.data || []);
 
-            // Fetch additional data
             try {
                 const [supRes, adjRes] = await Promise.all([
-                    api.get('/suppliers'),
-                    api.get('/adjustments')
+                    api.get('/suppliers').catch(() => ({ data: [] })),
+                    api.get('/adjustments').catch(() => ({ data: [] }))
                 ]);
-                setSuppliers(supRes.data);
-                setAdjustments(adjRes.data);
-            } catch (e) {
-                // These endpoints may not be ready yet
+                setSuppliers(supRes.data || []);
+                setAdjustments(adjRes.data || []);
+            } catch {
+                setSuppliers([]);
+                setAdjustments([]);
             }
         } catch (error) {
-            toast.error('Failed to fetch data');
+            logger.error('[Warehouse] Error fetching data:', error);
         } finally {
             setLoading(false);
         }
@@ -304,31 +304,31 @@ export default function WarehousePage() {
             {/* Tabs */}
             <div className="wh-tabs">
                 <button
-                    className={activeTab === 'warehouses' ? 'active' : ''}
+                    className={`wh-tab ${activeTab === 'warehouses' ? 'active' : ''}`}
                     onClick={() => setActiveTab('warehouses')}
                 >
                     <Building2 size={18} /> Warehouses
                 </button>
                 <button
-                    className={activeTab === 'transfers' ? 'active' : ''}
+                    className={`wh-tab ${activeTab === 'transfers' ? 'active' : ''}`}
                     onClick={() => setActiveTab('transfers')}
                 >
                     <Truck size={18} /> Transfers
                 </button>
                 <button
-                    className={activeTab === 'locations' ? 'active' : ''}
+                    className={`wh-tab ${activeTab === 'locations' ? 'active' : ''}`}
                     onClick={() => setActiveTab('locations')}
                 >
                     <MapPin size={18} /> Locations
                 </button>
                 <button
-                    className={activeTab === 'suppliers' ? 'active' : ''}
+                    className={`wh-tab ${activeTab === 'suppliers' ? 'active' : ''}`}
                     onClick={() => setActiveTab('suppliers')}
                 >
                     <Users size={18} /> Suppliers
                 </button>
                 <button
-                    className={activeTab === 'adjustments' ? 'active' : ''}
+                    className={`wh-tab ${activeTab === 'adjustments' ? 'active' : ''}`}
                     onClick={() => setActiveTab('adjustments')}
                 >
                     <AlertTriangle size={18} /> Adjustments

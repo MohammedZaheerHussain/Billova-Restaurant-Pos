@@ -113,13 +113,46 @@ export const combosAPI = {
 
 export const addonsAPI = {
     getAll: async () => {
-        try { return await api.get('/addons'); }
-        catch { return { data: [] }; }
+        try {
+            return await api.get('/addons');
+        } catch {
+            const { data } = await supabase.from('menu_item_addons').select('*').order('name');
+            const formatted = (data || []).map((a: any) => ({
+                id: a.id,
+                name: a.name,
+                price: Number(a.price || 0),
+                category: a.category || 'Extras',
+                isAvailable: a.is_active ?? true,
+            }));
+            return { data: formatted };
+        }
     },
-    create: (data: { name: string; price: number; category?: string }) =>
-        api.post('/addons', data).catch(() => ({ data: { success: true } })),
-    update: (id: string, data: Record<string, unknown>) => api.put(`/addons/${id}`, data).catch(() => ({ data: { success: true } })),
-    delete: (id: string) => api.delete(`/addons/${id}`).catch(() => ({ data: { success: true } })),
+    create: async (data: { name: string; price: number; category?: string }) => {
+        try {
+            return await api.post('/addons', data);
+        } catch {
+            const { data: addon, error } = await supabase.from('menu_item_addons').insert([{
+                name: data.name,
+                price: data.price,
+                category: data.category || 'Extras',
+                is_active: true,
+            }]).select().single();
+            if (error) throw error;
+            return { data: addon };
+        }
+    },
+    update: async (id: string, data: Record<string, unknown>) => {
+        try {
+            return await api.put(`/addons/${id}`, data);
+        } catch {
+            const { data: updated } = await supabase.from('menu_item_addons').update(data).eq('id', id).select().single();
+            return { data: updated };
+        }
+    },
+    delete: (id: string) => api.delete(`/addons/${id}`).catch(async () => {
+        await supabase.from('menu_item_addons').delete().eq('id', id);
+        return { data: { success: true } };
+    }),
     getForMenuItem: (menuItemId: string) => api.get(`/addons/menu-item/${menuItemId}`).catch(() => ({ data: [] })),
     linkToMenuItem: (menuItemId: string, addonIds: string[]) =>
         api.post(`/addons/menu-item/${menuItemId}`, { addonIds }).catch(() => ({ data: { success: true } })),
