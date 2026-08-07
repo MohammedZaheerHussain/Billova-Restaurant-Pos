@@ -307,7 +307,10 @@ export default function SuperAdminPage() {
                 const { data: authData, error: authErr } = await supabase.auth.signUp({
                     email: ownerEmail,
                     password: ownerPassword,
-                    options: { data: { name: ownerName, role: 'OWNER', branch_id: branch.id, is_demo: quickDemo } }
+                    options: {
+                        data: { name: ownerName, role: 'OWNER', branch_id: branch.id, is_demo: quickDemo },
+                        emailRedirectTo: `${window.location.origin}/login`,
+                    }
                 });
 
                 if (authErr) throw authErr;
