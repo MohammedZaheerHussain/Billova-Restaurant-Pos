@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import api, { inventoryAPI } from '../api';
+import { hasExpressBackend } from '../lib/superadmin-direct';
 import './Warehouse.css';
 import { logger } from '../utils/logger';
 
@@ -104,8 +105,8 @@ export default function WarehousePage() {
         try {
             setLoading(true);
             const [whRes, trRes, invRes] = await Promise.all([
-                api.get('/warehouses').catch(() => ({ data: [] })),
-                api.get('/warehouses/transfers').catch(() => ({ data: [] })),
+                hasExpressBackend() ? api.get('/warehouses').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+                hasExpressBackend() ? api.get('/warehouses/transfers').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
                 inventoryAPI.getAll().catch(() => ({ data: [] }))
             ]);
             setWarehouses(whRes.data || []);
@@ -114,8 +115,8 @@ export default function WarehousePage() {
 
             try {
                 const [supRes, adjRes] = await Promise.all([
-                    api.get('/suppliers').catch(() => ({ data: [] })),
-                    api.get('/adjustments').catch(() => ({ data: [] }))
+                    hasExpressBackend() ? api.get('/suppliers').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+                    hasExpressBackend() ? api.get('/adjustments').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
                 ]);
                 setSuppliers(supRes.data || []);
                 setAdjustments(adjRes.data || []);
