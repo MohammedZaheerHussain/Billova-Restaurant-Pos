@@ -255,7 +255,7 @@ export default function SuperAdminPage() {
 
             if (!checkExpressBackend()) {
                 const licenseKey = `LIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-                const expiryDays = quickDemo ? 3 : (licenseDuration * 30);
+                const expiryDays = quickDemo ? 3 : (licenseDuration === 999 ? 36500 : 365);
                 const basePayload: any = {
                     name: newCustomer.restaurantName,
                     address: newCustomer.address || (quickDemo ? 'Kasba, Vellore' : ''),
@@ -1041,10 +1041,8 @@ export default function SuperAdminPage() {
                                             <div className="sky-form-group">
                                                 <label>License Duration</label>
                                                 <select value={newCustomer.licenseDuration} onChange={e => setNewCustomer({ ...newCustomer, licenseDuration: parseInt(e.target.value) })}>
-                                                    <option value={1}>1 Month</option>
-                                                    <option value={3}>3 Months</option>
-                                                    <option value={6}>6 Months</option>
-                                                    <option value={12}>12 Months (1 Year)</option>
+                                                    <option value={12}>1 Year (12 Months)</option>
+                                                    <option value={999}>Permanent / Lifetime Access</option>
                                                 </select>
                                             </div>
                                         </div>
