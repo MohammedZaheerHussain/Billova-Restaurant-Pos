@@ -133,6 +133,21 @@ export function useSubscription() {
         return `Upgrade to ${premiumFeatures.includes(feature) ? 'Premium' : 'Plus'} to access ${featureNames[feature]}`;
     };
 
+    // Calculate expiry & demo lock status
+    const branch = user?.branch as any;
+    const expiryDateStr = branch?.subscriptionExpiry || branch?.license?.expiresAt || branch?.license?.expires_at;
+    let isExpired = false;
+    let daysLeft: number | null = null;
+
+    if (expiryDateStr) {
+        const expiryTime = new Date(expiryDateStr).getTime();
+        const now = Date.now();
+        daysLeft = Math.ceil((expiryTime - now) / 86400000);
+        if (expiryTime < now || branch?.isActive === false) {
+            isExpired = true;
+        }
+    }
+
     return {
         currentPlan,
         planName: planConfig.name,
@@ -143,6 +158,8 @@ export function useSubscription() {
         getPlanColor,
         getUpgradeMessage,
         isSuperAdmin: user?.role === 'SUPER_ADMIN',
+        isExpired,
+        daysLeft,
     };
 }
 

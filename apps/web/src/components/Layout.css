@@ -671,3 +671,100 @@
     z-index: 9999;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+/* ── Subscription Lock Screen ── */
+.subscription-lock-container {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 15, 29, 0.96);
+    backdrop-filter: blur(14px);
+    padding: 24px;
+}
+
+.subscription-lock-card {
+    width: 100%;
+    max-width: 480px;
+    background: #1e293b;
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    border-radius: 16px;
+    padding: 36px 32px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(249, 115, 22, 0.15);
+    animation: lockCardFade 0.3s ease-out;
+}
+
+@keyframes lockCardFade {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.lock-icon-badge {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: rgba(249, 115, 22, 0.15);
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f97316;
+}
+
+.subscription-lock-card h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+.lock-subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 24px;
+}
+
+.lock-message-box {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    text-align: left;
+}
+
+.lock-message-box p {
+    font-size: 13px;
+    color: #fca5a5;
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.lock-message-box p:last-child {
+    margin-bottom: 0;
+}
+
+.btn-lock-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background: #ef4444;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-lock-logout:hover {
+    background: #dc2626;
+}

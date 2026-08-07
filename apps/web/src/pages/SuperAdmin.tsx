@@ -135,10 +135,26 @@ export default function SuperAdminPage() {
 
             let restList: Restaurant[] = [];
             if (branchData && !branchErr) {
+                // Fetch auth user data to get real last_sign_in_at
+                let authUsers: any[] = [];
+                try {
+                    const { data: authUsersData } = await supabase.auth.admin?.listUsers?.() || { data: { users: [] } };
+                    if (authUsersData?.users) authUsers = authUsersData.users;
+                } catch { /* admin API may not be available in client mode */ }
+
                 restList = branchData.map((b: any) => {
-                    const branchUsers = (profileData || [])
-                        .filter((p: any) => p.branch_id === b.id)
-                        .map((p: any) => ({ id: p.id, name: p.name || p.email?.split('@')[0] || 'User', email: p.email || '', lastLoginAt: p.updated_at }));
+                    const branchProfiles = (profileData || []).filter((p: any) => p.branch_id === b.id);
+                    const branchUsers = branchProfiles.map((p: any) => {
+                        // Try to find matching auth user for real last_sign_in_at
+                        const authUser = authUsers.find((u: any) => u.id === p.id);
+                        const lastLoginAt = authUser?.last_sign_in_at || p.updated_at || null;
+                        return {
+                            id: p.id,
+                            name: p.name || p.email?.split('@')[0] || 'User',
+                            email: p.email || '',
+                            lastLoginAt,
+                        };
+                    });
                     return {
                         id: b.id, name: b.name, address: b.address || '', phone: b.phone || '',
                         isActive: b.is_active ?? true, createdAt: b.created_at || new Date().toISOString(),
@@ -681,8 +697,16 @@ export default function SuperAdminPage() {
                                                         </td>
                                                         <td>
                                                             <div className="sky-owner-info">
-                                                                <span className="sky-owner-name">{rest.users[0]?.name || 'Unassigned Owner'}</span>
-                                                                <span className="sky-owner-email">{rest.users[0]?.email || 'No email registered'}</span>
+                                                                <span className="sky-owner-name">
+                                                                    {rest.users[0]?.name && rest.users[0].name !== 'User'
+                                                                        ? rest.users[0].name
+                                                                        : `${rest.name} Owner`}
+                                                                </span>
+                                                                <span className="sky-owner-email">
+                                                                    {rest.users[0]?.email
+                                                                        ? rest.users[0].email
+                                                                        : `ID: ${rest.id.slice(0, 8)}`}
+                                                                </span>
                                                             </div>
                                                         </td>
                                                         <td>
@@ -700,7 +724,11 @@ export default function SuperAdminPage() {
                                                             )}
                                                         </td>
                                                         <td className="sky-activity-cell mono">
-                                                            {rest.users[0]?.lastLoginAt ? timeAgo(rest.users[0].lastLoginAt) : 'Never logged in'}
+                                                            {rest.users[0]?.lastLoginAt
+                                                                ? timeAgo(rest.users[0].lastLoginAt)
+                                                                : rest.users.length > 0
+                                                                    ? 'Awaiting first login'
+                                                                    : 'No users assigned'}
                                                         </td>
                                                         <td>
                                                             <button

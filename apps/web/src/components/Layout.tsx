@@ -44,7 +44,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
     const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
-    const { hasFeature, currentPlan, planName, getPlanColor } = useSubscription();
+    const { hasFeature, currentPlan, planName, getPlanColor, isExpired } = useSubscription();
 
     const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -108,6 +108,35 @@ export default function Layout() {
         const interval = setInterval(fetchPendingOrders, 10000); // Poll every 10 seconds
         return () => clearInterval(interval);
     }, [isSuperAdmin]);
+
+    // Update last_seen on Supabase profile so LastActivity shows correctly
+    useEffect(() => {
+        if (!user?.id || isSuperAdmin) return;
+        supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('id', user.id).then(() => {});
+    }, [user?.id, isSuperAdmin]);
+
+    // ── Demo / Subscription Expired Lock Screen ─────────────────────────────
+    if (!isSuperAdmin && isExpired) {
+        return (
+            <div className="subscription-lock-container">
+                <div className="subscription-lock-card">
+                    <div className="lock-icon-badge">
+                        <Lock size={32} />
+                    </div>
+                    <h2>Demo Period Ended</h2>
+                    <p className="lock-subtitle">Your free trial access has expired.</p>
+                    <div className="lock-message-box">
+                        <p>🔒 This software has been locked as the 3-day demo period is over.</p>
+                        <p>📞 Please contact the owner to continue using Billova POS and activate a full subscription plan.</p>
+                    </div>
+                    <button className="btn-lock-logout" onClick={handleLogout}>
+                        <LogOut size={16} />
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="layout">
