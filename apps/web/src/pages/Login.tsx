@@ -55,6 +55,12 @@ export default function LoginPage() {
             setRememberMe(true);
         }
 
+        // Detect email signup confirmation hash in URL
+        if (window.location.hash.includes('type=signup') || window.location.hash.includes('access_token')) {
+            toast.success('🎉 Email verified successfully! Logging you into Billova POS...', { duration: 5000 });
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+
         // Check if already logged in via Supabase
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
@@ -62,6 +68,15 @@ export default function LoginPage() {
                 fetchUserProfile(session.user.id);
             }
         });
+
+        // Listen for SIGNED_IN event (e.g. from email confirmation token)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                fetchUserProfile(session.user.id);
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, [navigate]);
 
     // Fetch user profile from profiles table
