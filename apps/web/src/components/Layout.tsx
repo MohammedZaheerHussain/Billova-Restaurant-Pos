@@ -44,7 +44,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
     const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
-    const { hasFeature, currentPlan, getPlanColor } = useSubscription();
+    const { hasFeature, currentPlan, planName, getPlanColor } = useSubscription();
 
     const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -142,7 +142,7 @@ export default function Layout() {
                 {/* Subscription Badge */}
                 {sidebarOpen && !isSuperAdmin && (
                     <div className="subscription-badge" style={{ borderColor: getPlanColor() }}>
-                        <span style={{ color: getPlanColor() }}>{currentPlan}</span>
+                        <span style={{ color: getPlanColor() }}>{planName || currentPlan}</span>
                     </div>
                 )}
 

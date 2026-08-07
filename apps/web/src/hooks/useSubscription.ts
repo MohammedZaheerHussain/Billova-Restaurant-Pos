@@ -82,8 +82,12 @@ export function useSubscription() {
 
     // Get current plan from user's branch (default to BASIC)
     const rawPlan = user?.branch?.subscriptionPlan as SubscriptionPlan;
-    // Validate plan exists in PLAN_LIMITS, fallback to BASIC if invalid
-    const currentPlan: SubscriptionPlan = (rawPlan && PLAN_LIMITS[rawPlan]) ? rawPlan : 'BASIC';
+    // Demo accounts (email ends in @billova.test) always get DEMO_PREMIUM features
+    const isDemoAccount = user?.email?.endsWith('@billova.test') || false;
+    // Validate plan exists in PLAN_LIMITS; demo accounts force DEMO_PREMIUM
+    const currentPlan: SubscriptionPlan = isDemoAccount
+        ? 'DEMO_PREMIUM'
+        : ((rawPlan && PLAN_LIMITS[rawPlan]) ? rawPlan : 'BASIC');
     const planConfig = PLAN_LIMITS[currentPlan];
 
     // Check if a feature is available
