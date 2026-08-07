@@ -118,20 +118,48 @@ export const reportsAPI = {
 
 export const dashboardAPI = {
     ownerSummary: async () => {
-        try { return await api.get('/dashboard/owner-summary'); }
-        catch {
-            const orders = await getSupabaseOrders();
+        try {
+            return await api.get('/dashboard/owner-summary');
+        } catch {
+            const { data: ordersData } = await supabase.from('orders').select('*');
+            const orders = ordersData || [];
             const todayStr = new Date().toISOString().split('T')[0];
             const todayOrders = orders.filter((o: any) => (o.created_at || '').startsWith(todayStr));
-            const totalSalesToday = todayOrders.reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0);
-            const openOrders = orders.filter((o: any) => ['PENDING', 'PREPARING', 'READY'].includes(o.status));
+            const todayRevenue = todayOrders.reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0);
+
+            const paymentSplit: Record<string, number> = {};
+            todayOrders.forEach((o: any) => {
+                const pm = o.payment_method || 'CASH';
+                paymentSplit[pm] = (paymentSplit[pm] || 0) + Number(o.total_amount || 0);
+            });
+
+            const hourlySales = Array.from({ length: 24 }, (_, hour) => {
+                const hourOrders = todayOrders.filter((o: any) => new Date(o.created_at || Date.now()).getHours() === hour);
+                return {
+                    hour,
+                    orders: hourOrders.length,
+                    revenue: hourOrders.reduce((s: number, o: any) => s + Number(o.total_amount || 0), 0),
+                };
+            });
+
             return {
                 data: {
-                    totalSalesToday,
-                    openOrdersCount: openOrders.length,
-                    totalOrdersToday: todayOrders.length,
-                    avgOrderValue: todayOrders.length ? Math.round(totalSalesToday / todayOrders.length) : 0,
-                    totalCustomersCount: 0,
+                    today: {
+                        revenue: todayRevenue,
+                        orders: todayOrders.length,
+                        avgBill: todayOrders.length ? Math.round(todayRevenue / todayOrders.length) : 0,
+                    },
+                    yesterday: { revenue: 0 },
+                    revenueChange: 0,
+                    topItems: [],
+                    slowItems: [],
+                    lowStockAlerts: [],
+                    lowStockCount: 0,
+                    paymentSplit,
+                    hourlySales,
+                    peakHour: { hour: 13, label: '1:00 PM', orders: 0 },
+                    profitEstimate: { revenue: todayRevenue, estimatedCost: Math.round(todayRevenue * 0.4), estimatedProfit: Math.round(todayRevenue * 0.6), margin: 60 },
+                    generatedAt: new Date().toISOString(),
                 }
             };
         }

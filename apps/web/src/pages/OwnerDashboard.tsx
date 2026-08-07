@@ -85,8 +85,18 @@ export function OwnerDashboard() {
 
     if (!data) return null;
 
-    const maxHourly = Math.max(...data.hourlySales.map(h => h.revenue), 1);
-    const hourlyFiltered = data.hourlySales.filter(h => h.hour >= 6 && h.hour <= 23);
+    const hourlySales = data.hourlySales || [];
+    const topItems = data.topItems || [];
+    const slowItems = data.slowItems || [];
+    const lowStockAlerts = data.lowStockAlerts || [];
+    const paymentSplit = data.paymentSplit || {};
+    const today = data.today || { revenue: 0, orders: 0, avgBill: 0 };
+    const yesterday = data.yesterday || { revenue: 0 };
+    const peakHour = data.peakHour || { hour: 12, label: '12:00 PM', orders: 0 };
+    const profitEstimate = data.profitEstimate || { revenue: 0, estimatedCost: 0, estimatedProfit: 0, margin: 0 };
+
+    const maxHourly = Math.max(...hourlySales.map(h => h.revenue || 0), 1);
+    const hourlyFiltered = hourlySales.filter(h => h.hour >= 6 && h.hour <= 23);
 
     return (
         <div className="od-root">
@@ -109,37 +119,37 @@ export function OwnerDashboard() {
                 {/* Revenue */}
                 <div className="od-kpi">
                     <span className="od-kpi-label">Revenue Today</span>
-                    <span className="od-kpi-value">{fmt(data.today.revenue)}</span>
-                    <span className={`od-kpi-change ${data.revenueChange >= 0 ? 'up' : 'down'}`}>
-                        {data.revenueChange >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {Math.abs(data.revenueChange).toFixed(1)}% vs yesterday
+                    <span className="od-kpi-value">{fmt(today.revenue)}</span>
+                    <span className={`od-kpi-change ${(data.revenueChange || 0) >= 0 ? 'up' : 'down'}`}>
+                        {(data.revenueChange || 0) >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                        {Math.abs(data.revenueChange || 0).toFixed(1)}% vs yesterday
                     </span>
                 </div>
                 {/* Orders */}
                 <div className="od-kpi">
                     <span className="od-kpi-label">Orders Today</span>
-                    <span className="od-kpi-value">{data.today.orders}</span>
-                    <span className="od-kpi-sub">Yesterday: {fmt(data.yesterday.revenue)}</span>
+                    <span className="od-kpi-value">{today.orders}</span>
+                    <span className="od-kpi-sub">Yesterday: {fmt(yesterday.revenue)}</span>
                 </div>
                 {/* Avg Bill */}
                 <div className="od-kpi">
                     <span className="od-kpi-label">Avg Bill Value</span>
-                    <span className="od-kpi-value">{fmt(data.today.avgBill)}</span>
+                    <span className="od-kpi-value">{fmt(today.avgBill)}</span>
                     <span className="od-kpi-sub">Per order</span>
                 </div>
                 {/* Peak Hour */}
                 <div className="od-kpi">
                     <span className="od-kpi-label">Peak Hour</span>
-                    <span className="od-kpi-value">{data.peakHour.label}</span>
-                    <span className="od-kpi-sub">{data.peakHour.orders} orders</span>
+                    <span className="od-kpi-value">{peakHour.label}</span>
+                    <span className="od-kpi-sub">{peakHour.orders} orders</span>
                 </div>
                 {/* Profit */}
                 <div className="od-kpi">
                     <span className="od-kpi-label">Est. Profit</span>
                     <span className="od-kpi-value" style={{ color: 'var(--success)' }}>
-                        {fmt(data.profitEstimate.estimatedProfit)}
+                        {fmt(profitEstimate.estimatedProfit)}
                     </span>
-                    <span className="od-kpi-sub">{data.profitEstimate.margin}% margin</span>
+                    <span className="od-kpi-sub">{profitEstimate.margin}% margin</span>
                 </div>
             </motion.div>
 
@@ -151,19 +161,19 @@ export function OwnerDashboard() {
                         <Clock size={14} style={{ color: 'var(--primary)' }} />
                         <h3>Hourly Sales</h3>
                         <span className="od-chart-sub">
-                            Peak: <strong style={{ color: 'var(--primary)' }}>{data.peakHour.label}</strong>
+                            Peak: <strong style={{ color: 'var(--primary)' }}>{peakHour.label}</strong>
                         </span>
                     </div>
                     <div className="od-chart-bars">
                         {hourlyFiltered.map((hour) => (
                             <div
                                 key={hour.hour}
-                                className={`od-bar-wrap ${hour.hour === data.peakHour.hour ? 'peak' : ''}`}
+                                className={`od-bar-wrap ${hour.hour === peakHour.hour ? 'peak' : ''}`}
                                 title={`${fmtTime(hour.hour)}: ${fmt(hour.revenue)} (${hour.orders} orders)`}
                             >
                                 <div
                                     className="od-bar"
-                                    style={{ height: `${Math.max((hour.revenue / maxHourly) * 100, 2)}%` }}
+                                    style={{ height: `${Math.max(((hour.revenue || 0) / maxHourly) * 100, 2)}%` }}
                                 />
                                 <span className="od-bar-label">{fmtTime(hour.hour)}</span>
                             </div>
@@ -181,8 +191,8 @@ export function OwnerDashboard() {
                             <span className="od-panel-badge neutral">7 days</span>
                         </div>
                         <div className="od-panel-body">
-                            {data.topItems.length > 0 ? (
-                                data.topItems.map((item, i) => (
+                            {topItems.length > 0 ? (
+                                topItems.map((item, i) => (
                                     <div key={i} className="od-item-row">
                                         <span className={`od-rank ${i === 0 ? 'top' : ''}`}>#{i + 1}</span>
                                         <span className="od-item-name">{item.name}</span>
@@ -195,7 +205,7 @@ export function OwnerDashboard() {
                             )}
 
                             {/* Divider + Slow Items */}
-                            {data.slowItems.length > 0 && (
+                            {slowItems.length > 0 && (
                                 <>
                                     <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }} />
                                     <div className="od-panel-header" style={{ border: 'none', padding: '4px 16px 4px' }}>
@@ -203,7 +213,7 @@ export function OwnerDashboard() {
                                         <h3 style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dead Stock</h3>
                                         <span className="od-panel-badge warn">7+ days</span>
                                     </div>
-                                    {data.slowItems.map((item, i) => (
+                                    {slowItems.map((item, i) => (
                                         <div key={i} className="od-slow-row">
                                             <span className="od-slow-name">{item.name}</span>
                                             <span className="od-slow-days">{item.daysSinceLastSale}d</span>
@@ -211,7 +221,7 @@ export function OwnerDashboard() {
                                     ))}
                                 </>
                             )}
-                            {data.slowItems.length === 0 && data.topItems.length > 0 && (
+                            {slowItems.length === 0 && topItems.length > 0 && (
                                 <div className="od-empty success">All items selling ✓</div>
                             )}
                         </div>
@@ -219,27 +229,27 @@ export function OwnerDashboard() {
 
                     {/* Column 2: Stock Alerts */}
                     <motion.div
-                        className={`od-panel ${data.lowStockCount > 0 ? 'alert' : ''}`}
+                        className={`od-panel ${(data.lowStockCount || 0) > 0 ? 'alert' : ''}`}
                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
                     >
                         <div className="od-panel-header">
                             <Package size={14} />
                             <h3>Stock Alerts</h3>
-                            {data.lowStockCount > 0 && (
+                            {(data.lowStockCount || 0) > 0 && (
                                 <span className="od-panel-badge danger">{data.lowStockCount}</span>
                             )}
                         </div>
                         <div className="od-panel-body">
-                            {data.lowStockAlerts.length > 0 ? (
-                                data.lowStockAlerts.map((item) => {
+                            {lowStockAlerts.length > 0 ? (
+                                lowStockAlerts.map((item) => {
                                     const cls = item.status === 'OUT_OF_STOCK' ? 'critical' : item.status === 'CRITICAL' ? 'critical' : '';
                                     return (
                                         <div key={item.id} className={`od-stock-row ${cls}`}>
                                             <AlertTriangle size={13} />
                                             <span className="od-stock-name">{item.name}</span>
                                             <span className="od-stock-qty">{item.quantity}{item.unit}</span>
-                                            <span className={`od-stock-status ${item.status.toLowerCase()}`}>
-                                                {item.status.replace('_', ' ')}
+                                            <span className={`od-stock-status ${(item.status || '').toLowerCase()}`}>
+                                                {(item.status || '').replace('_', ' ')}
                                             </span>
                                         </div>
                                     );
@@ -257,8 +267,8 @@ export function OwnerDashboard() {
                             <h3>Payment Split</h3>
                         </div>
                         <div className="od-panel-body">
-                            {Object.keys(data.paymentSplit).length > 0 ? (
-                                Object.entries(data.paymentSplit).map(([mode, amount]) => (
+                            {Object.keys(paymentSplit).length > 0 ? (
+                                Object.entries(paymentSplit).map(([mode, amount]) => (
                                     <div key={mode} className="od-payment-row">
                                         <div className="od-payment-top">
                                             <span className="od-payment-mode">{mode}</span>
@@ -267,7 +277,7 @@ export function OwnerDashboard() {
                                         <div className="od-payment-bar">
                                             <div
                                                 className="od-payment-fill"
-                                                style={{ width: `${(amount / data.today.revenue) * 100}%` }}
+                                                style={{ width: `${today.revenue > 0 ? (amount / today.revenue) * 100 : 0}%` }}
                                             />
                                         </div>
                                     </div>
