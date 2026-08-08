@@ -163,6 +163,7 @@ export default function MenuPage() {
                 description: form.description || undefined,
                 price: parseFloat(form.price),
                 categoryId: form.categoryId,
+                branchId: user?.branch?.id,
                 isVeg: form.isVeg,
                 image: form.image || undefined,
                 hasGST: form.hasGST,
@@ -180,7 +181,7 @@ export default function MenuPage() {
             closeModal();
             fetchData();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Failed to save item');
+            toast.error(error?.message || error.response?.data?.error || 'Failed to save item');
         } finally {
             setSaving(false);
         }
@@ -273,24 +274,31 @@ export default function MenuPage() {
         if (extractedItems.length === 0) return;
 
         setImporting(true);
+        let successCount = 0;
+        let failCount = 0;
         try {
             for (const item of extractedItems) {
-                await menuAPI.create({
-                    name: item.name,
-                    price: parseFloat(item.price),
-                    categoryId: item.categoryId,
-                    isVeg: item.isVeg,
-                    hasGST: true,
-                    gstPercent: 5,
-                });
+                try {
+                    await menuAPI.create({
+                        name: item.name,
+                        price: parseFloat(item.price),
+                        categoryId: item.categoryId,
+                        branchId: user?.branch?.id,
+                        isVeg: item.isVeg,
+                        hasGST: true,
+                        gstPercent: 5,
+                    });
+                    successCount++;
+                } catch {
+                    failCount++;
+                }
             }
-            toast.success(`${extractedItems.length} items imported!`);
+            if (successCount > 0) toast.success(`${successCount} items saved to menu!`);
+            if (failCount > 0) toast.error(`${failCount} items failed to save`);
             setShowMenuCardModal(false);
             setMenuCardImage('');
             setExtractedItems([]);
             fetchData();
-        } catch (error) {
-            toast.error('Failed to import some items');
         } finally {
             setImporting(false);
         }
@@ -451,9 +459,9 @@ export default function MenuPage() {
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="modal-header">
-                                <h2>{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
+                                <h2>{editingItem ? 'Edit Menu Item' : 'Add New Item'}</h2>
                                 <button className="modal-close" onClick={closeModal}>
-                                    <X size={20} />
+                                    <X size={18} />
                                 </button>
                             </div>
 
@@ -466,6 +474,7 @@ export default function MenuPage() {
                                             value={form.name}
                                             onChange={(e) => setForm({ ...form, name: e.target.value })}
                                             placeholder="e.g., Chicken Biryani"
+                                            autoFocus
                                         />
                                     </div>
                                     <div className="form-group">
@@ -497,18 +506,18 @@ export default function MenuPage() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>Type</label>
+                                        <label>Food Type</label>
                                         <div className="toggle-group">
                                             <button
                                                 type="button"
-                                                className={`toggle-btn ${form.isVeg ? 'active veg' : ''}`}
+                                                className={`toggle-option veg-option ${form.isVeg ? 'selected' : ''}`}
                                                 onClick={() => setForm({ ...form, isVeg: true })}
                                             >
                                                 🟢 Veg
                                             </button>
                                             <button
                                                 type="button"
-                                                className={`toggle-btn ${!form.isVeg ? 'active non-veg' : ''}`}
+                                                className={`toggle-option nonveg-option ${!form.isVeg ? 'selected' : ''}`}
                                                 onClick={() => setForm({ ...form, isVeg: false })}
                                             >
                                                 🔴 Non-Veg
@@ -528,12 +537,13 @@ export default function MenuPage() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Image</label>
+                                    <label>Item Image</label>
                                     <div
-                                        className={`image-upload ${form.image ? 'has-image' : ''}`}
+                                        className="upload-placeholder"
                                         onClick={() => fileInputRef.current?.click()}
                                         onDrop={handleDrop}
                                         onDragOver={(e) => e.preventDefault()}
+                                        style={form.image ? { padding: 0, border: 'none', height: 'auto' } : undefined}
                                     >
                                         {form.image ? (
                                             <div className="image-preview">
@@ -546,15 +556,15 @@ export default function MenuPage() {
                                                         setForm({ ...form, image: '' });
                                                     }}
                                                 >
-                                                    <X size={16} />
+                                                    <X size={14} />
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="upload-placeholder">
-                                                <Upload size={32} />
+                                            <>
+                                                <Upload size={24} />
                                                 <p>Click or drag image here</p>
-                                                <span>Max 2MB, JPG/PNG</span>
-                                            </div>
+                                                <span>Max 2MB · JPG / PNG</span>
+                                            </>
                                         )}
                                     </div>
                                     <input

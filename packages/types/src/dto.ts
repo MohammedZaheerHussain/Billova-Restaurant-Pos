@@ -59,6 +59,7 @@ export interface CreateMenuItemDTO {
     name: string;
     price: number;
     categoryId: string;
+    branchId?: string;
     description?: string;
     isVeg?: boolean;
     isAvailable?: boolean;

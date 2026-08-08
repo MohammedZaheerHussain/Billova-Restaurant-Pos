@@ -11,6 +11,7 @@ export const menuAPI = {
         }
         try {
             let query = supabase.from('menu_items').select('*, category:categories(*)');
+            if (branchId) query = query.eq('branch_id', branchId);
             if (categoryId) query = query.eq('category_id', categoryId);
             const { data, error } = await query;
             if (error) return { data: [] };
@@ -50,14 +51,22 @@ export const menuAPI = {
                 name: data.name,
                 price: data.price,
                 category_id: data.categoryId,
-                is_veg: data.isVeg ?? true,
+                branch_id: data.branchId || null,
+                is_veg: data.isVeg ?? false,
                 is_available: data.isAvailable ?? true,
                 description: data.description,
+                has_gst: data.hasGST ?? true,
+                gst_percent: data.gstPercent ?? 5,
+                image: data.image || null,
             }]).select().single();
-            if (error) throw error;
+            if (error) {
+                logger.error('[menuAPI.create] Supabase error:', error);
+                throw error;
+            }
             return { data: created };
-        } catch {
-            return { data: { id: 'temp-' + Date.now(), ...data } };
+        } catch (err) {
+            logger.error('[menuAPI.create] Failed:', err);
+            throw err;
         }
     },
     update: async (id: string, data: Partial<CreateMenuItemDTO>) => {
@@ -84,9 +93,16 @@ export const menuAPI = {
             return { data: { id, is_available: true } };
         }
     },
-    delete: (id: string) => {
+    delete: async (id: string) => {
         if (hasExpressBackend()) return api.delete(`/menu/${id}`).catch(() => ({ data: { success: true } }));
-        return Promise.resolve({ data: { success: true } });
+        try {
+            const { error } = await supabase.from('menu_items').delete().eq('id', id);
+            if (error) throw error;
+            return { data: { success: true } };
+        } catch (err) {
+            logger.error('[menuAPI.delete] Failed:', err);
+            throw err;
+        }
     },
     extractMenuCard: async (imageData: string) => {
         if (hasExpressBackend()) {
@@ -227,12 +243,14 @@ export const categoriesAPI = {
             try { return await api.get('/categories', { params: { branchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('categories').select('*').order('name');
+            let query = supabase.from('categories').select('*').order('name');
+            if (branchId) query = query.eq('branch_id', branchId);
+            const { data, error } = await query;
             if (error) return { data: [] };
             const formatted = (data || []).map((c: any) => ({
                 id: c.id,
                 name: c.name,
-                icon: c.icon || 'Utensils',
+                icon: c.icon || '🍽️',
                 color: c.color,
             }));
             return { data: formatted };
@@ -245,11 +263,19 @@ export const categoriesAPI = {
             try { return await api.post('/categories', data); } catch { /* fallback */ }
         }
         try {
-            const { data: cat, error } = await supabase.from('categories').insert([{ name: data.name, icon: data.icon || 'Utensils' }]).select().single();
-            if (error) throw error;
+            const { data: cat, error } = await supabase.from('categories').insert([{
+                name: data.name,
+                icon: data.icon || '🍽️',
+                branch_id: data.branchId || null,
+            }]).select().single();
+            if (error) {
+                logger.error('[categoriesAPI.create] Supabase error:', error);
+                throw error;
+            }
             return { data: cat };
-        } catch {
-            return { data: { id: 'temp-' + Date.now(), ...data } };
+        } catch (err) {
+            logger.error('[categoriesAPI.create] Failed:', err);
+            throw err;
         }
     },
     update: (id: string, data: Partial<CreateCategoryDTO>) => {
