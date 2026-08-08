@@ -2,19 +2,15 @@
 -- BILLOVA POS - FIX MENU ITEMS & CATEGORIES RLS & HELPER FUNCTIONS
 -- ============================================
 
--- 1. Fix get_user_branch_id() to check profiles table first (where auth.uid() is stored)
+-- 1. Fix get_user_branch_id() to check profiles table ONLY (no legacy users table)
 CREATE OR REPLACE FUNCTION get_user_branch_id() RETURNS UUID AS $$
-    SELECT COALESCE(
-        (SELECT branch_id FROM profiles WHERE id = auth.uid()),
-        (SELECT branch_id FROM users WHERE auth_id = auth.uid())
-    );
+    SELECT branch_id FROM profiles WHERE id = auth.uid() LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER;
 
--- 2. Fix get_user_role() to check profiles table first
+-- 2. Fix get_user_role() to check profiles table ONLY
 CREATE OR REPLACE FUNCTION get_user_role() RETURNS TEXT AS $$
     SELECT COALESCE(
-        (SELECT role::TEXT FROM profiles WHERE id = auth.uid()),
-        (SELECT role::TEXT FROM users WHERE auth_id = auth.uid()),
+        (SELECT role::TEXT FROM profiles WHERE id = auth.uid() LIMIT 1),
         'OWNER'
     );
 $$ LANGUAGE sql SECURITY DEFINER;
