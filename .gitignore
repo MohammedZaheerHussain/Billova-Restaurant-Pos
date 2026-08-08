@@ -38,4 +38,7 @@ coverage
 
 # Misc
 *.tgz
+*.mp4
+*.webm
+
 .turbo
