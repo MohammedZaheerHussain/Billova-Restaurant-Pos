@@ -266,8 +266,44 @@ export const menuAPI = {
 };
 
 /**
+ * Downscale and compress image to fit under Groq Vision API token limits (8000 TPM)
+ */
+async function compressImageForGroq(imageData: string, maxDimension = 1200, quality = 0.85): Promise<string> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            } else {
+                resolve(imageData);
+            }
+        };
+        img.onerror = () => resolve(imageData);
+        img.src = imageData;
+    });
+}
+
+/**
  * Extract menu items using Groq AI Vision (qwen/qwen3.6-27b)
- * Flow: Upload base64 → Supabase Storage → public URL → Groq Vision → parsed items
  */
 async function extractWithGroqVision(
     imageData: string,
@@ -277,10 +313,11 @@ async function extractWithGroqVision(
 ): Promise<any[]> {
 
     try {
-        // Build the image URL — Groq qwen/qwen3.6-27b accepts base64 data URIs directly
-        const imageUrl = imageData.startsWith('data:') ? imageData : `data:image/jpeg;base64,${imageData}`;
+        // Downscale image to max 1200px and compress to JPEG to fit under Groq 8000 TPM limit
+        const compressedImage = await compressImageForGroq(imageData, 1200, 0.85);
+        const imageUrl = compressedImage.startsWith('data:') ? compressedImage : `data:image/jpeg;base64,${compressedImage}`;
 
-        logger.info('[extractWithGroqVision] Sending image to Groq AI Vision...');
+        logger.info('[extractWithGroqVision] Sending compressed image to Groq AI Vision...');
 
         // Call Groq AI Vision
         const existingCatNames = existingCategories.map((c: any) => c.name).join(', ');
