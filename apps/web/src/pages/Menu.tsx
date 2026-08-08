@@ -351,7 +351,7 @@ export default function MenuPage() {
                 >
                     All
                 </button>
-                {categories.map((cat) => (
+                {Array.from(new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()).map((cat) => (
                     <button
                         key={cat.id}
                         className={`filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
@@ -384,62 +384,69 @@ export default function MenuPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredItems.map((item) => (
-                                <motion.tr
-                                    key={item.id}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                >
-                                    <td>
-                                        <div className="item-image">
-                                            {item.image ? (
-                                                <img src={item.image} alt={item.name} />
-                                            ) : (
-                                                <div className="no-image">
-                                                    <ImageIcon size={20} />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="item-cell">
-                                            <div className={`veg-indicator ${item.isVeg ? 'veg' : 'non-veg'}`} />
-                                            <span className="item-name">{item.name}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className="category-badge">
-                                            {item.category?.icon} {item.category?.name}
-                                        </span>
-                                    </td>
-                                    <td className="price-cell">₹{item.price}</td>
-                                    <td>
-                                        <button
-                                            className={`status-toggle ${item.isAvailable ? 'available' : 'unavailable'}`}
-                                            onClick={() => handleToggleAvailability(item.id)}
-                                        >
-                                            {item.isAvailable ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-                                            {item.isAvailable ? 'Available' : 'Unavailable'}
-                                        </button>
-                                    </td>
-                                    <td>
-                                        <div className="action-buttons">
+                            {filteredItems.map((item) => {
+                                const cat = item.category || categories.find((c) => c.id === item.categoryId);
+                                return (
+                                    <motion.tr
+                                        key={item.id}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                    >
+                                        <td>
+                                            <div className="item-image">
+                                                {item.image ? (
+                                                    <img src={item.image} alt={item.name} />
+                                                ) : (
+                                                    <div className="no-image">
+                                                        <ImageIcon size={18} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="item-cell">
+                                                <span className="item-name">{item.name}</span>
+                                                <span className={item.isVeg ? 'veg-badge' : 'nonveg-badge'}>
+                                                    {item.isVeg ? '🟢 Veg' : '🔴 Non-Veg'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span className="category-badge">
+                                                {cat?.icon || '🍽️'} {cat?.name || 'General'}
+                                            </span>
+                                        </td>
+                                        <td className="price-cell">₹{item.price}</td>
+                                        <td>
                                             <button
-                                                className="btn-icon-sm"
-                                                onClick={() => openEditModal(item)}
+                                                className={`status-toggle ${item.isAvailable ? 'available' : 'unavailable'}`}
+                                                onClick={() => handleToggleAvailability(item.id)}
                                             >
-                                                <Edit2 size={16} />
+                                                {item.isAvailable ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                                {item.isAvailable ? 'Available' : 'Unavailable'}
                                             </button>
-                                            <button
-                                                className="btn-icon-sm danger"
-                                                onClick={() => setDeleteConfirm(item.id)}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </motion.tr>
-                            ))}
+                                        </td>
+                                        <td>
+                                            <div className="action-buttons">
+                                                <button
+                                                    className="btn-icon-sm"
+                                                    onClick={() => openEditModal(item)}
+                                                    title="Edit item"
+                                                >
+                                                    <Edit2 size={15} />
+                                                </button>
+                                                <button
+                                                    className="btn-icon-sm danger"
+                                                    onClick={() => setDeleteConfirm(item.id)}
+                                                    title="Delete item"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </motion.tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

@@ -247,34 +247,40 @@
 }
 
 /* ── Availability Toggle ── */
-.toggle-btn {
-    display: flex;
+.status-toggle {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
+    border: 1px solid transparent;
     transition: all var(--transition-fast);
     white-space: nowrap;
 }
 
-.toggle-btn.available {
-    border-color: rgba(16, 185, 129, 0.3);
-    background: var(--success-bg);
-    color: var(--success);
+.status-toggle.available {
+    background: rgba(34, 197, 94, 0.12);
+    color: #4ade80;
+    border-color: rgba(34, 197, 94, 0.3);
 }
 
-.toggle-btn.unavailable {
-    border-color: var(--border);
-    color: var(--text-muted);
+.status-toggle.available:hover {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: #4ade80;
 }
 
-.toggle-btn:hover {
-    border-color: var(--border-light);
+.status-toggle.unavailable {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-toggle.unavailable:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #f87171;
 }
 
 /* ── Action Buttons ── */
@@ -682,8 +688,47 @@
    CATEGORY MODAL
    ========================================================= */
 .category-modal {
-    max-width: 400px;
+    max-width: 440px;
     width: 100%;
+}
+
+.category-form {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.icon-picker {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.icon-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    font-size: 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.icon-option:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
+    transform: scale(1.08);
+}
+
+.icon-option.selected {
+    border-color: var(--primary);
+    background: rgba(249, 115, 22, 0.15);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
 }
 
 /* =========================================================
