@@ -1,7 +1,7 @@
 // Menu Management Page
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, Upload, Image as ImageIcon, FileImage, FolderPlus, Sparkles, Loader, UtensilsCrossed } from 'lucide-react';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, Upload, Image as ImageIcon, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuAPI, categoriesAPI } from '../api';
 import { useAuthStore, MenuItem, Category } from '../store';
@@ -50,6 +50,12 @@ export default function MenuPage() {
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [categoryForm, setCategoryForm] = useState({ name: '', icon: '🍽️' });
     const [savingCategory, setSavingCategory] = useState(false);
+
+    // Manage Categories Modal & Editing
+    const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [editCatName, setEditCatName] = useState('');
+    const [editCatIcon, setEditCatIcon] = useState('🍽️');
 
     // Menu Card Upload
     const [showMenuCardModal, setShowMenuCardModal] = useState(false);
@@ -223,6 +229,48 @@ export default function MenuPage() {
         }
     };
 
+    // Clean up duplicate categories
+    const handleCleanDuplicates = async () => {
+        try {
+            const res = await categoriesAPI.cleanDuplicates(user?.branch?.id);
+            if (res.success) {
+                toast.success(res.count > 0 ? `✨ Merged ${res.count} duplicate categories!` : 'All categories are already clean!');
+                fetchData();
+            } else {
+                toast.error('Failed to merge categories');
+            }
+        } catch {
+            toast.error('Failed to merge categories');
+        }
+    };
+
+    // Update Category
+    const handleUpdateCategory = async (id: string, name: string, icon: string) => {
+        if (!name.trim()) {
+            toast.error('Category name is required');
+            return;
+        }
+        try {
+            await categoriesAPI.update(id, { name, icon });
+            toast.success('Category updated!');
+            setEditingCategory(null);
+            fetchData();
+        } catch {
+            toast.error('Failed to update category');
+        }
+    };
+
+    // Delete Category
+    const handleDeleteCategory = async (id: string) => {
+        try {
+            await categoriesAPI.delete(id);
+            toast.success('Category deleted!');
+            fetchData();
+        } catch {
+            toast.error('Failed to delete category');
+        }
+    };
+
     // Handle Menu Card Upload
     const handleMenuCardUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -332,6 +380,9 @@ export default function MenuPage() {
                     <p>{items.length} items across {categories.length} categories</p>
                 </div>
                 <div className="header-actions">
+                    <button className="btn btn-secondary" onClick={() => setShowManageCategoriesModal(true)}>
+                        <FolderCog size={18} /> Manage Categories
+                    </button>
                     <button className="btn btn-secondary" onClick={() => setShowCategoryModal(true)}>
                         <FolderPlus size={18} /> Add Category
                     </button>
@@ -717,6 +768,108 @@ export default function MenuPage() {
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Manage Categories Modal */}
+            <AnimatePresence>
+                {showManageCategoriesModal && (
+                    <motion.div
+                        className="modal-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowManageCategoriesModal(false)}
+                    >
+                        <motion.div
+                            className="modal category-modal"
+                            style={{ maxWidth: '520px' }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="modal-header">
+                                <h2><FolderCog size={20} /> Manage Categories</h2>
+                                <button className="modal-close" onClick={() => setShowManageCategoriesModal(false)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="category-manager-body" style={{ padding: '20px', maxHeight: '60vh', overflowY: 'auto' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        {categories.length} Categories
+                                    </span>
+                                    <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '11px' }} onClick={handleCleanDuplicates}>
+                                        <Sparkles size={14} /> Merge Duplicates
+                                    </button>
+                                </div>
+                                <div className="category-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {categories.map((cat) => {
+                                        const itemCount = items.filter(i => i.categoryId === cat.id || (cat as any).ids?.includes(i.categoryId)).length;
+                                        const isEditing = editingCategory?.id === cat.id;
+
+                                        return (
+                                            <div key={cat.id} className="category-manager-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                                {isEditing ? (
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+                                                        <input
+                                                            type="text"
+                                                            value={editCatIcon}
+                                                            onChange={(e) => setEditCatIcon(e.target.value)}
+                                                            style={{ width: '45px', textAlign: 'center', padding: '6px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={editCatName}
+                                                            onChange={(e) => setEditCatName(e.target.value)}
+                                                            style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                        />
+                                                        <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}>
+                                                            Save
+                                                        </button>
+                                                        <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingCategory(null)}>
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <span style={{ fontSize: '18px' }}>{cat.icon}</span>
+                                                            <div>
+                                                                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{cat.name}</span>
+                                                                <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)' }}>{itemCount} items</span>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button
+                                                                className="btn-icon-sm"
+                                                                onClick={() => {
+                                                                    setEditingCategory(cat);
+                                                                    setEditCatName(cat.name);
+                                                                    setEditCatIcon(cat.icon || '🍽️');
+                                                                }}
+                                                                title="Edit Category"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button
+                                                                className="btn-icon-sm danger"
+                                                                onClick={() => handleDeleteCategory(cat.id)}
+                                                                title="Delete Category"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

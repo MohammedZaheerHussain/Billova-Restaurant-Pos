@@ -329,12 +329,24 @@ export const categoriesAPI = {
             if (branchId) query = query.eq('branch_id', branchId);
             const { data, error } = await query;
             if (error) return { data: [] };
-            const formatted = (data || []).map((c: any) => ({
-                id: c.id,
-                name: c.name,
-                icon: c.icon || '🍽️',
-                color: c.color,
-            }));
+
+            const uniqueMap = new Map<string, any>();
+            for (const c of (data || [])) {
+                const key = c.name.trim().toLowerCase();
+                if (!uniqueMap.has(key)) {
+                    uniqueMap.set(key, {
+                        id: c.id,
+                        name: c.name.trim(),
+                        icon: c.icon || '🍽️',
+                        color: c.color,
+                        ids: [c.id],
+                    });
+                } else {
+                    uniqueMap.get(key).ids.push(c.id);
+                }
+            }
+
+            const formatted = Array.from(uniqueMap.values());
             return { data: formatted };
         } catch {
             return { data: [] };
@@ -355,7 +367,7 @@ export const categoriesAPI = {
             }
 
             const insertPayload: any = {
-                name: data.name,
+                name: data.name.trim(),
                 icon: data.icon || '🍽️',
             };
             if (branchId) insertPayload.branch_id = branchId;
@@ -371,14 +383,73 @@ export const categoriesAPI = {
             throw err;
         }
     },
-    update: (id: string, data: Partial<CreateCategoryDTO>) => {
-        if (hasExpressBackend()) return api.put(`/categories/${id}`, data).catch(() => ({ data: { success: true } }));
-        return Promise.resolve({ data: { success: true } });
+    update: async (id: string, data: Partial<CreateCategoryDTO>) => {
+        if (hasExpressBackend()) {
+            try { return await api.put(`/categories/${id}`, data); } catch { /* fallback */ }
+        }
+        try {
+            const updatePayload: any = {};
+            if (data.name) updatePayload.name = data.name.trim();
+            if (data.icon) updatePayload.icon = data.icon;
+            const { data: updated, error } = await supabase.from('categories').update(updatePayload).eq('id', id).select().single();
+            if (error) throw error;
+            return { data: updated };
+        } catch (err) {
+            logger.error('[categoriesAPI.update] Failed:', err);
+            throw err;
+        }
     },
-    delete: (id: string) => {
+    delete: async (id: string) => {
         if (hasExpressBackend()) return api.delete(`/categories/${id}`).catch(() => ({ data: { success: true } }));
-        return Promise.resolve({ data: { success: true } });
+        try {
+            const { error } = await supabase.from('categories').delete().eq('id', id);
+            if (error) throw error;
+            return { data: { success: true } };
+        } catch (err) {
+            logger.error('[categoriesAPI.delete] Failed:', err);
+            throw err;
+        }
     },
+    cleanDuplicates: async (branchId?: string) => {
+        try {
+            let query = supabase.from('categories').select('*');
+            if (branchId) query = query.eq('branch_id', branchId);
+            const { data: allCats } = await query;
+            if (!allCats || allCats.length === 0) return { success: true, count: 0 };
+
+            const groups = new Map<string, any[]>();
+            for (const cat of allCats) {
+                const key = cat.name.trim().toLowerCase();
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(cat);
+            }
+
+            let mergedCount = 0;
+            for (const list of groups.values()) {
+                if (list.length > 1) {
+                    const primary = list[0];
+                    const duplicates = list.slice(1);
+                    const dupIds = duplicates.map((d: any) => d.id);
+
+                    await supabase
+                        .from('menu_items')
+                        .update({ category_id: primary.id })
+                        .in('category_id', dupIds);
+
+                    await supabase
+                        .from('categories')
+                        .delete()
+                        .in('id', dupIds);
+
+                    mergedCount += duplicates.length;
+                }
+            }
+            return { success: true, count: mergedCount };
+        } catch (err) {
+            logger.error('[categoriesAPI.cleanDuplicates] Error:', err);
+            return { success: false, count: 0 };
+        }
+    }
 };
 
 export const combosAPI = {

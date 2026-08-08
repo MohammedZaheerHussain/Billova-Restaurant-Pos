@@ -90,10 +90,6 @@ export default function POSPage() {
             ]);
             setCategories(catRes.data || []);
             setMenuItems(menuRes.data || []);
-
-            if (catRes.data && catRes.data.length > 0 && !selectedCategory) {
-                setSelectedCategory(catRes.data[0].id);
-            }
         } catch (error) {
             logger.error('Failed to fetch data:', error);
             toast.error('Failed to load menu');
@@ -104,9 +100,16 @@ export default function POSPage() {
 
     // Filter items
     const filteredItems = menuItems.filter((item) => {
-        const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+        const catObj = categories.find((c) => c.id === selectedCategory);
+        const catIds = catObj && (catObj as any).ids ? (catObj as any).ids : (selectedCategory ? [selectedCategory] : []);
+
+        const matchesCategory = !selectedCategory ||
+            item.categoryId === selectedCategory ||
+            catIds.includes(item.categoryId);
+
         const matchesSearch = !searchQuery ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase());
+
         return matchesCategory && matchesSearch && item.isAvailable;
     });
 
@@ -303,6 +306,13 @@ export default function POSPage() {
 
                 {/* Categories */}
                 <div className="category-scroll">
+                    <button
+                        className={`category-btn ${!selectedCategory ? 'active' : ''}`}
+                        onClick={() => setSelectedCategory(null)}
+                    >
+                        <span className="category-icon">🍽️</span>
+                        <span className="category-name">All</span>
+                    </button>
                     {categories.map((cat) => (
                         <button
                             key={cat.id}
