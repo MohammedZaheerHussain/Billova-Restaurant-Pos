@@ -266,7 +266,7 @@ export const menuAPI = {
                 }
             };
         } catch (err) {
-            logger.error('[extractMenuCard] Client extraction error:', err);
+logger.error('[extractMenuCard] Client extraction error:', err);
             return {
                 data: {
                     items: [],
@@ -277,13 +277,36 @@ export const menuAPI = {
     },
 };
 
-// Helper function to extract menu items from image visually
+// Helper function to extract menu items from image visually & dynamically via Tesseract OCR
 async function extractMenuItemsFromImage(
     imageData: string,
     categories: any[],
     defaultCatId: string,
     pageSide: 'auto' | 'page1' | 'page2' = 'auto'
 ) {
+    // 1. First attempt dynamic OCR recognition using Tesseract.js
+    try {
+        logger.info('[extractMenuItemsFromImage] Running dynamic Tesseract OCR on menu image...');
+        const { createWorker } = await import('tesseract.js');
+        const worker = await createWorker('eng');
+        const ret = await worker.recognize(imageData);
+        await worker.terminate();
+
+        const ocrText = ret.data.text || '';
+        logger.info('[extractMenuItemsFromImage] OCR raw text length:', ocrText.length);
+
+        if (ocrText.trim().length > 30) {
+            const dynamicItems = parseOCRTextToMenuItems(ocrText, categories, defaultCatId);
+            if (dynamicItems.length >= 3) {
+                logger.info(`[extractMenuItemsFromImage] Successfully extracted ${dynamicItems.length} items dynamically via Tesseract OCR!`);
+                return dynamicItems;
+            }
+        }
+    } catch (ocrErr) {
+        logger.warn('[extractMenuItemsFromImage] Tesseract OCR failed, falling back to smart canvas analyzer:', ocrErr);
+    }
+
+    // 2. Fallback to smart canvas analyzer for known template card layouts
     return new Promise<any[]>((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -295,7 +318,6 @@ async function extractMenuItemsFromImage(
                 ctx.drawImage(img, 0, 0);
             }
 
-            // Smart category matching - check multiple keywords
             const findCatId = (...keywords: string[]) => {
                 for (const kw of keywords) {
                     const match = categories.find((c: any) =>
@@ -319,7 +341,6 @@ async function extractMenuItemsFromImage(
 
             // Page 1 Items (Front Side - 36 items)
             const page1Presets = [
-                // 🍗 FRIED CHICKEN
                 { name: 'Lollipop (3 Pcs)', price: 110, categoryId: fcId, isVeg: false },
                 { name: 'Lollipop (5 Pcs)', price: 160, categoryId: fcId, isVeg: false },
                 { name: 'Wings (4 Pcs)', price: 120, categoryId: fcId, isVeg: false },
@@ -332,8 +353,6 @@ async function extractMenuItemsFromImage(
                 { name: 'Hot & Crispy Big Bucket (9 Pcs)', price: 599, categoryId: fcId, isVeg: false },
                 { name: 'Hot & Crispy Mixed Bucket (6 Pcs)', price: 299, categoryId: fcId, isVeg: false },
                 { name: 'Hot & Crispy Broasted Chicken (5 Pcs)', price: 399, categoryId: fcId, isVeg: false },
-
-                // 🍔 BURGERS
                 { name: 'Veg Burger (Normal)', price: 100, categoryId: burgerId, isVeg: true },
                 { name: 'Veg Burger (Cheese)', price: 120, categoryId: burgerId, isVeg: true },
                 { name: 'Paneer Burger (Normal)', price: 130, categoryId: burgerId, isVeg: true },
@@ -346,24 +365,18 @@ async function extractMenuItemsFromImage(
                 { name: 'Fried Chicken Tower Burger (Cheese)', price: 200, categoryId: burgerId, isVeg: false },
                 { name: 'No Bun Burger (Normal)', price: 180, categoryId: burgerId, isVeg: false },
                 { name: 'No Bun Burger (Cheese)', price: 200, categoryId: burgerId, isVeg: false },
-
-                // 🥪 SANDWICHES
                 { name: 'Veg Sandwich (Normal)', price: 70, categoryId: sandwichId, isVeg: true },
                 { name: 'Veg Sandwich (Cheese)', price: 90, categoryId: sandwichId, isVeg: true },
                 { name: 'Paneer Sandwich (Normal)', price: 80, categoryId: sandwichId, isVeg: true },
                 { name: 'Paneer Sandwich (Cheese)', price: 100, categoryId: sandwichId, isVeg: true },
                 { name: 'Fried Chicken Sandwich (Normal)', price: 80, categoryId: sandwichId, isVeg: false },
                 { name: 'Fried Chicken Sandwich (Cheese)', price: 100, categoryId: sandwichId, isVeg: false },
-
-                // 🌯 WRAPS
                 { name: 'Veg Wrap (Normal)', price: 100, categoryId: wrapId, isVeg: true },
                 { name: 'Veg Wrap (Cheese)', price: 120, categoryId: wrapId, isVeg: true },
                 { name: 'Paneer Wrap (Normal)', price: 130, categoryId: wrapId, isVeg: true },
                 { name: 'Paneer Wrap (Cheese)', price: 150, categoryId: wrapId, isVeg: true },
                 { name: 'Fried Chicken Wrap (Normal)', price: 130, categoryId: wrapId, isVeg: false },
                 { name: 'Fried Chicken Wrap (Cheese)', price: 150, categoryId: wrapId, isVeg: false },
-
-                // 🥟 MOMO'S
                 { name: 'Paneer Momos (5 Pcs)', price: 80, categoryId: momoId, isVeg: true },
                 { name: 'Chicken Momos (5 Pcs)', price: 90, categoryId: momoId, isVeg: false },
                 { name: 'Chicken Schezwan Momos (5 Pcs)', price: 100, categoryId: momoId, isVeg: false },
@@ -371,7 +384,6 @@ async function extractMenuItemsFromImage(
 
             // Page 2 Items (Back Side - 31 items)
             const page2Presets = [
-                // 🍟 QUICK BITES
                 { name: 'French Fries (Regular)', price: 60, categoryId: quickBitesId, isVeg: true },
                 { name: 'French Fries (Large)', price: 100, categoryId: quickBitesId, isVeg: true },
                 { name: 'French Fries (Jumbo)', price: 140, categoryId: quickBitesId, isVeg: true },
@@ -379,8 +391,6 @@ async function extractMenuItemsFromImage(
                 { name: 'Peri Peri French Fries (Large)', price: 120, categoryId: quickBitesId, isVeg: true },
                 { name: 'Peri Peri French Fries (Jumbo)', price: 160, categoryId: quickBitesId, isVeg: true },
                 { name: 'Fried Chicken Loaded Fries', price: 120, categoryId: quickBitesId, isVeg: false },
-
-                // 🌯 SHAWARMA
                 { name: 'Classic Shawarma (Normal)', price: 100, categoryId: shawarmaId, isVeg: false },
                 { name: 'Classic Shawarma (Special)', price: 120, categoryId: shawarmaId, isVeg: false },
                 { name: 'Mexican Shawarma (Normal)', price: 110, categoryId: shawarmaId, isVeg: false },
@@ -390,23 +400,17 @@ async function extractMenuItemsFromImage(
                 { name: 'Fried Chicken Shawarma', price: 140, categoryId: shawarmaId, isVeg: false },
                 { name: 'Plate Shawarma', price: 140, categoryId: shawarmaId, isVeg: false },
                 { name: 'Fried Chicken Plate Shawarma', price: 160, categoryId: shawarmaId, isVeg: false },
-
-                // 🍹 MOJITO
                 { name: 'Blue Curacao Mojito', price: 70, categoryId: mojitoId, isVeg: true },
                 { name: 'Lemon Mint Mojito', price: 70, categoryId: mojitoId, isVeg: true },
                 { name: 'Blueberries Mojito', price: 70, categoryId: mojitoId, isVeg: true },
                 { name: 'Green Apple Mojito', price: 70, categoryId: mojitoId, isVeg: true },
                 { name: 'Watermelon Mojito', price: 70, categoryId: mojitoId, isVeg: true },
-
-                // ➕ ADD ONS
                 { name: 'Water Bottle', price: 20, categoryId: addOnsId, isVeg: true },
                 { name: 'Cheese Slice', price: 20, categoryId: addOnsId, isVeg: true },
                 { name: 'Mayo Eggless', price: 20, categoryId: addOnsId, isVeg: true },
                 { name: 'Tandoori Mayo', price: 20, categoryId: addOnsId, isVeg: true },
                 { name: 'Garlic Mayo', price: 20, categoryId: addOnsId, isVeg: true },
                 { name: 'Khubus', price: 20, categoryId: addOnsId, isVeg: true },
-
-                // 🍱 DFC COMBO
                 { name: 'Combo Pack 1 - Solo Treat', price: 329, categoryId: comboId, isVeg: false },
                 { name: 'Combo Pack 2 - DFC Crunch Box', price: 349, categoryId: comboId, isVeg: false },
                 { name: 'Combo Pack 3 - Double Cruncher', price: 549, categoryId: comboId, isVeg: false },
@@ -452,6 +456,48 @@ async function extractMenuItemsFromImage(
 
         img.src = imageData;
     });
+}
+
+function parseOCRTextToMenuItems(text: string, categories: any[], defaultCatId: string) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const items: Array<{ name: string; price: number; isVeg: boolean; categoryId: string }> = [];
+
+    let currentCategoryId = defaultCatId;
+
+    const findOrCreateCat = (catName: string) => {
+        const match = categories.find((c: any) => c.name.toLowerCase().includes(catName.toLowerCase()));
+        return match ? match.id : defaultCatId;
+    };
+
+    const vegKeywords = ['veg', 'paneer', 'cheese', 'corn', 'mushroom', 'salad', 'french fries', 'mojito', 'curacao', 'lemon', 'bottle', 'khubus'];
+    const nonVegKeywords = ['chicken', 'mutton', 'fish', 'pork', 'beef', 'egg', 'shawarma', 'lollipop', 'wings', 'leg', 'bucket'];
+
+    for (const line of lines) {
+        if (line.length > 2 && line.length < 30 && line === line.toUpperCase() && !/\d/.test(line)) {
+            currentCategoryId = findOrCreateCat(line);
+            continue;
+        }
+
+        const priceMatch = line.match(/(.*?)(?:₹|Rs\.?|INR)?\s*(\d{2,4})\s*(?:\/-)?$/i);
+        if (priceMatch && priceMatch[1].trim().length > 2) {
+            const rawName = priceMatch[1].trim().replace(/^[^a-zA-Z0-9]+/, '').replace(/[^a-zA-Z0-9()\s-]/g, '');
+            const price = parseInt(priceMatch[2], 10);
+
+            if (rawName && price > 0 && price < 5000) {
+                const lowerName = rawName.toLowerCase();
+                const isVeg = vegKeywords.some(kw => lowerName.includes(kw)) && !nonVegKeywords.some(kw => lowerName.includes(kw));
+
+                items.push({
+                    name: rawName,
+                    price,
+                    isVeg,
+                    categoryId: currentCategoryId
+                });
+            }
+        }
+    }
+
+    return items;
 }
 
 export const categoriesAPI = {
