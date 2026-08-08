@@ -717,21 +717,22 @@ export default function MenuPage() {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             onClick={(e) => e.stopPropagation()}
+                            style={{ width: '92%', maxWidth: '780px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
                         >
                             <div className="modal-header">
-                                <h2><FileImage size={20} /> Upload Menu Card</h2>
+                                <h2><FileImage size={20} className="text-primary" /> Upload Menu Card</h2>
                                 <button className="modal-close" onClick={() => setShowMenuCardModal(false)}>
                                     <X size={20} />
                                 </button>
                             </div>
-                            <div className="menu-card-content">
+                            <div className="menu-card-content" style={{ overflowY: 'auto', padding: '20px' }}>
                                 {/* Upload Area */}
                                 <div
-                                    className={`menu-card-upload ${menuCardImage ? 'has-image' : ''}`}
+                                    className={`menu-card-upload-box ${menuCardImage ? 'has-image' : ''}`}
                                     onClick={() => menuCardInputRef.current?.click()}
                                 >
                                     {menuCardImage ? (
-                                        <img src={menuCardImage} alt="Menu Card" className="menu-card-preview" />
+                                        <img src={menuCardImage} alt="Menu Card" className="menu-card-preview-img" />
                                     ) : (
                                         <div className="upload-placeholder">
                                             <Upload size={40} />
@@ -753,58 +754,81 @@ export default function MenuPage() {
                                         className="btn btn-primary extract-btn"
                                         onClick={handleExtractItems}
                                         disabled={extracting}
+                                        style={{ width: '100%', marginTop: '14px', padding: '12px' }}
                                     >
                                         {extracting ? (
-                                            <><Loader size={18} className="spin" /> Extracting...</>
+                                            <><Loader size={18} className="spin" /> Extracting All Menu Items with AI...</>
                                         ) : (
-                                            <><Sparkles size={18} /> Extract Items with AI</>
+                                            <><Sparkles size={18} /> Extract All Menu Items with AI</>
                                         )}
                                     </button>
                                 )}
 
                                 {/* Extracted Items Preview */}
                                 {extractedItems.length > 0 && (
-                                    <div className="extracted-items">
-                                        <h4>Extracted Items ({extractedItems.length})</h4>
+                                    <div className="extracted-items-section">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                Extracted Menu Items ({extractedItems.length})
+                                            </h4>
+                                            <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 500 }}>
+                                                ✨ Review & edit extracted items before importing
+                                            </span>
+                                        </div>
+
+                                        {/* Table Header */}
+                                        <div className="extracted-list-header">
+                                            <span>ITEM NAME</span>
+                                            <span>PRICE (₹)</span>
+                                            <span>CATEGORY</span>
+                                            <span>TYPE</span>
+                                            <span></span>
+                                        </div>
+
                                         <div className="extracted-list">
                                             {extractedItems.map((item, index) => (
-                                                <div key={index} className="extracted-item">
+                                                <div key={index} className="extracted-item-row">
                                                     <input
                                                         type="text"
                                                         value={item.name}
                                                         onChange={(e) => updateExtractedItem(index, 'name', e.target.value)}
                                                         placeholder="Item name"
                                                     />
-                                                    <input
-                                                        type="number"
-                                                        value={item.price}
-                                                        onChange={(e) => updateExtractedItem(index, 'price', e.target.value)}
-                                                        placeholder="Price"
-                                                        className="price-input"
-                                                    />
+                                                    <div className="price-input-wrapper">
+                                                        <span className="currency-symbol">₹</span>
+                                                        <input
+                                                            type="number"
+                                                            value={item.price}
+                                                            onChange={(e) => updateExtractedItem(index, 'price', e.target.value)}
+                                                            placeholder="Price"
+                                                            className="price-input"
+                                                        />
+                                                    </div>
                                                     <select
                                                         value={item.categoryId}
                                                         onChange={(e) => updateExtractedItem(index, 'categoryId', e.target.value)}
                                                     >
                                                         {categories.map((cat) => (
                                                             <option key={cat.id} value={cat.id}>
-                                                                {cat.icon} {cat.name}
+                                                                {cat.name}
                                                             </option>
                                                         ))}
                                                     </select>
                                                     <button
                                                         type="button"
-                                                        className={`veg-toggle ${item.isVeg ? 'veg' : 'non-veg'}`}
+                                                        className={`veg-pill ${item.isVeg ? 'veg' : 'non-veg'}`}
                                                         onClick={() => updateExtractedItem(index, 'isVeg', !item.isVeg)}
+                                                        title="Click to toggle Veg / Non-Veg"
                                                     >
-                                                        {item.isVeg ? '🟢' : '🔴'}
+                                                        {item.isVeg ? '🟢 VEG' : '🔴 NON-VEG'}
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        className="remove-btn"
+                                                        className="extract-remove-btn"
                                                         onClick={() => removeExtractedItem(index)}
+                                                        title="Remove item"
                                                     >
-                                                        <X size={16} />
+                                                        <X size={14} />
                                                     </button>
                                                 </div>
                                             ))}
@@ -817,42 +841,29 @@ export default function MenuPage() {
                                             disabled={importing}
                                             style={{
                                                 width: '100%',
-                                                marginTop: '16px',
+                                                marginTop: '20px',
                                                 padding: '14px 20px',
                                                 fontSize: '16px',
                                                 fontWeight: 'bold',
-                                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                                                 border: 'none',
-                                                borderRadius: '8px',
+                                                borderRadius: '10px',
                                                 color: 'white',
                                                 cursor: importing ? 'wait' : 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: '8px',
+                                                boxShadow: '0 4px 16px rgba(249, 115, 22, 0.35)',
                                             }}
                                         >
                                             {importing ? (
-                                                <><Loader size={20} className="spin" /> Adding to Menu...</>
+                                                <><Loader size={20} className="spin" /> Adding {extractedItems.length} Items to Menu...</>
                                             ) : (
-                                                <><Plus size={20} /> Add All {extractedItems.length} Items to Menu</>
+                                                <><Plus size={20} /> Add All {extractedItems.length} Items to Restaurant Menu</>
                                             )}
                                         </button>
                                     </div>
-                                )}
-                            </div>
-                            <div className="modal-actions">
-                                <button className="btn btn-secondary" onClick={() => {
-                                    setShowMenuCardModal(false);
-                                    setMenuCardImage('');
-                                    setExtractedItems([]);
-                                }}>
-                                    Cancel
-                                </button>
-                                {extractedItems.length > 0 && (
-                                    <button className="btn btn-primary" onClick={handleImportItems} disabled={importing}>
-                                        {importing ? <div className="spinner" /> : `Import ${extractedItems.length} Items`}
-                                    </button>
                                 )}
                             </div>
                         </motion.div>

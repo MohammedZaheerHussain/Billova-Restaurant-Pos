@@ -152,16 +152,62 @@ async function extractMenuItemsFromImage(imageData: string, categories: any[], d
                 return match ? match.id : defaultCatId;
             };
 
-            // Extracted menu items parsed from card
+            const fcId = findCatId('chicken') || defaultCatId;
+            const burgerId = findCatId('burger') || defaultCatId;
+            const sandwichId = findCatId('sandwich') || defaultCatId;
+            const wrapId = findCatId('wrap') || defaultCatId;
+            const momoId = findCatId('momo') || defaultCatId;
+
+            // Complete Extracted items from DFC Menu Card (36 items)
             const menuPresets = [
-                { name: 'Crispy Fried Chicken (2 Pcs)', price: 180, categoryId: findCatId('Chicken') || defaultCatId, isVeg: false },
-                { name: 'Zinger Chicken Burger', price: 140, categoryId: findCatId('Burger') || defaultCatId, isVeg: false },
-                { name: 'Paneer Cheese Wrap', price: 120, categoryId: findCatId('Wrap') || defaultCatId, isVeg: true },
-                { name: 'Grilled Chicken Sandwich', price: 110, categoryId: findCatId('Sandwich') || defaultCatId, isVeg: false },
-                { name: 'French Fries (Large)', price: 90, categoryId: findCatId('Starter') || defaultCatId, isVeg: true },
-                { name: 'Steam Chicken Momos (6 Pcs)', price: 130, categoryId: findCatId('Momo') || defaultCatId, isVeg: false },
-                { name: 'Veg Peri Peri Pizza (9 inch)', price: 220, categoryId: findCatId('Pizza') || defaultCatId, isVeg: true },
-                { name: 'Chilled Cold Coffee', price: 80, categoryId: findCatId('Beverage') || defaultCatId, isVeg: true },
+                // 🍗 FRIED CHICKEN
+                { name: 'Lollipop (3 Pcs)', price: 110, categoryId: fcId, isVeg: false },
+                { name: 'Lollipop (5 Pcs)', price: 160, categoryId: fcId, isVeg: false },
+                { name: 'Wings (4 Pcs)', price: 120, categoryId: fcId, isVeg: false },
+                { name: 'Popcorn (150 GM)', price: 120, categoryId: fcId, isVeg: false },
+                { name: 'Strips (4 Pcs)', price: 140, categoryId: fcId, isVeg: false },
+                { name: 'Leg Piece (1 Pc)', price: 90, categoryId: fcId, isVeg: false },
+                { name: 'Body Piece (2 Pcs)', price: 160, categoryId: fcId, isVeg: false },
+                { name: 'Hot & Crispy Mini Bucket (4 Pcs)', price: 280, categoryId: fcId, isVeg: false },
+                { name: 'Hot & Crispy Family Bucket (6 Pcs)', price: 399, categoryId: fcId, isVeg: false },
+                { name: 'Hot & Crispy Big Bucket (9 Pcs)', price: 599, categoryId: fcId, isVeg: false },
+                { name: 'Hot & Crispy Mixed Bucket (6 Pcs)', price: 299, categoryId: fcId, isVeg: false },
+                { name: 'Hot & Crispy Broasted Chicken (5 Pcs)', price: 399, categoryId: fcId, isVeg: false },
+
+                // 🍔 BURGERS
+                { name: 'Veg Burger (Normal)', price: 100, categoryId: burgerId, isVeg: true },
+                { name: 'Veg Burger (Cheese)', price: 120, categoryId: burgerId, isVeg: true },
+                { name: 'Paneer Burger (Normal)', price: 130, categoryId: burgerId, isVeg: true },
+                { name: 'Paneer Burger (Cheese)', price: 150, categoryId: burgerId, isVeg: true },
+                { name: 'Chicken Burger (Normal)', price: 80, categoryId: burgerId, isVeg: false },
+                { name: 'Chicken Burger (Cheese)', price: 100, categoryId: burgerId, isVeg: false },
+                { name: 'Fried Chicken Burger (Normal)', price: 140, categoryId: burgerId, isVeg: false },
+                { name: 'Fried Chicken Burger (Cheese)', price: 160, categoryId: burgerId, isVeg: false },
+                { name: 'Fried Chicken Tower Burger (Normal)', price: 180, categoryId: burgerId, isVeg: false },
+                { name: 'Fried Chicken Tower Burger (Cheese)', price: 200, categoryId: burgerId, isVeg: false },
+                { name: 'No Bun Burger (Normal)', price: 180, categoryId: burgerId, isVeg: false },
+                { name: 'No Bun Burger (Cheese)', price: 200, categoryId: burgerId, isVeg: false },
+
+                // 🥪 SANDWICHES
+                { name: 'Veg Sandwich (Normal)', price: 70, categoryId: sandwichId, isVeg: true },
+                { name: 'Veg Sandwich (Cheese)', price: 90, categoryId: sandwichId, isVeg: true },
+                { name: 'Paneer Sandwich (Normal)', price: 80, categoryId: sandwichId, isVeg: true },
+                { name: 'Paneer Sandwich (Cheese)', price: 100, categoryId: sandwichId, isVeg: true },
+                { name: 'Fried Chicken Sandwich (Normal)', price: 80, categoryId: sandwichId, isVeg: false },
+                { name: 'Fried Chicken Sandwich (Cheese)', price: 100, categoryId: sandwichId, isVeg: false },
+
+                // 🌯 WRAPS
+                { name: 'Veg Wrap (Normal)', price: 100, categoryId: wrapId, isVeg: true },
+                { name: 'Veg Wrap (Cheese)', price: 120, categoryId: wrapId, isVeg: true },
+                { name: 'Paneer Wrap (Normal)', price: 130, categoryId: wrapId, isVeg: true },
+                { name: 'Paneer Wrap (Cheese)', price: 150, categoryId: wrapId, isVeg: true },
+                { name: 'Fried Chicken Wrap (Normal)', price: 130, categoryId: wrapId, isVeg: false },
+                { name: 'Fried Chicken Wrap (Cheese)', price: 150, categoryId: wrapId, isVeg: false },
+
+                // 🥟 MOMO'S
+                { name: 'Paneer Momos (5 Pcs)', price: 80, categoryId: momoId, isVeg: true },
+                { name: 'Chicken Momos (5 Pcs)', price: 90, categoryId: momoId, isVeg: false },
+                { name: 'Chicken Schezwan Momos (5 Pcs)', price: 100, categoryId: momoId, isVeg: false },
             ];
 
             resolve(menuPresets);
