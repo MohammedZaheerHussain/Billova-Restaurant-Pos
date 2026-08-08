@@ -60,6 +60,7 @@ export default function MenuPage() {
     // Menu Card Upload
     const [showMenuCardModal, setShowMenuCardModal] = useState(false);
     const [menuCardImage, setMenuCardImage] = useState<string>('');
+    const [menuCardSide, setMenuCardSide] = useState<'auto' | 'page1' | 'page2'>('auto');
     const [extractedItems, setExtractedItems] = useState<Array<{ name: string; price: string; isVeg: boolean; categoryId: string }>>([]);
     const [extracting, setExtracting] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -299,8 +300,8 @@ export default function MenuPage() {
         setExtracting(true);
 
         try {
-            // Call backend API to extract items from menu card
-            const response = await menuAPI.extractMenuCard(menuCardImage);
+            // Call backend API to extract items from menu card with pageSide
+            const response = await menuAPI.extractMenuCard(menuCardImage, menuCardSide);
             const { items, message } = response.data;
 
             setExtractedItems(items);
@@ -924,18 +925,46 @@ export default function MenuPage() {
                                 />
 
                                 {menuCardImage && !extractedItems.length && (
-                                    <button
-                                        className="btn btn-primary extract-btn"
-                                        onClick={handleExtractItems}
-                                        disabled={extracting}
-                                        style={{ width: '100%', marginTop: '14px', padding: '12px' }}
-                                    >
-                                        {extracting ? (
-                                            <><Loader size={18} className="spin" /> Extracting All Menu Items with AI...</>
-                                        ) : (
-                                            <><Sparkles size={18} /> Extract All Menu Items with AI</>
-                                        )}
-                                    </button>
+                                     <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                         <div style={{ display: 'flex', gap: '8px' }}>
+                                             <button
+                                                 type="button"
+                                                 className={`btn ${menuCardSide === 'auto' ? 'btn-primary' : 'btn-secondary'}`}
+                                                 onClick={() => setMenuCardSide('auto')}
+                                                 style={{ flex: 1, fontSize: '12px', padding: '8px' }}
+                                             >
+                                                 ✨ Auto Detect
+                                             </button>
+                                             <button
+                                                 type="button"
+                                                 className={`btn ${menuCardSide === 'page1' ? 'btn-primary' : 'btn-secondary'}`}
+                                                 onClick={() => setMenuCardSide('page1')}
+                                                 style={{ flex: 1, fontSize: '12px', padding: '8px' }}
+                                             >
+                                                 📄 Front Side (Page 1)
+                                             </button>
+                                             <button
+                                                 type="button"
+                                                 className={`btn ${menuCardSide === 'page2' ? 'btn-primary' : 'btn-secondary'}`}
+                                                 onClick={() => setMenuCardSide('page2')}
+                                                 style={{ flex: 1, fontSize: '12px', padding: '8px' }}
+                                             >
+                                                 📄 Back Side (Page 2)
+                                             </button>
+                                         </div>
+                                         <button
+                                             className="btn btn-primary extract-btn"
+                                             onClick={handleExtractItems}
+                                             disabled={extracting}
+                                             style={{ width: '100%', padding: '12px' }}
+                                         >
+                                             {extracting ? (
+                                                 <><Loader size={18} className="spin" /> Extracting All Menu Items with AI...</>
+                                             ) : (
+                                                 <><Sparkles size={18} /> Extract All Menu Items with AI ({menuCardSide === 'page2' ? 'Back Side' : menuCardSide === 'page1' ? 'Front Side' : 'Auto Detect'})</>
+                                             )}
+                                         </button>
+                                     </div>
                                 )}
 
                                 {/* Extracted Items Preview */}

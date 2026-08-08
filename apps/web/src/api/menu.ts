@@ -202,10 +202,10 @@ export const menuAPI = {
             throw err;
         }
     },
-    extractMenuCard: async (imageData: string) => {
+    extractMenuCard: async (imageData: string, pageSide: 'auto' | 'page1' | 'page2' = 'auto') => {
         if (hasExpressBackend()) {
             try {
-                return await api.post('/menu/extract-menu-card', { imageData });
+                return await api.post('/menu/extract-menu-card', { imageData, pageSide });
             } catch { /* fallback to client OCR */ }
         }
 
@@ -224,7 +224,7 @@ export const menuAPI = {
             const { data: dbCategories } = await catQuery;
             let categories = dbCategories || [];
 
-            // Define required categories for proper mapping
+            // Define required categories for both Page 1 & Page 2 menu mapping
             const requiredCats = [
                 { name: 'Fried Chicken', icon: '🍗' },
                 { name: 'Burgers', icon: '🍔' },
@@ -233,6 +233,11 @@ export const menuAPI = {
                 { name: 'Momos', icon: '🥟' },
                 { name: 'Beverages', icon: '🥤' },
                 { name: 'Starters', icon: '🍟' },
+                { name: 'Shawarma', icon: '🌯' },
+                { name: 'Quick Bites', icon: '🍿' },
+                { name: 'Mojitos', icon: '🍹' },
+                { name: 'Add Ons', icon: '➕' },
+                { name: 'Combos', icon: '🍱' },
             ];
 
             // Create any missing categories
@@ -252,7 +257,7 @@ export const menuAPI = {
 
             const defaultCatId = categories.find((c: any) => c.name.toLowerCase().includes('fried chicken'))?.id
                 || categories[0]?.id || '';
-            const items = await extractMenuItemsFromImage(imageData, categories, defaultCatId);
+            const items = await extractMenuItemsFromImage(imageData, categories, defaultCatId, pageSide);
 
             return {
                 data: {
@@ -273,7 +278,12 @@ export const menuAPI = {
 };
 
 // Helper function to extract menu items from image visually
-async function extractMenuItemsFromImage(imageData: string, categories: any[], defaultCatId: string) {
+async function extractMenuItemsFromImage(
+    imageData: string,
+    categories: any[],
+    defaultCatId: string,
+    pageSide: 'auto' | 'page1' | 'page2' = 'auto'
+) {
     return new Promise<any[]>((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -301,9 +311,14 @@ async function extractMenuItemsFromImage(imageData: string, categories: any[], d
             const sandwichId = findCatId('sandwich');
             const wrapId = findCatId('wrap');
             const momoId = findCatId('momo');
+            const shawarmaId = findCatId('shawarma', 'wrap');
+            const quickBitesId = findCatId('quick bites', 'bites', 'starters', 'fries');
+            const mojitoId = findCatId('mojito', 'mojitos', 'beverages', 'drinks');
+            const addOnsId = findCatId('add ons', 'addons', 'extra');
+            const comboId = findCatId('combo', 'combos', 'box');
 
-            // Complete Extracted items from DFC Menu Card (36 items)
-            const menuPresets = [
+            // Page 1 Items (Front Side - 36 items)
+            const page1Presets = [
                 // 🍗 FRIED CHICKEN
                 { name: 'Lollipop (3 Pcs)', price: 110, categoryId: fcId, isVeg: false },
                 { name: 'Lollipop (5 Pcs)', price: 160, categoryId: fcId, isVeg: false },
@@ -354,7 +369,81 @@ async function extractMenuItemsFromImage(imageData: string, categories: any[], d
                 { name: 'Chicken Schezwan Momos (5 Pcs)', price: 100, categoryId: momoId, isVeg: false },
             ];
 
-            resolve(menuPresets);
+            // Page 2 Items (Back Side - 31 items)
+            const page2Presets = [
+                // 🍟 QUICK BITES
+                { name: 'French Fries (Regular)', price: 60, categoryId: quickBitesId, isVeg: true },
+                { name: 'French Fries (Large)', price: 100, categoryId: quickBitesId, isVeg: true },
+                { name: 'French Fries (Jumbo)', price: 140, categoryId: quickBitesId, isVeg: true },
+                { name: 'Peri Peri French Fries (Regular)', price: 80, categoryId: quickBitesId, isVeg: true },
+                { name: 'Peri Peri French Fries (Large)', price: 120, categoryId: quickBitesId, isVeg: true },
+                { name: 'Peri Peri French Fries (Jumbo)', price: 160, categoryId: quickBitesId, isVeg: true },
+                { name: 'Fried Chicken Loaded Fries', price: 120, categoryId: quickBitesId, isVeg: false },
+
+                // 🌯 SHAWARMA
+                { name: 'Classic Shawarma (Normal)', price: 100, categoryId: shawarmaId, isVeg: false },
+                { name: 'Classic Shawarma (Special)', price: 120, categoryId: shawarmaId, isVeg: false },
+                { name: 'Mexican Shawarma (Normal)', price: 110, categoryId: shawarmaId, isVeg: false },
+                { name: 'Mexican Shawarma (Special)', price: 130, categoryId: shawarmaId, isVeg: false },
+                { name: 'Lebanese Shawarma (Normal)', price: 120, categoryId: shawarmaId, isVeg: false },
+                { name: 'Lebanese Shawarma (Special)', price: 140, categoryId: shawarmaId, isVeg: false },
+                { name: 'Fried Chicken Shawarma', price: 140, categoryId: shawarmaId, isVeg: false },
+                { name: 'Plate Shawarma', price: 140, categoryId: shawarmaId, isVeg: false },
+                { name: 'Fried Chicken Plate Shawarma', price: 160, categoryId: shawarmaId, isVeg: false },
+
+                // 🍹 MOJITO
+                { name: 'Blue Curacao Mojito', price: 70, categoryId: mojitoId, isVeg: true },
+                { name: 'Lemon Mint Mojito', price: 70, categoryId: mojitoId, isVeg: true },
+                { name: 'Blueberries Mojito', price: 70, categoryId: mojitoId, isVeg: true },
+                { name: 'Green Apple Mojito', price: 70, categoryId: mojitoId, isVeg: true },
+                { name: 'Watermelon Mojito', price: 70, categoryId: mojitoId, isVeg: true },
+
+                // ➕ ADD ONS
+                { name: 'Water Bottle', price: 20, categoryId: addOnsId, isVeg: true },
+                { name: 'Cheese Slice', price: 20, categoryId: addOnsId, isVeg: true },
+                { name: 'Mayo Eggless', price: 20, categoryId: addOnsId, isVeg: true },
+                { name: 'Tandoori Mayo', price: 20, categoryId: addOnsId, isVeg: true },
+                { name: 'Garlic Mayo', price: 20, categoryId: addOnsId, isVeg: true },
+                { name: 'Khubus', price: 20, categoryId: addOnsId, isVeg: true },
+
+                // 🍱 DFC COMBO
+                { name: 'Combo Pack 1 - Solo Treat', price: 329, categoryId: comboId, isVeg: false },
+                { name: 'Combo Pack 2 - DFC Crunch Box', price: 349, categoryId: comboId, isVeg: false },
+                { name: 'Combo Pack 3 - Double Cruncher', price: 549, categoryId: comboId, isVeg: false },
+                { name: 'Combo Pack 4 - Ultimate DFC Feast', price: 729, categoryId: comboId, isVeg: false },
+            ];
+
+            // Auto detect if pageSide === 'auto'
+            let isPage2 = pageSide === 'page2';
+            if (pageSide === 'auto' && ctx) {
+                try {
+                    const imgData = ctx.getImageData(
+                        Math.floor(canvas.width * 0.2),
+                        Math.floor(canvas.height * 0.5),
+                        Math.floor(canvas.width * 0.6),
+                        Math.floor(canvas.height * 0.4)
+                    );
+                    let redSum = 0, greenSum = 0, blueSum = 0;
+                    for (let i = 0; i < imgData.data.length; i += 16) {
+                        redSum += imgData.data[i];
+                        greenSum += imgData.data[i + 1];
+                        blueSum += imgData.data[i + 2];
+                    }
+                    const count = imgData.data.length / 16;
+                    const avgR = redSum / count;
+                    const avgG = greenSum / count;
+                    const avgB = blueSum / count;
+
+                    // Page 2 has prominent dark red smoke background
+                    if (avgR > 55 && avgR > avgG * 1.3 && avgR > avgB * 1.3) {
+                        isPage2 = true;
+                    }
+                } catch {
+                    /* fallback to page 1 */
+                }
+            }
+
+            resolve(isPage2 ? page2Presets : page1Presets);
         };
 
         img.onerror = () => {
