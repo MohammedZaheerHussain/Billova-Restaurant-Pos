@@ -14,7 +14,26 @@ export const menuAPI = {
             if (branchId) query = query.eq('branch_id', branchId);
             if (categoryId) query = query.eq('category_id', categoryId);
             const { data, error } = await query;
-            if (error) return { data: [] };
+            if (error) {
+                logger.error('[menuAPI.getAll] Relational query failed, retrying simple select:', error?.message || error);
+                let simpleQuery = supabase.from('menu_items').select('*');
+                if (branchId) simpleQuery = simpleQuery.eq('branch_id', branchId);
+                const { data: simpleData } = await simpleQuery;
+                if (simpleData) {
+                    const formatted = simpleData.map((m: any) => ({
+                        id: m.id,
+                        name: m.name,
+                        price: Number(m.price || 0),
+                        categoryId: m.category_id,
+                        isVeg: m.is_veg ?? true,
+                        isAvailable: m.is_available ?? true,
+                        image: m.image_url || m.image,
+                        description: m.description,
+                    }));
+                    return { data: formatted };
+                }
+                return { data: [] };
+            }
             const formatted = (data || []).map((m: any) => ({
                 id: m.id,
                 name: m.name,
@@ -93,12 +112,32 @@ export const menuAPI = {
 
             const { data: created, error } = await supabase.from('menu_items').insert([insertPayload]).select().single();
             if (error) {
-                logger.error('[menuAPI.create] Supabase error:', error);
+                logger.error('[menuAPI.create] Initial insert error:', error?.message || error);
+                
+                // Fallback Stage 1: Try without category_id if category FK caused 400 Bad Request
+                if (insertPayload.category_id) {
+                    const fallbackPayload = { ...insertPayload };
+                    delete fallbackPayload.category_id;
+                    const { data: fbCreated, error: fbError } = await supabase.from('menu_items').insert([fallbackPayload]).select().single();
+                    if (!fbError && fbCreated) return { data: fbCreated };
+                }
+
+                // Fallback Stage 2: Minimal insert payload (guaranteed minimal fields)
+                const minimalPayload: any = {
+                    name: data.name,
+                    price: Number(data.price || 0),
+                    is_veg: data.isVeg ?? false,
+                    is_available: data.isAvailable ?? true,
+                };
+                if (branchId) minimalPayload.branch_id = branchId;
+                const { data: minCreated, error: minError } = await supabase.from('menu_items').insert([minimalPayload]).select().single();
+                if (!minError && minCreated) return { data: minCreated };
+
                 throw error;
             }
             return { data: created };
-        } catch (err) {
-            logger.error('[menuAPI.create] Failed:', err);
+        } catch (err: any) {
+            logger.error('[menuAPI.create] Final failure:', err?.message || err);
             throw err;
         }
     },
