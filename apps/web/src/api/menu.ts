@@ -146,10 +146,36 @@ export const menuAPI = {
             try { return await api.put(`/menu/${id}`, data); } catch { /* fallback */ }
         }
         try {
-            const { data: updated } = await supabase.from('menu_items').update(data).eq('id', id).select().single();
+            // Map camelCase DTO fields to snake_case Supabase columns
+            const updatePayload: Record<string, any> = {};
+            if (data.name !== undefined) updatePayload.name = data.name;
+            if (data.price !== undefined) updatePayload.price = Number(data.price);
+            if (data.categoryId !== undefined) updatePayload.category_id = data.categoryId;
+            if (data.isVeg !== undefined) updatePayload.is_veg = data.isVeg;
+            if (data.isAvailable !== undefined) updatePayload.is_available = data.isAvailable;
+            if (data.description !== undefined) updatePayload.description = data.description || null;
+            if (data.image !== undefined) updatePayload.image = data.image || null;
+            if (data.hasGST !== undefined) updatePayload.has_gst = data.hasGST;
+            if (data.gstPercent !== undefined) updatePayload.gst_percent = Number(data.gstPercent);
+
+            logger.info('[menuAPI.update] Updating item', id, 'with payload:', updatePayload);
+
+            const { data: updated, error } = await supabase
+                .from('menu_items')
+                .update(updatePayload)
+                .eq('id', id)
+                .select('*, category:categories(*)')
+                .single();
+
+            if (error) {
+                logger.error('[menuAPI.update] Supabase error:', error);
+                throw error;
+            }
+
             return { data: updated };
-        } catch {
-            return { data: { id, ...data } };
+        } catch (err) {
+            logger.error('[menuAPI.update] Failed:', err);
+            throw err;
         }
     },
     toggleAvailability: async (id: string) => {
@@ -198,20 +224,34 @@ export const menuAPI = {
             const { data: dbCategories } = await catQuery;
             let categories = dbCategories || [];
 
-            if (categories.length === 0) {
-                // Seed standard categories for this branch if empty
-                const initialCats = [
-                    { name: 'Fried Chicken', icon: '🍗', branch_id: branchId },
-                    { name: 'Burgers & Wraps', icon: '🍔', branch_id: branchId },
-                    { name: 'Pizza & Pasta', icon: '🍕', branch_id: branchId },
-                    { name: 'Beverages', icon: '🥤', branch_id: branchId },
-                    { name: 'Starters & Snacks', icon: '🍟', branch_id: branchId },
-                ];
-                const { data: createdCats } = await supabase.from('categories').insert(initialCats).select();
-                if (createdCats) categories = createdCats;
+            // Define required categories for proper mapping
+            const requiredCats = [
+                { name: 'Fried Chicken', icon: '🍗' },
+                { name: 'Burgers', icon: '🍔' },
+                { name: 'Sandwiches', icon: '🥪' },
+                { name: 'Wraps', icon: '🌯' },
+                { name: 'Momos', icon: '🥟' },
+                { name: 'Beverages', icon: '🥤' },
+                { name: 'Starters', icon: '🍟' },
+            ];
+
+            // Create any missing categories
+            for (const req of requiredCats) {
+                const exists = categories.some((c: any) =>
+                    c.name.trim().toLowerCase() === req.name.toLowerCase()
+                );
+                if (!exists) {
+                    const { data: created } = await supabase
+                        .from('categories')
+                        .insert([{ name: req.name, icon: req.icon, branch_id: branchId }])
+                        .select()
+                        .single();
+                    if (created) categories.push(created);
+                }
             }
 
-            const defaultCatId = categories[0]?.id || '';
+            const defaultCatId = categories.find((c: any) => c.name.toLowerCase().includes('fried chicken'))?.id
+                || categories[0]?.id || '';
             const items = await extractMenuItemsFromImage(imageData, categories, defaultCatId);
 
             return {
@@ -245,16 +285,22 @@ async function extractMenuItemsFromImage(imageData: string, categories: any[], d
                 ctx.drawImage(img, 0, 0);
             }
 
-            const findCatId = (nameQuery: string) => {
-                const match = categories.find((c: any) => c.name.toLowerCase().includes(nameQuery.toLowerCase()));
-                return match ? match.id : defaultCatId;
+            // Smart category matching - check multiple keywords
+            const findCatId = (...keywords: string[]) => {
+                for (const kw of keywords) {
+                    const match = categories.find((c: any) =>
+                        c.name.toLowerCase().includes(kw.toLowerCase())
+                    );
+                    if (match) return match.id;
+                }
+                return defaultCatId;
             };
 
-            const fcId = findCatId('chicken') || defaultCatId;
-            const burgerId = findCatId('burger') || defaultCatId;
-            const sandwichId = findCatId('sandwich') || defaultCatId;
-            const wrapId = findCatId('wrap') || defaultCatId;
-            const momoId = findCatId('momo') || defaultCatId;
+            const fcId = findCatId('fried chicken', 'chicken');
+            const burgerId = findCatId('burger');
+            const sandwichId = findCatId('sandwich');
+            const wrapId = findCatId('wrap');
+            const momoId = findCatId('momo');
 
             // Complete Extracted items from DFC Menu Card (36 items)
             const menuPresets = [
