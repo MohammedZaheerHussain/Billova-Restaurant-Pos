@@ -276,25 +276,29 @@ export default function MenuPage() {
         setImporting(true);
         let successCount = 0;
         let failCount = 0;
+        const currentBranchId = user?.branch?.id;
+
         try {
             for (const item of extractedItems) {
                 try {
+                    const priceVal = typeof item.price === 'number' ? item.price : parseFloat(String(item.price)) || 0;
                     await menuAPI.create({
                         name: item.name,
-                        price: parseFloat(item.price),
-                        categoryId: item.categoryId,
-                        branchId: user?.branch?.id,
-                        isVeg: item.isVeg,
+                        price: priceVal,
+                        categoryId: (item.categoryId && item.categoryId.trim() !== '') ? item.categoryId : undefined,
+                        branchId: currentBranchId,
+                        isVeg: Boolean(item.isVeg),
                         hasGST: true,
                         gstPercent: 5,
                     });
                     successCount++;
-                } catch {
+                } catch (err) {
+                    console.error('Failed to import menu item:', item.name, err);
                     failCount++;
                 }
             }
-            if (successCount > 0) toast.success(`${successCount} items saved to menu!`);
-            if (failCount > 0) toast.error(`${failCount} items failed to save`);
+            if (successCount > 0) toast.success(`🎉 Successfully saved ${successCount} items to your menu!`);
+            if (failCount > 0) toast.error(`⚠️ ${failCount} items failed to save.`);
             setShowMenuCardModal(false);
             setMenuCardImage('');
             setExtractedItems([]);

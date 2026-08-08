@@ -47,18 +47,51 @@ export const menuAPI = {
             try { return await api.post('/menu', data); } catch { /* fallback */ }
         }
         try {
-            const { data: created, error } = await supabase.from('menu_items').insert([{
+            // Resolve branch_id from profile if not provided
+            let branchId = (data.branchId && data.branchId.trim() !== '') ? data.branchId : null;
+            if (!branchId) {
+                const userRes = await supabase.auth.getUser();
+                if (userRes.data?.user?.id) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('branch_id')
+                        .eq('id', userRes.data.user.id)
+                        .maybeSingle();
+                    if (profile?.branch_id) {
+                        branchId = profile.branch_id;
+                    }
+                }
+            }
+
+            // Sanitize category_id (must be a valid non-empty UUID string or omitted)
+            let categoryId = (data.categoryId && data.categoryId.trim() !== '') ? data.categoryId : null;
+
+            // If categoryId is missing, attempt to find or create a default category for the branch
+            if (!categoryId && branchId) {
+                const { data: cats } = await supabase.from('categories').select('id').eq('branch_id', branchId).limit(1);
+                if (cats && cats.length > 0) {
+                    categoryId = cats[0].id;
+                } else {
+                    const { data: newCat } = await supabase.from('categories').insert([{ name: 'General', icon: '🍽️', branch_id: branchId }]).select('id').single();
+                    if (newCat) categoryId = newCat.id;
+                }
+            }
+
+            const insertPayload: any = {
                 name: data.name,
-                price: data.price,
-                category_id: data.categoryId,
-                branch_id: data.branchId || null,
+                price: Number(data.price || 0),
                 is_veg: data.isVeg ?? false,
                 is_available: data.isAvailable ?? true,
-                description: data.description,
+                description: data.description || null,
                 has_gst: data.hasGST ?? true,
-                gst_percent: data.gstPercent ?? 5,
+                gst_percent: Number(data.gstPercent || 5),
                 image: data.image || null,
-            }]).select().single();
+            };
+
+            if (branchId) insertPayload.branch_id = branchId;
+            if (categoryId) insertPayload.category_id = categoryId;
+
+            const { data: created, error } = await supabase.from('menu_items').insert([insertPayload]).select().single();
             if (error) {
                 logger.error('[menuAPI.create] Supabase error:', error);
                 throw error;
@@ -112,18 +145,28 @@ export const menuAPI = {
         }
 
         try {
-            // Fetch existing categories from Supabase to map category IDs
-            const { data: dbCategories } = await supabase.from('categories').select('*');
+            // Resolve current branch_id from user profile
+            let branchId: string | null = null;
+            const userRes = await supabase.auth.getUser();
+            if (userRes.data?.user?.id) {
+                const { data: profile } = await supabase.from('profiles').select('branch_id').eq('id', userRes.data.user.id).maybeSingle();
+                if (profile?.branch_id) branchId = profile.branch_id;
+            }
+
+            // Fetch existing categories from Supabase
+            let catQuery = supabase.from('categories').select('*');
+            if (branchId) catQuery = catQuery.eq('branch_id', branchId);
+            const { data: dbCategories } = await catQuery;
             let categories = dbCategories || [];
 
             if (categories.length === 0) {
-                // Seed standard categories if database is empty
+                // Seed standard categories for this branch if empty
                 const initialCats = [
-                    { name: 'Fried Chicken', icon: '🍗' },
-                    { name: 'Burgers & Wraps', icon: '🍔' },
-                    { name: 'Pizza & Pasta', icon: '🍕' },
-                    { name: 'Beverages', icon: '🥤' },
-                    { name: 'Starters & Snacks', icon: '🍟' },
+                    { name: 'Fried Chicken', icon: '🍗', branch_id: branchId },
+                    { name: 'Burgers & Wraps', icon: '🍔', branch_id: branchId },
+                    { name: 'Pizza & Pasta', icon: '🍕', branch_id: branchId },
+                    { name: 'Beverages', icon: '🥤', branch_id: branchId },
+                    { name: 'Starters & Snacks', icon: '🍟', branch_id: branchId },
                 ];
                 const { data: createdCats } = await supabase.from('categories').insert(initialCats).select();
                 if (createdCats) categories = createdCats;
@@ -263,11 +306,22 @@ export const categoriesAPI = {
             try { return await api.post('/categories', data); } catch { /* fallback */ }
         }
         try {
-            const { data: cat, error } = await supabase.from('categories').insert([{
+            let branchId = (data.branchId && data.branchId.trim() !== '') ? data.branchId : null;
+            if (!branchId) {
+                const userRes = await supabase.auth.getUser();
+                if (userRes.data?.user?.id) {
+                    const { data: profile } = await supabase.from('profiles').select('branch_id').eq('id', userRes.data.user.id).maybeSingle();
+                    if (profile?.branch_id) branchId = profile.branch_id;
+                }
+            }
+
+            const insertPayload: any = {
                 name: data.name,
                 icon: data.icon || '🍽️',
-                branch_id: data.branchId || null,
-            }]).select().single();
+            };
+            if (branchId) insertPayload.branch_id = branchId;
+
+            const { data: cat, error } = await supabase.from('categories').insert([insertPayload]).select().single();
             if (error) {
                 logger.error('[categoriesAPI.create] Supabase error:', error);
                 throw error;

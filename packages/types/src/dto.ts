@@ -58,7 +58,7 @@ export interface AddPaymentDTO {
 export interface CreateMenuItemDTO {
     name: string;
     price: number;
-    categoryId: string;
+    categoryId?: string;
     branchId?: string;
     description?: string;
     isVeg?: boolean;
