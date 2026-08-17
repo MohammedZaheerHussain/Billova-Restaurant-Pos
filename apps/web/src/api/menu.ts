@@ -104,9 +104,10 @@ export const menuAPI = {
                 description: data.description || null,
                 has_gst: data.hasGST ?? true,
                 gst_percent: Number(data.gstPercent || 5),
-                image: data.image || null,
             };
 
+            // Schema uses image_url, not image
+            if (data.image) insertPayload.image_url = data.image;
             if (branchId) insertPayload.branch_id = branchId;
             if (categoryId) insertPayload.category_id = categoryId;
 
@@ -154,7 +155,7 @@ export const menuAPI = {
             if (data.isVeg !== undefined) updatePayload.is_veg = data.isVeg;
             if (data.isAvailable !== undefined) updatePayload.is_available = data.isAvailable;
             if (data.description !== undefined) updatePayload.description = data.description || null;
-            if (data.image !== undefined) updatePayload.image = data.image || null;
+            if (data.image !== undefined) updatePayload.image_url = data.image || null;
             if (data.hasGST !== undefined) updatePayload.has_gst = data.hasGST;
             if (data.gstPercent !== undefined) updatePayload.gst_percent = Number(data.gstPercent);
 
@@ -188,11 +189,13 @@ export const menuAPI = {
             const { data: updated } = await supabase.from('menu_items').update({ is_available: newStatus }).eq('id', id).select().single();
             return { data: updated };
         } catch {
-            return { data: { id, is_available: true } };
+            return { data: null };
         }
     },
     delete: async (id: string) => {
-        if (hasExpressBackend()) return api.delete(`/menu/${id}`).catch(() => ({ data: { success: true } }));
+        if (hasExpressBackend()) {
+            try { return await api.delete(`/menu/${id}`); } catch { /* fallback */ }
+        }
         try {
             const { error } = await supabase.from('menu_items').delete().eq('id', id);
             if (error) throw error;
@@ -202,34 +205,26 @@ export const menuAPI = {
             throw err;
         }
     },
-    extractMenuCard: async (imageData: string) => {
-        if (hasExpressBackend()) {
-            try {
-                return await api.post('/menu/extract-menu-card', { imageData });
-            } catch { /* fallback to client extraction */ }
-        }
-
+    extractMenuCard: async (imageData: string, branchId?: string | null) => {
         try {
-            // 1. Resolve current branch_id from user profile
-            let branchId: string | null = null;
-            const userRes = await supabase.auth.getUser();
-            if (userRes.data?.user?.id) {
-                const { data: profile } = await supabase.from('profiles').select('branch_id').eq('id', userRes.data.user.id).maybeSingle();
-                if (profile?.branch_id) branchId = profile.branch_id;
-            }
+            logger.info('[extractMenuCard] Starting AI Vision menu extraction...');
 
-            // 2. Fetch existing categories
-            let catQuery = supabase.from('categories').select('*');
-            if (branchId) catQuery = catQuery.eq('branch_id', branchId);
-            const { data: dbCategories } = await catQuery;
+            // 1. Fetch existing categories
+            let dbCategories: any[] = [];
+            try {
+                const catRes = await categoriesAPI.getAll(branchId || undefined);
+                dbCategories = catRes.data || [];
+            } catch (catErr) {
+                logger.warn('[extractMenuCard] Could not fetch categories from DB:', catErr);
+            }
             let categories = dbCategories || [];
 
-            // 3. Try Groq AI Vision extraction first
+            // 2. Try Groq AI Vision extraction
             const groqKey = import.meta.env.VITE_GROQ_API_KEY;
             if (groqKey) {
                 try {
                     logger.info('[extractMenuCard] Using Groq AI Vision for extraction...');
-                    const items = await extractWithGroqVision(imageData, groqKey, categories, branchId);
+                    const items = await extractWithGroqVision(imageData, groqKey, categories, branchId || null);
                     if (items.length >= 1) {
                         // Refresh categories (Groq may have created new ones)
                         const { data: refreshedCats } = await supabase.from('categories').select('*').eq('branch_id', branchId || '');
@@ -252,11 +247,11 @@ export const menuAPI = {
                 }
             }
 
-            // 4. Fallback: return empty with message
+            // 3. Fallback: return empty with message
             return {
                 data: {
                     items: [],
-                    message: 'AI extraction requires a valid Groq API key.'
+                    message: 'AI extraction requires a valid Groq API key in Vercel environment variables.'
                 }
             };
         } catch (err: any) {
@@ -272,9 +267,9 @@ export const menuAPI = {
 };
 
 /**
- * Downscale and compress image to fit under Groq Vision API token limits (8000 TPM)
+ * Downscale and compress image to optimal resolution for Groq Vision (1080px max dimension, quality 0.85)
  */
-async function compressImageForGroq(imageData: string, maxDimension = 720, quality = 0.75): Promise<string> {
+async function compressImageForGroq(imageData: string, maxDimension = 1080, quality = 0.85): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -319,38 +314,52 @@ async function extractWithGroqVision(
 ): Promise<any[]> {
 
     try {
-        // Downscale image to max 720px and compress to JPEG to fit under Groq 8000 TPM limit
-        const compressedImage = await compressImageForGroq(imageData, 720, 0.75);
+        // Downscale image to max 1080px and compress to JPEG for sharp text under Groq 8000 TPM limit
+        const compressedImage = await compressImageForGroq(imageData, 1080, 0.85);
         const imageUrl = compressedImage.startsWith('data:') ? compressedImage : `data:image/jpeg;base64,${compressedImage}`;
 
-        logger.info('[extractWithGroqVision] Sending compressed image to Groq AI Vision...');
+        logger.info('[extractWithGroqVision] Sending high-resolution image to Groq AI Vision...');
 
         // Call Groq AI Vision
         const existingCatNames = existingCategories.map((c: any) => c.name).join(', ');
 
-        const prompt = `You are a restaurant menu OCR extraction AI. Analyze this restaurant menu card image and extract ALL menu items visible in the image.
+        const prompt = `You are a high-precision restaurant menu OCR extraction AI.
+Carefully inspect this restaurant menu card image from top to bottom, left to right, and extract EVERY single menu item with EXACT names and EXACT prices.
 
-Return ONLY a valid JSON object (no markdown, no code blocks, no explanation, JUST the JSON):
+CRITICAL EXTRACTION RULES:
+1. MULTI-PRICE / SIZE / VARIANT ITEMS:
+   If an item has multiple sizes or price tiers (e.g. Normal/Special, 150G/250G, Small/Medium/Large, Half/Full), create a SEPARATE entry for EACH variant:
+   - Example: "French Fries (150G)" with price 69, and "French Fries (250G)" with price 130
+   - Example: "Peri Peri French Fries (150G)" with price 79, and "Peri Peri French Fries (250G)" with price 140
+   - Example: "Classic Shawarma (Normal)" with price 90, and "Classic Shawarma (Special)" with price 120
+   - Example: "Mexican Shawarma (Normal)" with price 100, and "Mexican Shawarma (Special)" with price 130
+   - Example: "Labonese Shawarma (Normal)" with price 110, and "Labonese Shawarma (Special)" with price 140
+2. EXACT PRICES: Read every single number carefully. Do NOT approximate or round prices. Look at the exact printed price (e.g., 79 is 79 not 76, 179 is 179 not 176, 259 is 259, 349 is 349, 649 is 649, 729 is 729). Strip currency symbols ('₹', '/-').
+3. ALL SECTIONS & HEADERS: Scan every section thoroughly:
+   - Quick Bites, Fries, Loaded Fries
+   - Shawarma, Rolls, Wraps, Plate Shawarma
+   - Mojitos, Beverages, Coolers, Water
+   - Add Ons, Dips, Sauces, Bread, Kubus
+   - Combos, Family Packs, Meals, Treats
+   - Desserts, Ice Creams, Shakes
+   - Burgers, Fried Chicken, Momos, Sandwiches
+4. VEG / NON-VEG:
+   - Set isVeg to true for vegetarian items, drinks, mojitos, shakes, fries, dips, and desserts.
+   - Set isVeg to false for chicken, meat, shawarma, seafood, and bacon items.
+5. CATEGORIES:
+   - Group items into clear categories based on section headers (e.g., "Quick Bites", "Shawarma", "Mojito", "Add Ons", "DFC Combo").
+   - Use matching food emojis (🍟, 🌯, 🍹, 🧀, 🍱, 🍗, 🍔, 🥤, 🍰, 🥟).
+   ${existingCatNames ? `Existing categories: ${existingCatNames}. Reuse them when matching.` : ''}
+
+Return ONLY valid JSON (no markdown, no other text):
 {
   "categories": [
     {"name": "Category Name", "icon": "emoji"}
   ],
   "items": [
-    {"name": "Item Name", "price": 100, "isVeg": true, "categoryName": "Category Name"}
+    {"name": "Item Name (Variant)", "price": 100, "isVeg": true, "categoryName": "Category Name"}
   ]
-}
-
-STRICT RULES:
-1. Extract EVERY single item visible in the menu with their EXACT names and EXACT prices
-2. Group items into logical categories based on the section headers visible in the menu
-3. Use appropriate food emoji icons for each category (🍗🍔🥪🌯🥟🍟🥤🍹🍱 etc.)
-4. Set isVeg to true for vegetarian items (no meat/fish/egg), false for non-veg
-5. Price must be a number without currency symbols (e.g., 120 not ₹120)
-6. If an item has size variants (Small/Large/Regular), create separate entries for each
-7. Include ALL sections: main items, sides, drinks, combos, add-ons, everything
-8. Be extremely thorough - extract every single item, don't skip any
-9. Item names should be clean and properly capitalized
-${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}. Reuse these category names when they match.` : ''}`;
+}`;
 
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -367,7 +376,7 @@ ${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}
                         { type: 'image_url', image_url: { url: imageUrl } },
                     ],
                 }],
-                temperature: 0.1,
+                temperature: 0.05,
                 max_tokens: 4096,
             }),
         });

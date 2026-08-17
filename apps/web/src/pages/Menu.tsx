@@ -316,16 +316,22 @@ export default function MenuPage() {
 
         try {
             // Call Groq AI Vision to extract items from menu card
-            const response = await menuAPI.extractMenuCard(menuCardImage);
+            const response = await menuAPI.extractMenuCard(menuCardImage, user?.branch?.id);
             const { items, message } = response.data;
 
-            setExtractedItems(items);
+            // Give each item a stable unique ID for clean React keying
+            const itemsWithKeys = (items || []).map((it: any, idx: number) => ({
+                ...it,
+                _id: `ext_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+            }));
+
+            setExtractedItems(itemsWithKeys);
 
             // Refresh categories in case new ones were created
             const catRes = await categoriesAPI.getAll(user?.branch?.id);
             setCategories(catRes.data);
 
-            toast.success(message || `Extracted ${items.length} items!`);
+            toast.success(message || `Extracted ${itemsWithKeys.length} items!`);
         } catch (error: any) {
             toast.error(error.response?.data?.error || 'Failed to extract items');
         } finally {
@@ -988,8 +994,8 @@ export default function MenuPage() {
                                         </div>
 
                                         <div className="extracted-list">
-                                            {extractedItems.map((item, index) => (
-                                                <div key={index} className="extracted-item-row">
+                                            {extractedItems.map((item: any, index) => (
+                                                <div key={item._id || `ext_${index}`} className="extracted-item-row">
                                                     <input
                                                         type="text"
                                                         value={item.name}
