@@ -703,7 +703,29 @@
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 8px;
-    padding-top: 4px;
+    padding: 8px;
+    max-height: 210px;
+    overflow-y: auto;
+    background: var(--bg-surface-subtle, rgba(255, 255, 255, 0.02));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.icon-picker::-webkit-scrollbar {
+    width: 6px;
+}
+
+.icon-picker::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.icon-picker::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.icon-picker::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 .icon-option {
@@ -711,7 +733,7 @@
     align-items: center;
     justify-content: center;
     height: 42px;
-    font-size: 20px;
+    font-size: 22px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -722,13 +744,13 @@
 .icon-option:hover {
     background: var(--bg-surface-hover);
     border-color: var(--border-light);
-    transform: scale(1.08);
+    transform: scale(1.12);
 }
 
 .icon-option.selected {
     border-color: var(--primary);
-    background: rgba(249, 115, 22, 0.15);
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+    background: rgba(249, 115, 22, 0.18);
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.35);
 }
 
 /* =========================================================

@@ -29,6 +29,21 @@ const emptyForm: MenuItemForm = {
     gstPercent: '5',
 };
 
+// Rich collection of 48 food, beverage, dessert, and dining emojis
+const CATEGORY_ICONS = [
+    // Mains & Fast Food
+    '🍽️', '🍕', '🍔', '🌭', '🥪', '🌮', '🌯', '🥙',
+    '🍗', '🍖', '🥩', '🍳', '🍤', '🍢', '🍟', '🍿',
+    // Asian, Indian, Rice & Soups
+    '🍛', '🍚', '🍜', '🥟', '🍲', '🍝', '🍣', '🧆',
+    // Desserts, Bakery & Sweets
+    '🍰', '🧁', '🍨', '🍦', '🍩', '🧇', '🥞', '🥧',
+    '🍫', '🍪', '🥐', '🍞',
+    // Beverages & Drinks
+    '🥤', '🧃', '🧋', '☕', '🍵', '🍹', '🍺', '🥛',
+    '🧊', '🥗', '🍱', '🥡'
+];
+
 export default function MenuPage() {
     const [items, setItems] = useState<MenuItem[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -748,12 +763,13 @@ export default function MenuPage() {
                                 <div className="form-group">
                                     <label>Icon</label>
                                     <div className="icon-picker">
-                                        {['🍽️', '🍕', '🍔', '🍗', '🍛', '🥗', '🍜', '🥤', '🍰', '🍿', '☕', '🍲'].map((icon) => (
+                                        {CATEGORY_ICONS.map((icon) => (
                                             <button
                                                 key={icon}
                                                 type="button"
                                                 className={`icon-option ${categoryForm.icon === icon ? 'selected' : ''}`}
                                                 onClick={() => setCategoryForm({ ...categoryForm, icon })}
+                                                title={icon}
                                             >
                                                 {icon}
                                             </button>
@@ -786,7 +802,7 @@ export default function MenuPage() {
                     >
                         <motion.div
                             className="modal category-modal"
-                            style={{ maxWidth: '520px' }}
+                            style={{ maxWidth: '540px' }}
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
@@ -798,7 +814,7 @@ export default function MenuPage() {
                                     <X size={20} />
                                 </button>
                             </div>
-                            <div className="category-manager-body" style={{ padding: '20px', maxHeight: '60vh', overflowY: 'auto' }}>
+                            <div className="category-manager-body" style={{ padding: '20px', maxHeight: '65vh', overflowY: 'auto' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                         {categories.length} Categories
@@ -813,27 +829,38 @@ export default function MenuPage() {
                                         const isEditing = editingCategory?.id === cat.id;
 
                                         return (
-                                            <div key={cat.id} className="category-manager-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                            <div key={cat.id} className="category-manager-row" style={{ padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                                                 {isEditing ? (
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
-                                                        <input
-                                                            type="text"
-                                                            value={editCatIcon}
-                                                            onChange={(e) => setEditCatIcon(e.target.value)}
-                                                            style={{ width: '45px', textAlign: 'center', padding: '6px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={editCatName}
-                                                            onChange={(e) => setEditCatName(e.target.value)}
-                                                            style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                                                        />
-                                                        <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}>
-                                                            Save
-                                                        </button>
-                                                        <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingCategory(null)}>
-                                                            Cancel
-                                                        </button>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '20px', padding: '0 4px' }}>{editCatIcon || '🍽️'}</span>
+                                                            <input
+                                                                type="text"
+                                                                value={editCatName}
+                                                                onChange={(e) => setEditCatName(e.target.value)}
+                                                                placeholder="Category Name"
+                                                                style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                            />
+                                                            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}>
+                                                                Save
+                                                            </button>
+                                                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingCategory(null)}>
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                        <div className="icon-picker" style={{ maxHeight: '110px' }}>
+                                                            {CATEGORY_ICONS.map((icon) => (
+                                                                <button
+                                                                    key={icon}
+                                                                    type="button"
+                                                                    className={`icon-option ${editCatIcon === icon ? 'selected' : ''}`}
+                                                                    onClick={() => setEditCatIcon(icon)}
+                                                                    style={{ height: '36px', fontSize: '18px' }}
+                                                                >
+                                                                    {icon}
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     <>
