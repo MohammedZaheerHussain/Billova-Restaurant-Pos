@@ -367,6 +367,7 @@ ${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}
                         { type: 'image_url', image_url: { url: imageUrl } },
                     ],
                 }],
+                response_format: { type: 'json_object' },
                 temperature: 0.1,
                 max_tokens: 4096,
             }),
@@ -382,20 +383,30 @@ ${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}
 
         logger.info('[extractWithGroqVision] Groq AI response received, parsing...');
 
-        // Parse the JSON response
+        // Parse the JSON response with multi-layer fallback
         let cleanJson = responseText.trim();
-        // Remove thinking tags if present (Qwen3 model outputs <think>...</think>)
-        cleanJson = cleanJson.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-        // Remove markdown code blocks if present
-        if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
-        if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
-        if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
-        cleanJson = cleanJson.trim();
+
+        // 1. Strip think tags if present
+        cleanJson = cleanJson.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        if (cleanJson.includes('<think>')) {
+            const parts = cleanJson.split('</think>');
+            cleanJson = (parts[parts.length - 1] || '').trim();
+        }
+
+        // 2. Strip markdown backticks
+        cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        // 3. Extract JSON object substring if surrounded by other text
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+        }
 
         const extractedData = JSON.parse(cleanJson);
 
         if (!extractedData.items || !Array.isArray(extractedData.items)) {
-            throw new Error('Invalid AI response: no items array');
+            throw new Error('Invalid AI response: no items array found in JSON');
         }
 
         // Create any new categories that AI discovered
