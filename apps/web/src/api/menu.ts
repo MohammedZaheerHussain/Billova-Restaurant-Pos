@@ -241,8 +241,14 @@ export const menuAPI = {
                             }
                         };
                     }
-                } catch (groqErr) {
-                    logger.warn('[extractMenuCard] Groq AI Vision failed, will use fallback:', groqErr);
+                } catch (groqErr: any) {
+                    logger.error('[extractMenuCard] Groq AI Vision failed:', groqErr);
+                    return {
+                        data: {
+                            items: [],
+                            message: `AI Vision Error: ${groqErr?.message || 'Failed to process image'}`
+                        }
+                    };
                 }
             }
 
@@ -250,15 +256,15 @@ export const menuAPI = {
             return {
                 data: {
                     items: [],
-                    message: 'AI extraction requires Groq API key. Please configure VITE_GROQ_API_KEY.'
+                    message: 'AI extraction requires a valid Groq API key.'
                 }
             };
-        } catch (err) {
+        } catch (err: any) {
             logger.error('[extractMenuCard] Client extraction error:', err);
             return {
                 data: {
                     items: [],
-                    message: 'Failed to extract items from menu card.'
+                    message: err?.message || 'Failed to extract items from menu card.'
                 }
             };
         }
@@ -268,7 +274,7 @@ export const menuAPI = {
 /**
  * Downscale and compress image to fit under Groq Vision API token limits (8000 TPM)
  */
-async function compressImageForGroq(imageData: string, maxDimension = 1200, quality = 0.85): Promise<string> {
+async function compressImageForGroq(imageData: string, maxDimension = 720, quality = 0.75): Promise<string> {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -313,8 +319,8 @@ async function extractWithGroqVision(
 ): Promise<any[]> {
 
     try {
-        // Downscale image to max 1200px and compress to JPEG to fit under Groq 8000 TPM limit
-        const compressedImage = await compressImageForGroq(imageData, 1200, 0.85);
+        // Downscale image to max 720px and compress to JPEG to fit under Groq 8000 TPM limit
+        const compressedImage = await compressImageForGroq(imageData, 720, 0.75);
         const imageUrl = compressedImage.startsWith('data:') ? compressedImage : `data:image/jpeg;base64,${compressedImage}`;
 
         logger.info('[extractWithGroqVision] Sending compressed image to Groq AI Vision...');
@@ -362,7 +368,7 @@ ${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}
                     ],
                 }],
                 temperature: 0.1,
-                max_tokens: 8192,
+                max_tokens: 4096,
             }),
         });
 
