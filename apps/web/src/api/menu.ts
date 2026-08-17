@@ -367,7 +367,6 @@ ${existingCatNames ? `10. Existing categories in the system: ${existingCatNames}
                         { type: 'image_url', image_url: { url: imageUrl } },
                     ],
                 }],
-                response_format: { type: 'json_object' },
                 temperature: 0.1,
                 max_tokens: 4096,
             }),
