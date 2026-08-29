@@ -13,30 +13,58 @@ import './Settings.css';
 
 // Cloud Sync Status Component
 function CloudSyncStatus() {
-    const { isOnline, licenseExpiredHard } = useSyncStore();
+    const { isOnline, licenseExpiredHard, pendingOrders, pendingPayments, pendingKOTs } = useSyncStore();
     const display = getSyncStatusDisplay();
+    const totalPending = pendingOrders + pendingPayments + pendingKOTs;
 
     return (
         <div className="sync-status-box" style={{
-            padding: '16px',
-            borderRadius: '12px',
-            background: 'rgba(255,255,255,0.05)',
+            padding: '16px 18px',
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
             border: `1px solid ${display.color}33`,
+            boxShadow: `0 4px 16px ${display.color}10`,
         }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 24 }}>{display.icon}</span>
-                <div>
-                    <div style={{ fontWeight: 600, color: display.color }}>{display.text}</div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                        {isOnline ? 'Connected to internet' : 'No internet connection'}
-                    </div>
-                    {licenseExpiredHard && (
-                        <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>
-                            ⚠️ License expired - please renew to sync
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: display.color,
+                        boxShadow: `0 0 10px ${display.color}`,
+                        animation: isOnline ? 'pulse 2s infinite' : 'none',
+                    }} />
+                    <div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: display.color }}>{display.text}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 2 }}>
+                            {isOnline ? '🌐 Connected to cloud servers' : '📡 Offline mode (local storage active)'}
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
+
+            {totalPending > 0 && (
+                <div style={{
+                    marginTop: 12,
+                    paddingTop: 10,
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex',
+                    gap: 16,
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)'
+                }}>
+                    {pendingOrders > 0 && <span>📦 Orders: <strong>{pendingOrders}</strong></span>}
+                    {pendingPayments > 0 && <span>💳 Payments: <strong>{pendingPayments}</strong></span>}
+                    {pendingKOTs > 0 && <span>🍳 KOTs: <strong>{pendingKOTs}</strong></span>}
+                </div>
+            )}
+
+            {licenseExpiredHard && (
+                <div style={{ fontSize: 12, color: '#ef4444', marginTop: 8 }}>
+                    ⚠️ License expired - please renew to sync
+                </div>
+            )}
         </div>
     );
 }
@@ -66,7 +94,7 @@ function SyncNowButton() {
             } else if (result.failed > 0) {
                 toast.error(`${result.failed} items failed to sync`);
             } else if (pending === 0) {
-                toast.success('Already synced!');
+                toast.success('All data is already up to date!');
             }
         } finally {
             setSyncing(false);
@@ -78,12 +106,22 @@ function SyncNowButton() {
     return (
         <button
             className="btn btn-primary"
-            style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}
+            style={{
+                marginTop: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                justifyContent: 'center',
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                fontWeight: 600
+            }}
             onClick={handleSync}
             disabled={disabled}
         >
             <RefreshCw size={16} className={syncing || isSyncing ? 'spin' : ''} />
-            {syncing || isSyncing ? 'Syncing...' : `Sync Now${pending > 0 ? ` (${pending})` : ''}`}
+            {syncing || isSyncing ? 'Syncing with cloud...' : `Sync Now${pending > 0 ? ` (${pending} pending)` : ''}`}
         </button>
     );
 }
@@ -92,16 +130,20 @@ function SyncNowButton() {
 function LastSyncInfo() {
     const { lastSyncAt, lastSyncError } = useSyncStore();
 
-    if (!lastSyncAt) return null;
+    if (!lastSyncAt) return (
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            No previous sync recorded
+        </div>
+    );
 
     const syncDate = new Date(lastSyncAt);
     const timeAgo = getTimeAgo(syncDate);
 
     return (
-        <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
-            <div>Last synced: {timeAgo}</div>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            <div>Last synced: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{timeAgo}</span></div>
             {lastSyncError && (
-                <div style={{ color: '#ef4444', marginTop: 4 }}>{lastSyncError}</div>
+                <div style={{ color: '#ef4444', marginTop: 4 }}>⚠️ {lastSyncError}</div>
             )}
         </div>
     );
