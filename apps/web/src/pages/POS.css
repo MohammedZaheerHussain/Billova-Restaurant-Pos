@@ -1033,204 +1033,411 @@
 }
 
 /* =========================================================
-   PAYMENT & BILL SUMMARY MODAL
+   CHECKOUT PAYMENT MODAL — Ice Pops Blueprint Style
    ========================================================= */
 .modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    padding: 20px;
+    padding: 16px;
 }
 
-.payment-modal.bill-modal {
+.checkout-payment-modal {
     width: 100%;
-    max-width: 520px;
+    max-width: 480px;
     background: var(--bg-surface);
     border: 1px solid var(--border-light);
-    border-radius: 20px;
+    border-radius: 24px;
     padding: 24px;
     display: flex;
     flex-direction: column;
     gap: 18px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
-.modal-header {
+[data-theme="light"] .checkout-payment-modal {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+}
+
+/* Modal Header */
+.checkout-modal-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
-.modal-header h2 {
-    font-size: 18px;
+.checkout-modal-header h2 {
+    font-size: 20px;
     font-weight: 800;
     color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    line-height: 1.2;
 }
 
-.close-btn {
-    background: transparent;
-    border: none;
+.checkout-modal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.checkout-modal-header .close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-root);
+    border: 1px solid var(--border);
     color: var(--text-muted);
     cursor: pointer;
-}
-
-.close-btn:hover {
-    color: var(--text-primary);
-}
-
-/* Bill Items in Modal */
-.bill-items-section {
-    background: var(--bg-root);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.bill-items-header {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.03);
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-}
-
-.bill-items-list {
-    max-height: 140px;
-    overflow-y: auto;
-}
-
-.bill-item-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    border-top: 1px solid var(--border-subtle);
-    align-items: center;
-}
-
-.bill-item-name {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.bill-note {
-    color: var(--primary);
-    font-size: 11px;
-}
-
-.bill-summary {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px;
-    background: var(--bg-root);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-}
-
-.bill-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-    color: var(--text-secondary);
-}
-
-.bill-row.discount-row {
-    color: #10b981;
-    font-weight: 600;
-}
-
-.bill-row.total-row {
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--text-primary);
-}
-
-/* Payment Tender Grid */
-.payment-methods h3 {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-muted);
-    margin-bottom: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.payment-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-}
-
-.payment-method-btn {
-    display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 16px 10px;
-    background: var(--bg-root);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    color: var(--text-primary);
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 13px;
     transition: all var(--transition-fast);
 }
 
-.payment-method-btn:hover {
-    border-color: var(--primary);
+.checkout-modal-header .close-btn:hover {
+    color: var(--text-primary);
     background: var(--bg-surface-hover);
-    transform: translateY(-2px);
 }
 
-.payment-method-btn.cash:hover {
-    border-color: #10b981;
-    color: #10b981;
-}
-
-.payment-method-btn.upi:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
-}
-
-.payment-method-btn.card:hover {
-    border-color: #f59e0b;
-    color: #f59e0b;
-}
-
-/* Submitting overlay */
-.submitting-overlay {
+/* TOTAL PAYABLE Top Banner */
+.total-payable-banner {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(249, 115, 22, 0.04) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    border-radius: 18px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    gap: 12px;
+    gap: 2px;
 }
 
-.spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgba(249, 115, 22, 0.2);
-    border-top-color: var(--primary);
+.payable-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--primary);
+    text-transform: uppercase;
+}
+
+.payable-amount {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--primary);
+}
+
+.payable-amount .currency {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.payable-amount span:last-child {
+    font-size: 34px;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+/* Payment Method Pills (3 Segmented Buttons) */
+.payment-method-pills {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: var(--bg-root);
+    padding: 5px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+.method-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.method-pill:hover {
+    color: var(--text-primary);
+}
+
+.method-pill.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+}
+
+/* Cash Tender Specific Styles */
+.cash-tender-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cash-input-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.section-helper {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.cash-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.cash-input-wrapper .input-currency {
+    position: absolute;
+    left: 18px;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.cash-input-field {
+    width: 100%;
+    height: 52px;
+    background: var(--bg-input);
+    border: 2px solid var(--border-light);
+    border-radius: 16px;
+    padding: 0 18px 0 38px;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-primary);
+    outline: none;
+    font-family: var(--font-mono);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.cash-input-field:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+/* ⚡ Quick Cash Row */
+.quick-cash-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quick-cash-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #f59e0b;
+}
+
+.quick-cash-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.quick-cash-btn {
+    padding: 7px 14px;
+    background: var(--bg-root);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: var(--font-mono);
+}
+
+.quick-cash-btn:hover {
+    border-color: var(--primary);
+    background: var(--bg-surface-hover);
+    transform: translateY(-1px);
+}
+
+.quick-cash-btn.selected {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.quick-cash-btn.exact {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #10b981;
+}
+
+.quick-cash-btn.exact.selected {
+    background: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+/* Change to Return Banner */
+.change-return-banner {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 14px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.change-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #10b981;
+}
+
+.change-amount {
+    font-size: 20px;
+    font-weight: 900;
+    color: #10b981;
+    font-family: var(--font-mono);
+}
+
+/* UPI & Card Tender Cards */
+.upi-tender-section,
+.card-tender-section {
+    padding: 10px 0;
+}
+
+.tender-info-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px;
+    background: var(--bg-root);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+
+.tender-info-icon {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.tender-info-text h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.tender-info-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* Modal Customer Inputs */
+.modal-customer-section {
+    padding-top: 4px;
+    border-top: 1px dashed var(--border);
+}
+
+.modal-customer-inputs {
+    display: flex;
+    gap: 8px;
+}
+
+.modal-input-group {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-root);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 10px;
+    height: 36px;
+}
+
+.modal-input-group svg {
+    color: var(--text-muted);
+}
+
+.modal-input-group input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-size: 12px;
+    color: var(--text-primary);
+    outline: none;
+}
+
+/* Modal Complete Bill Action Button */
+.modal-complete-bill-btn {
+    width: 100%;
+    height: 50px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    border: none;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+    transition: all var(--transition-fast);
+}
+
+.modal-complete-bill-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+}
+
+.modal-complete-bill-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.modal-complete-bill-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.button-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }

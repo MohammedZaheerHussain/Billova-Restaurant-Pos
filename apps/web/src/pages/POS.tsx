@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, ShoppingCart, Minus, Plus, Trash2, X,
     CreditCard, Banknote, Smartphone, Coffee,
-    UtensilsCrossed, Globe, User, Phone, Receipt, FileText,
+    UtensilsCrossed, Globe, User, Phone, FileText,
     Sparkles, Flame, Check, ChevronDown, ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,6 +31,8 @@ export default function POSPage() {
     const [loading, setLoading] = useState(true);
     const [showPayment, setShowPayment] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'CASH' | 'UPI' | 'CARD'>('CASH');
+    const [cashReceived, setCashReceived] = useState<string>('');
 
     // Quick Picks Tab State
     const [isQuickPicksActive, setIsQuickPicksActive] = useState(false);
@@ -303,6 +305,8 @@ export default function POSPage() {
             toast.error('Add items to cart first');
             return;
         }
+        setSelectedPaymentMethod('CASH');
+        setCashReceived(getTotal().toFixed(0));
         setShowPayment(true);
     };
 
@@ -747,7 +751,7 @@ export default function POSPage() {
                 </div>
             </div>
 
-            {/* Payment Modal with Bill Summary */}
+            {/* Checkout Payment Modal - Ice Pops Blueprint Style */}
             <AnimatePresence>
                 {showPayment && (
                     <motion.div
@@ -758,37 +762,168 @@ export default function POSPage() {
                         onClick={() => setShowPayment(false)}
                     >
                         <motion.div
-                            className="payment-modal bill-modal"
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="checkout-payment-modal"
+                            initial={{ scale: 0.95, opacity: 0, y: 15 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 15 }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="modal-header">
-                                <h2><Receipt size={22} /> Bill Summary & Settlement</h2>
+                            {/* Modal Header */}
+                            <div className="checkout-modal-header">
+                                <div>
+                                    <h2>Checkout Payment</h2>
+                                    <p className="checkout-modal-subtitle">Select payment method and collect payment.</p>
+                                </div>
                                 <button className="close-btn" onClick={() => setShowPayment(false)}>
-                                    <X size={24} />
+                                    <X size={20} />
                                 </button>
                             </div>
 
-                            {/* Customer Details in Modal */}
-                            <div className="customer-details">
-                                <h3>Customer Details (Optional)</h3>
-                                <div className="customer-inputs">
-                                    <div className="input-group">
-                                        <User size={18} className="input-icon" />
+                            {/* TOTAL PAYABLE Top Banner */}
+                            <div className="total-payable-banner">
+                                <span className="payable-label">TOTAL PAYABLE</span>
+                                <div className="payable-amount">
+                                    <span className="currency">₹</span>
+                                    <span>{getTotal().toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            {/* Payment Method Selector (3 Segmented Pills) */}
+                            <div className="payment-method-pills">
+                                <button
+                                    type="button"
+                                    className={`method-pill ${selectedPaymentMethod === 'CASH' ? 'active' : ''}`}
+                                    onClick={() => setSelectedPaymentMethod('CASH')}
+                                >
+                                    <Banknote size={18} />
+                                    <span>Cash</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`method-pill ${selectedPaymentMethod === 'UPI' ? 'active' : ''}`}
+                                    onClick={() => setSelectedPaymentMethod('UPI')}
+                                >
+                                    <Smartphone size={18} />
+                                    <span>UPI</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`method-pill ${selectedPaymentMethod === 'CARD' ? 'active' : ''}`}
+                                    onClick={() => setSelectedPaymentMethod('CARD')}
+                                >
+                                    <CreditCard size={18} />
+                                    <span>Card</span>
+                                </button>
+                            </div>
+
+                            {/* Tender Specific Body */}
+                            {selectedPaymentMethod === 'CASH' && (
+                                <div className="cash-tender-section">
+                                    <div className="cash-input-header">
+                                        <label className="section-label">Cash Received</label>
+                                        <span className="section-helper">Type or tap quick cash</span>
+                                    </div>
+
+                                    <div className="cash-input-wrapper">
+                                        <span className="input-currency">₹</span>
                                         <input
                                             type="text"
-                                            placeholder="Customer Name"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            value={cashReceived}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/[^0-9.]/g, '');
+                                                setCashReceived(val);
+                                            }}
+                                            placeholder="0"
+                                            className="cash-input-field"
+                                            autoFocus
+                                        />
+                                    </div>
+
+                                    {/* ⚡ Quick Cash Denomination Buttons */}
+                                    <div className="quick-cash-row">
+                                        <div className="quick-cash-label">
+                                            <Sparkles size={12} />
+                                            <span>QUICK CASH</span>
+                                        </div>
+                                        <div className="quick-cash-buttons">
+                                            <button
+                                                type="button"
+                                                className={`quick-cash-btn exact ${cashReceived === getTotal().toFixed(0) || cashReceived === getTotal().toString() ? 'selected' : ''}`}
+                                                onClick={() => setCashReceived(getTotal().toFixed(0))}
+                                            >
+                                                Exact ₹{getTotal().toFixed(0)}
+                                            </button>
+
+                                            {[50, 100, 200, 500, 1000, 2000]
+                                                .filter(denom => denom >= getTotal())
+                                                .slice(0, 4)
+                                                .map(denom => (
+                                                    <button
+                                                        key={denom}
+                                                        type="button"
+                                                        className={`quick-cash-btn ${cashReceived === denom.toString() ? 'selected' : ''}`}
+                                                        onClick={() => setCashReceived(denom.toString())}
+                                                    >
+                                                        ₹{denom}
+                                                    </button>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+
+                                    {/* Change to Return Banner */}
+                                    <div className="change-return-banner">
+                                        <span className="change-label">Change to Return</span>
+                                        <span className="change-amount">
+                                            ₹{Math.max(0, (parseFloat(cashReceived || '0') - getTotal())).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPaymentMethod === 'UPI' && (
+                                <div className="upi-tender-section">
+                                    <div className="tender-info-card">
+                                        <Smartphone size={32} className="tender-info-icon" />
+                                        <div className="tender-info-text">
+                                            <h4>Dynamic UPI Payment</h4>
+                                            <p>Scan the merchant QR code on billing counter or verify customer UPI transfer.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedPaymentMethod === 'CARD' && (
+                                <div className="card-tender-section">
+                                    <div className="tender-info-card">
+                                        <CreditCard size={32} className="tender-info-icon" />
+                                        <div className="tender-info-text">
+                                            <h4>Card Swipe / Tap</h4>
+                                            <p>Swipe or tap credit/debit card on EDC POS Machine and complete transaction.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Optional Customer Details (Collapsible in Modal) */}
+                            <div className="modal-customer-section">
+                                <div className="modal-customer-inputs">
+                                    <div className="modal-input-group">
+                                        <User size={14} />
+                                        <input
+                                            type="text"
+                                            placeholder="Customer Name (optional)"
                                             value={customerName}
                                             onChange={(e) => setCustomerName(e.target.value)}
                                         />
                                     </div>
-                                    <div className="input-group">
-                                        <Phone size={18} className="input-icon" />
+                                    <div className="modal-input-group">
+                                        <Phone size={14} />
                                         <input
                                             type="tel"
-                                            placeholder="Phone Number"
+                                            placeholder="Phone Number (optional)"
                                             value={customerPhone}
                                             onChange={(e) => setCustomerPhone(e.target.value)}
                                         />
@@ -796,127 +931,21 @@ export default function POSPage() {
                                 </div>
                             </div>
 
-                            {/* Online Platform Selection */}
-                            {orderType === 'ONLINE' && (
-                                <div className="online-platform-section">
-                                    <h3>Select Platform</h3>
-                                    <div className="platform-selector">
-                                        <button
-                                            className={`platform-btn ${onlinePlatform === 'SWIGGY' ? 'selected' : ''}`}
-                                            onClick={() => setOnlinePlatform('SWIGGY')}
-                                        >
-                                            <img
-                                                src="https://logos-world.net/wp-content/uploads/2020/11/Swiggy-Logo.png"
-                                                alt="Swiggy"
-                                                className="platform-logo"
-                                            />
-                                            <span>Swiggy</span>
-                                        </button>
-                                        <button
-                                            className={`platform-btn ${onlinePlatform === 'ZOMATO' ? 'selected' : ''}`}
-                                            onClick={() => setOnlinePlatform('ZOMATO')}
-                                        >
-                                            <img
-                                                src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Zomato_Logo.svg/1280px-Zomato_Logo.svg.png"
-                                                alt="Zomato"
-                                                className="platform-logo"
-                                            />
-                                            <span>Zomato</span>
-                                        </button>
-                                    </div>
-                                    {onlinePlatform && (
-                                        <div className="platform-order-id">
-                                            <label>{onlinePlatform} Order ID:</label>
-                                            <input
-                                                type="text"
-                                                placeholder={`Enter ${onlinePlatform} order number`}
-                                                value={onlineOrderId}
-                                                onChange={(e) => setOnlineOrderId(e.target.value)}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Bill Items List */}
-                            <div className="bill-items-section">
-                                <div className="bill-items-header">
-                                    <span>Item</span>
-                                    <span>Qty</span>
-                                    <span>Price</span>
-                                    <span>Total</span>
-                                </div>
-                                <div className="bill-items-list custom-scrollbar">
-                                    {cartItems.map((item) => (
-                                        <div key={item.id} className="bill-item-row">
-                                            <span className="bill-item-name">
-                                                {formatProductName(item.menuItem.name)}
-                                                {item.variant && <small> ({item.variant.name})</small>}
-                                                {item.notes && <small className="bill-note"> [{item.notes}]</small>}
-                                            </span>
-                                            <span className="bill-item-qty">x{item.quantity}</span>
-                                            <span className="bill-item-price">₹{item.unitPrice}</span>
-                                            <span className="bill-item-total">₹{item.total.toFixed(2)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Bill Summary in Modal */}
-                            <div className="bill-summary">
-                                <div className="bill-row">
-                                    <span>Subtotal ({getItemCount()} items)</span>
-                                    <span>₹{getSubtotal().toFixed(2)}</span>
-                                </div>
-                                {getDiscountAmount() > 0 && (
-                                    <div className="bill-row discount-row">
-                                        <span>Discount ({discountType === 'PERCENTAGE' ? `${discountValue}%` : `₹${discountValue}`})</span>
-                                        <span>-₹{getDiscountAmount().toFixed(2)}</span>
-                                    </div>
+                            {/* Full-Width Complete Bill Action Button */}
+                            <button
+                                className="modal-complete-bill-btn"
+                                onClick={() => handleSubmitOrder(selectedPaymentMethod)}
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <>
+                                        <div className="button-spinner" />
+                                        <span>PROCESSING ORDER...</span>
+                                    </>
+                                ) : (
+                                    <span>COMPLETE BILL</span>
                                 )}
-                                <div className="bill-row total-row">
-                                    <span>Grand Total</span>
-                                    <span>₹{getTotal().toFixed(2)}</span>
-                                </div>
-                            </div>
-
-                            {/* Instant Payment Selection */}
-                            <div className="payment-methods">
-                                <h3>Select Payment Tender</h3>
-                                <div className="payment-grid">
-                                    <button
-                                        className="payment-method-btn cash"
-                                        onClick={() => handleSubmitOrder('CASH')}
-                                        disabled={submitting}
-                                    >
-                                        <Banknote size={30} />
-                                        <span>CASH</span>
-                                    </button>
-                                    <button
-                                        className="payment-method-btn upi"
-                                        onClick={() => handleSubmitOrder('UPI')}
-                                        disabled={submitting}
-                                    >
-                                        <Smartphone size={30} />
-                                        <span>UPI / QR</span>
-                                    </button>
-                                    <button
-                                        className="payment-method-btn card"
-                                        onClick={() => handleSubmitOrder('CARD')}
-                                        disabled={submitting}
-                                    >
-                                        <CreditCard size={30} />
-                                        <span>CARD</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {submitting && (
-                                <div className="submitting-overlay">
-                                    <div className="spinner" />
-                                    <p>Processing and finalizing order...</p>
-                                </div>
-                            )}
+                            </button>
                         </motion.div>
                     </motion.div>
                 )}
