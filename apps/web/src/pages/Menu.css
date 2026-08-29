@@ -930,6 +930,20 @@
     padding-left: 20px;
 }
 
+/* Remove number input up/down arrows across all browsers */
+.menu-page input[type="number"]::-webkit-inner-spin-button,
+.menu-page input[type="number"]::-webkit-outer-spin-button,
+.price-input-wrapper input::-webkit-inner-spin-button,
+.price-input-wrapper input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.menu-page input[type="number"],
+.price-input-wrapper input {
+    -moz-appearance: textfield;
+}
+
 .veg-pill {
     padding: 5px 8px;
     border-radius: 20px;

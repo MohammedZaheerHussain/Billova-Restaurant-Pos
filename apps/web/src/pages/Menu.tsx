@@ -1005,9 +1005,14 @@ export default function MenuPage() {
                                                     <div className="price-input-wrapper">
                                                         <span className="currency-symbol">₹</span>
                                                         <input
-                                                            type="number"
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            pattern="[0-9]*"
                                                             value={item.price}
-                                                            onChange={(e) => updateExtractedItem(index, 'price', e.target.value)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value.replace(/[^0-9.]/g, '');
+                                                                updateExtractedItem(index, 'price', val);
+                                                            }}
                                                             placeholder="Price"
                                                             className="price-input"
                                                         />
