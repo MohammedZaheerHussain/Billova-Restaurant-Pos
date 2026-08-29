@@ -156,25 +156,26 @@
     align-items: center;
     gap: 12px;
     padding: 10px 14px;
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     color: var(--text-secondary);
     text-decoration: none;
-    font-weight: 500;
-    font-size: 14px;
+    font-weight: 600;
+    font-size: 13px;
     transition: all var(--transition-fast);
-    border-left: 3px solid transparent;
 }
 
 .nav-item:hover {
-    background: var(--bg-card-hover);
+    background: var(--bg-surface-hover);
     color: var(--text-primary);
+    transform: translateX(2px);
 }
 
 .nav-item.active {
-    background: var(--bg-active);
-    color: var(--text-primary);
-    border-left-color: var(--primary);
-    font-weight: 600;
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.16) 0%, rgba(249, 115, 22, 0.04) 100%);
+    color: var(--primary);
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    box-shadow: 0 2px 10px rgba(249, 115, 22, 0.15);
+    font-weight: 700;
 }
 
 /* Super Admin Nav Item */
