@@ -3,16 +3,14 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
-    BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Bell, Warehouse, RefreshCw,
+    BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Warehouse,
     Puzzle, LayoutDashboard, Sun, Moon, Search,
     Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscription, { FeatureKey } from '../hooks/useSubscription';
-import { ordersAPI } from '../api';
 import { useSync, useSyncInit } from '../hooks/useSync';
-import { SyncStatusBadge, OfflineIndicator } from './sync';
-import SyncIndicator from './SyncIndicator';
+import { OfflineIndicator } from './sync';
 import { CommandPalette } from './ui/CommandPalette';
 import { supabase } from '../lib/supabase';
 import './Layout.css';
@@ -44,13 +42,13 @@ export default function Layout() {
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
     const { sidebarOpen, toggleSidebar, theme, toggleTheme } = useUIStore();
-    const { hasFeature, currentPlan, planName, getPlanColor, isExpired } = useSubscription();
+    const { hasFeature, isExpired } = useSubscription();
 
     const [cmdOpen, setCmdOpen] = useState(false);
 
     // Initialize offline sync
     useSyncInit();
-    const { triggerSync, status: syncStatus, isOnline, pendingCount } = useSync();
+    const { isOnline } = useSync();
 
     // Check token expiry on mount and periodically
     useEffect(() => {
@@ -84,30 +82,7 @@ export default function Layout() {
 
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
-    // Online orders notification
-    const [pendingOnlineOrders, setPendingOnlineOrders] = useState(0);
 
-    useEffect(() => {
-        if (isSuperAdmin) return;
-
-        const fetchPendingOrders = async () => {
-            if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-            try {
-                const res = await ordersAPI.getAll();
-                const pending = (res.data || []).filter((o: any) =>
-                    (o.orderType === 'DELIVERY' || o.orderType === 'TAKEAWAY') &&
-                    o.status === 'PENDING'
-                ).length;
-                setPendingOnlineOrders(pending);
-            } catch (e) {
-                // Ignore offline errors when waking from laptop sleep
-            }
-        };
-
-        fetchPendingOrders();
-        const interval = setInterval(fetchPendingOrders, 10000); // Poll every 10 seconds
-        return () => clearInterval(interval);
-    }, [isSuperAdmin]);
 
     // Update last_seen on Supabase profile so LastActivity shows correctly
     useEffect(() => {
@@ -151,7 +126,7 @@ export default function Layout() {
                 role="navigation"
                 aria-label="Main navigation"
             >
-                {/* Logo - Click to toggle sidebar */}
+                {/* Logo Header */}
                 <div className="sidebar-header">
                     <div
                         className="logo clickable"
@@ -165,55 +140,14 @@ export default function Layout() {
                         style={{ cursor: 'pointer' }}
                     >
                         <img src="/logo.png" alt="Billova POS" className="logo-icon-img" />
-                        {sidebarOpen && <span className="logo-text">Billova</span>}
+                        {sidebarOpen && (
+                            <div className="logo-text-group">
+                                <span className="logo-text">Billova</span>
+                                <span className="logo-tagline">Restaurant POS</span>
+                            </div>
+                        )}
                     </div>
                 </div>
-
-                {/* Subscription Badge */}
-                {sidebarOpen && !isSuperAdmin && (
-                    <div className="subscription-badge" style={{ borderColor: getPlanColor() }}>
-                        <span style={{ color: getPlanColor() }}>{planName || currentPlan}</span>
-                    </div>
-                )}
-
-                {/* Online Order Notifications */}
-                {!isSuperAdmin && (
-                    <button
-                        className={`notification-bell ${pendingOnlineOrders > 0 ? 'has-orders' : ''}`}
-                        onClick={() => navigate('/orders')}
-                        aria-label={pendingOnlineOrders > 0 ? `${pendingOnlineOrders} pending online orders` : 'No pending orders'}
-                        title={pendingOnlineOrders > 0 ? `${pendingOnlineOrders} pending online orders` : 'No pending orders'}
-                    >
-                        <Bell size={20} />
-                        {pendingOnlineOrders > 0 && (
-                            <span className="notification-badge">{pendingOnlineOrders}</span>
-                        )}
-                        {sidebarOpen && <span className="notification-label">Online Orders</span>}
-                    </button>
-                )}
-
-                {/* Sync Status & Controls */}
-                {!isSuperAdmin && (
-                    <div className="sync-controls">
-                        <SyncStatusBadge showLabel={sidebarOpen} onClick={triggerSync} />
-                        {sidebarOpen && !isOnline && (
-                            <OfflineIndicator variant="badge" />
-                        )}
-                        {sidebarOpen && pendingCount > 0 && isOnline && (
-                            <button
-                                className="sync-now-btn"
-                                onClick={triggerSync}
-                                disabled={syncStatus === 'syncing'}
-                                title="Sync pending orders now"
-                            >
-                                <RefreshCw size={16} className={syncStatus === 'syncing' ? 'spinning' : ''} />
-                                <span>Sync Now ({pendingCount})</span>
-                            </button>
-                        )}
-                        {/* New Cloud Sync Indicator */}
-                        <SyncIndicator />
-                    </div>
-                )}
 
                 {/* Navigation */}
                 <nav className="sidebar-nav" aria-label="Pages">
@@ -269,32 +203,42 @@ export default function Layout() {
                     )}
                 </nav>
 
-                {/* User Profile */}
+                {/* Sidebar Footer — User Profile + Actions */}
                 <div className="sidebar-footer">
-                    <div className="user-info">
+                    {/* User Profile Card */}
+                    <div className="user-profile-card">
                         <div className="user-avatar">
                             {user?.name?.charAt(0) || 'U'}
                         </div>
                         {sidebarOpen && (
                             <div className="user-details">
                                 <span className="user-name">{user?.name}</span>
-                                <span className="user-role">{user?.role}</span>
+                                <span className="user-role">{user?.role?.replace('_', ' ')}</span>
                             </div>
                         )}
                     </div>
-                    <div className="sidebar-footer-actions">
-                        <button
-                            className="theme-toggle-btn"
-                            onClick={toggleTheme}
-                            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                        >
-                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                        </button>
-                        <button className="logout-btn" onClick={handleLogout} title="Logout" aria-label="Sign out">
-                            <LogOut size={18} />
-                        </button>
-                    </div>
+
+                    {/* Footer Action Buttons */}
+                    {sidebarOpen && (
+                        <div className="sidebar-footer-actions">
+                            <button
+                                className="footer-action-btn"
+                                onClick={toggleTheme}
+                                title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            >
+                                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                            </button>
+                            <button
+                                className="footer-action-btn logout"
+                                onClick={handleLogout}
+                                title="Sign out"
+                                aria-label="Sign out"
+                            >
+                                <LogOut size={16} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </motion.aside>
 
