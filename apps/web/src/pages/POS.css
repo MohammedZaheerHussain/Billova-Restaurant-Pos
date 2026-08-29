@@ -1146,6 +1146,122 @@
     font-family: var(--font-mono);
 }
 
+/* =========================================================
+   ONLINE AGGREGATOR SECTION (Swiggy / Zomato)
+   ========================================================= */
+.online-aggregator-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.online-platform-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.online-partner-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--bg-root);
+    border: 2px solid var(--border);
+    border-radius: 18px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    text-align: left;
+}
+
+.online-partner-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+}
+
+.online-partner-card.swiggy:hover,
+.online-partner-card.swiggy.selected {
+    border-color: #fc8019;
+    background: linear-gradient(135deg, rgba(252, 128, 25, 0.12) 0%, rgba(252, 128, 25, 0.03) 100%);
+    box-shadow: 0 4px 16px rgba(252, 128, 25, 0.25);
+}
+
+.online-partner-card.zomato:hover,
+.online-partner-card.zomato.selected {
+    border-color: #cb202d;
+    background: linear-gradient(135deg, rgba(203, 32, 45, 0.12) 0%, rgba(203, 32, 45, 0.03) 100%);
+    box-shadow: 0 4px 16px rgba(203, 32, 45, 0.25);
+}
+
+.partner-logo-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    flex-shrink: 0;
+}
+
+.partner-logo-box.swiggy-bg {
+    background: #fc8019;
+}
+
+.partner-logo-box.zomato-bg {
+    background: #cb202d;
+}
+
+.partner-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+}
+
+.partner-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.partner-info h4 {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.partner-info span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.partner-check-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+}
+
+.online-partner-card.swiggy .partner-check-icon {
+    background: #fc8019;
+}
+
+.online-partner-card.zomato .partner-check-icon {
+    background: #cb202d;
+}
+
+.online-details-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 /* Payment Method Pills (3 Segmented Buttons) */
 .payment-method-pills {
     display: grid;
