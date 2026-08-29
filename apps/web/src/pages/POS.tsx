@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, ShoppingCart, Minus, Plus, Trash2, X,
-    CreditCard, Banknote, Smartphone, Percent, Coffee,
-    UtensilsCrossed, Globe, User, Phone, Receipt, FileText
+    CreditCard, Banknote, Smartphone, Coffee,
+    UtensilsCrossed, Globe, User, Phone, Receipt, FileText,
+    Sparkles, Flame, Check, ChevronDown, ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCartStore, useUIStore, useAuthStore, MenuItem, Category } from '../store';
@@ -24,7 +25,6 @@ function formatProductName(name: string): string {
         .replace(/\b\w/g, char => char.toUpperCase());
 }
 
-
 export default function POSPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -32,15 +32,23 @@ export default function POSPage() {
     const [showPayment, setShowPayment] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // Quick Picks Tab State
+    const [isQuickPicksActive, setIsQuickPicksActive] = useState(false);
+
     // Customer details (optional)
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
+    const [showCustomerInputs, setShowCustomerInputs] = useState(false);
 
-    // Discount input
+    // Inline Discount Mode (₹ vs %)
+    const [discountMode, setDiscountMode] = useState<'PERCENTAGE' | 'FIXED'>('PERCENTAGE');
     const [discountInput, setDiscountInput] = useState('');
 
-    // Order notes (for parcel/special instructions)
+    // Order notes
     const [orderNotes, setOrderNotes] = useState('');
+
+    // Active editing item notes
+    const [editingNoteItemId, setEditingNoteItemId] = useState<string | null>(null);
 
     // Online platform details
     const [onlinePlatform, setOnlinePlatform] = useState<'SWIGGY' | 'ZOMATO' | null>(null);
@@ -49,7 +57,6 @@ export default function POSPage() {
     // Order success state
     const [showSuccess, setShowSuccess] = useState(false);
     const [completedOrderData, setCompletedOrderData] = useState<OrderCompleteData | null>(null);
-
 
     const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery } = useUIStore();
     const user = useAuthStore((state) => state.user);
@@ -61,6 +68,7 @@ export default function POSPage() {
         addItem,
         removeItem,
         updateQuantity,
+        updateItemNotes,
         clearCart,
         getSubtotal,
         getDiscountAmount,
@@ -81,6 +89,22 @@ export default function POSPage() {
         }
     }, [isAuthenticated]);
 
+    // Keyboard Shortcuts (F4 to trigger payment)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (cartItems.length > 0) {
+                    openPaymentModal();
+                } else {
+                    toast.error('Add items to cart first');
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [cartItems]);
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -98,8 +122,21 @@ export default function POSPage() {
         }
     };
 
+    // Helper to get quantity of an item currently in cart
+    const getQuantityInCart = (itemId: string) => {
+        return cartItems
+            .filter((ci) => ci.menuItem.id === itemId)
+            .reduce((sum, ci) => sum + ci.quantity, 0);
+    };
+
     // Filter items
     const filteredItems = menuItems.filter((item) => {
+        if (isQuickPicksActive) {
+            // In Quick Picks mode, show items that match search query
+            const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+            return matchesSearch && item.isAvailable;
+        }
+
         const catObj = categories.find((c) => c.id === selectedCategory);
         const catIds = catObj && (catObj as any).ids ? (catObj as any).ids : (selectedCategory ? [selectedCategory] : []);
 
@@ -113,34 +150,43 @@ export default function POSPage() {
         return matchesCategory && matchesSearch && item.isAvailable;
     });
 
+    // If Quick Picks is active, limit to top 10 items
+    const displayItems = isQuickPicksActive ? filteredItems.slice(0, 12) : filteredItems;
+
     // Handle add to cart
     const handleAddItem = (item: MenuItem) => {
         try {
-            // If item has variants, use the default variant
             if (item.variants && item.variants.length > 0) {
                 const defaultVariant = item.variants.find(v => v.isDefault) || item.variants[0];
                 addItem(item, defaultVariant);
             } else {
                 addItem(item);
             }
-            toast.success(`Added ${item.name}`, { duration: 1500 });
         } catch (error) {
             logger.error('Error adding item:', error);
             toast.error('Failed to add item');
         }
     };
 
-    // Apply discount from input
-    const applyDiscount = () => {
-        const value = parseFloat(discountInput);
-        if (!isNaN(value) && value > 0 && value <= 100) {
-            setDiscount('PERCENTAGE', value);
-            toast.success(`${value}% discount applied!`);
-        } else if (value === 0 || discountInput === '') {
-            setDiscount(null, 0);
-            toast.success('Discount removed');
+    // Apply inline discount changes
+    const handleDiscountChange = (valStr: string, mode: 'PERCENTAGE' | 'FIXED') => {
+        setDiscountInput(valStr);
+        const num = parseFloat(valStr);
+        if (!isNaN(num) && num > 0) {
+            if (mode === 'PERCENTAGE' && num <= 100) {
+                setDiscount('PERCENTAGE', num);
+            } else if (mode === 'FIXED') {
+                setDiscount('FIXED', num);
+            }
         } else {
-            toast.error('Enter valid discount (0-100%)');
+            setDiscount(null, 0);
+        }
+    };
+
+    const toggleDiscountMode = (newMode: 'PERCENTAGE' | 'FIXED') => {
+        setDiscountMode(newMode);
+        if (discountInput) {
+            handleDiscountChange(discountInput, newMode);
         }
     };
 
@@ -244,12 +290,12 @@ export default function POSPage() {
             setSubmitting(false);
         }
     };
+
     // Close success modal and start new order
     const handleNewOrder = () => {
         setShowSuccess(false);
         setCompletedOrderData(null);
     };
-
 
     // Open payment modal
     const openPaymentModal = () => {
@@ -257,165 +303,313 @@ export default function POSPage() {
             toast.error('Add items to cart first');
             return;
         }
-        // Pre-fill discount input if discount exists
-        if (discountType === 'PERCENTAGE' && discountValue > 0) {
-            setDiscountInput(discountValue.toString());
-        }
         setShowPayment(true);
     };
 
     return (
         <div className="pos-container">
-            {/* Left Side - Menu Items */}
+            {/* Left Side - Products & Categories (65% Width) */}
             <div className="pos-menu">
-                {/* Order Type Tabs */}
-                <div className="order-type-tabs">
-                    <button
-                        className={`order-type-tab ${orderType === 'DINE_IN' ? 'active' : ''}`}
-                        onClick={() => setOrderType('DINE_IN')}
-                    >
-                        <UtensilsCrossed size={18} />
-                        Dine In
-                    </button>
-                    <button
-                        className={`order-type-tab ${orderType === 'TAKEAWAY' ? 'active' : ''}`}
-                        onClick={() => setOrderType('TAKEAWAY')}
-                    >
-                        <Coffee size={18} />
-                        Takeaway
-                    </button>
-                    <button
-                        className={`order-type-tab ${orderType === 'ONLINE' ? 'active' : ''}`}
-                        onClick={() => setOrderType('ONLINE')}
-                    >
-                        <Globe size={18} />
-                        Online
-                    </button>
+                {/* Top Action Bar: Order Types & Search */}
+                <div className="pos-top-bar">
+                    <div className="order-type-tabs">
+                        <button
+                            className={`order-type-tab ${orderType === 'DINE_IN' ? 'active' : ''}`}
+                            onClick={() => setOrderType('DINE_IN')}
+                        >
+                            <UtensilsCrossed size={16} />
+                            <span>Dine In</span>
+                        </button>
+                        <button
+                            className={`order-type-tab ${orderType === 'TAKEAWAY' ? 'active' : ''}`}
+                            onClick={() => setOrderType('TAKEAWAY')}
+                        >
+                            <Coffee size={16} />
+                            <span>Takeaway</span>
+                        </button>
+                        <button
+                            className={`order-type-tab ${orderType === 'ONLINE' ? 'active' : ''}`}
+                            onClick={() => setOrderType('ONLINE')}
+                        >
+                            <Globe size={16} />
+                            <span>Online</span>
+                        </button>
+                    </div>
+
+                    {/* Search Bar with auto-focus styling */}
+                    <div className="pos-search">
+                        <Search size={18} className="search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search food items... (Press / to search)"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        {searchQuery && (
+                            <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                {/* Search Bar */}
-                <div className="pos-search">
-                    <Search size={20} className="search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Search items..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-
-                {/* Categories */}
-                <div className="category-scroll">
+                {/* Category Pill Rail with ⭐ Quick Picks */}
+                <div className="category-scroll custom-scrollbar">
                     <button
-                        className={`category-btn ${!selectedCategory ? 'active' : ''}`}
-                        onClick={() => setSelectedCategory(null)}
+                        className={`category-btn ${!selectedCategory && !isQuickPicksActive ? 'active' : ''}`}
+                        onClick={() => {
+                            setIsQuickPicksActive(false);
+                            setSelectedCategory(null);
+                        }}
                     >
-                        <span className="category-icon">🍽️</span>
                         <span className="category-name">All</span>
                     </button>
+
+                    <button
+                        className={`category-btn quick-picks-btn ${isQuickPicksActive ? 'active' : ''}`}
+                        onClick={() => {
+                            setIsQuickPicksActive(true);
+                            setSelectedCategory(null);
+                        }}
+                    >
+                        <Flame size={14} className="quick-picks-icon" />
+                        <span className="category-name">Quick Picks ⭐</span>
+                    </button>
+
                     {categories.map((cat) => (
                         <button
                             key={cat.id}
-                            className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                            onClick={() => setSelectedCategory(cat.id)}
-                            style={{ '--cat-color': cat.color || '#dc2626' } as React.CSSProperties}
+                            className={`category-btn ${selectedCategory === cat.id && !isQuickPicksActive ? 'active' : ''}`}
+                            onClick={() => {
+                                setIsQuickPicksActive(false);
+                                setSelectedCategory(cat.id);
+                            }}
                         >
-                            <span className="category-icon">{cat.icon}</span>
+                            <span className="category-icon">{cat.icon || '🍽️'}</span>
                             <span className="category-name">{cat.name}</span>
                         </button>
                     ))}
                 </div>
 
-                {/* Menu Grid */}
-                <div className={`menu-grid ${filteredItems.length > 0 && filteredItems.length <= 6 ? 'menu-grid-sparse' : ''}`}>
+                {/* Product Cards Grid */}
+                <div className={`menu-grid custom-scrollbar ${displayItems.length > 0 && displayItems.length <= 6 ? 'menu-grid-sparse' : ''}`}>
                     {loading ? (
                         <POSSkeleton />
-                    ) : filteredItems.length === 0 ? (
+                    ) : displayItems.length === 0 ? (
                         <div className="empty-state">
-                            <Search size={32} strokeWidth={1.5} />
-                            <p>No items in this category</p>
-                            <span className="empty-hint">Try selecting a different category or add items from the Menu page</span>
+                            <Search size={36} strokeWidth={1.5} />
+                            <p>No items found in this section</p>
+                            <span className="empty-hint">Try selecting another category or check your search term</span>
                         </div>
                     ) : (
                         <AnimatePresence mode="popLayout">
-                            {filteredItems.map((item) => (
-                                <motion.div
-                                    key={item.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.97 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.97 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="menu-item-card"
-                                    onClick={() => handleAddItem(item)}
-                                >
-                                    <div className="item-header">
-                                        <div className={`veg-indicator ${item.isVeg ? 'veg' : 'non-veg'}`} />
-                                        {item.variants && item.variants.length > 1 && (
-                                            <span className="variant-badge">{item.variants.length} sizes</span>
-                                        )}
-                                    </div>
-                                    <h3 className="item-name">{item.name}</h3>
-                                    <div className="item-price">
-                                        ₹{item.variants?.[0]?.price || item.price}
-                                    </div>
-                                </motion.div>
-                            ))}
+                            {displayItems.map((item) => {
+                                const inCartQty = getQuantityInCart(item.id);
+                                const itemImage = (item as any).image_url || (item as any).image;
+                                const itemPrice = Number(item.variants?.[0]?.price ?? item.price);
+
+                                return (
+                                    <motion.div
+                                        key={item.id}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        whileHover={{ y: -3 }}
+                                        whileTap={{ scale: 0.97 }}
+                                        transition={{ duration: 0.15 }}
+                                        className={`menu-item-card ${inCartQty > 0 ? 'in-cart' : ''}`}
+                                        onClick={() => handleAddItem(item)}
+                                    >
+                                        {/* Top Card Badges */}
+                                        <div className="card-badge-row">
+                                            {/* In-Cart Counter Badge */}
+                                            {inCartQty > 0 ? (
+                                                <span className="in-cart-badge">
+                                                    {inCartQty} in cart
+                                                </span>
+                                            ) : (
+                                                <span className="badge-placeholder" />
+                                            )}
+
+                                            <div className="card-top-right">
+                                                {item.variants && item.variants.length > 1 && (
+                                                    <span className="variant-badge">{item.variants.length} sizes</span>
+                                                )}
+                                                <div className={`veg-indicator ${item.isVeg ? 'veg' : 'non-veg'}`} />
+                                            </div>
+                                        </div>
+
+                                        {/* Product Hero Image / Illustration */}
+                                        <div className="item-hero-container">
+                                            {itemImage ? (
+                                                <img
+                                                    src={itemImage}
+                                                    alt={item.name}
+                                                    className="item-hero-img"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="item-hero-fallback">
+                                                    <span className="fallback-emoji">
+                                                        {item.isVeg ? '🥗' : '🍗'}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Card Details */}
+                                        <div className="item-details">
+                                            <h3 className="item-name" title={item.name}>
+                                                {item.name}
+                                            </h3>
+
+                                            <div className="item-footer">
+                                                <div className="item-price">
+                                                    <span className="currency">₹</span>
+                                                    <span className="price-num">{itemPrice}</span>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    className={`card-add-btn ${inCartQty > 0 ? 'added' : ''}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleAddItem(item);
+                                                    }}
+                                                    title="Add to cart"
+                                                >
+                                                    <Plus size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
                         </AnimatePresence>
                     )}
                 </div>
             </div>
 
-            {/* Right Side - Cart */}
+            {/* Right Side - Sticky Cart & Settlement (35% Width) */}
             <div className="pos-cart">
+                {/* Cart Header */}
                 <div className="cart-header">
-                    <h2>
-                        <ShoppingCart size={22} />
-                        Current Order
-                    </h2>
-                    <span className="cart-count">{getItemCount()} items</span>
+                    <div className="cart-header-title">
+                        <ShoppingCart size={20} className="cart-icon" />
+                        <h2>CURRENT BILL</h2>
+                    </div>
+
+                    <div className="cart-header-actions">
+                        <span className="cart-count-badge">
+                            {getItemCount()} {getItemCount() === 1 ? 'item' : 'items'}
+                        </span>
+                        {cartItems.length > 0 && (
+                            <button
+                                className="clear-cart-btn"
+                                onClick={clearCart}
+                                title="Clear current cart"
+                            >
+                                <Trash2 size={15} />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                {/* Cart Items */}
-                <div className="cart-items">
+                {/* Cart Items List */}
+                <div className="cart-items custom-scrollbar">
                     {cartItems.length === 0 ? (
                         <div className="cart-empty">
-                            <ShoppingCart size={48} strokeWidth={1} />
-                            <p>Cart is empty</p>
-                            <span>Add items to start an order</span>
+                            <div className="empty-cart-icon-wrapper">
+                                <ShoppingCart size={40} strokeWidth={1.5} />
+                            </div>
+                            <h3>Ready to create a bill?</h3>
+                            <p>Select any item from the menu to get started.</p>
                         </div>
                     ) : (
                         <AnimatePresence>
                             {cartItems.map((item, index) => (
                                 <motion.div
                                     key={item.id}
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
                                     className="cart-item"
                                 >
-                                    <span className="item-sno">{index + 1}.</span>
-                                    <div className="cart-item-info">
-                                        <h4>{formatProductName(item.menuItem.name)}</h4>
-                                        {item.variant && (
-                                            <span className="variant-name">{item.variant.name}</span>
-                                        )}
-                                        <span className="item-unit-price">₹{item.unitPrice}</span>
-                                    </div>
-                                    <div className="cart-item-controls">
-                                        <div className="quantity-control">
-                                            <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                                                <Minus size={16} />
-                                            </button>
-                                            <span>{item.quantity}</span>
-                                            <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-                                                <Plus size={16} />
+                                    <div className="cart-item-main">
+                                        <div className="cart-item-details">
+                                            <div className="cart-item-title-row">
+                                                <span className="item-sno">{index + 1}.</span>
+                                                <h4 className="cart-item-name">{formatProductName(item.menuItem.name)}</h4>
+                                            </div>
+                                            {item.variant && (
+                                                <span className="variant-name">{item.variant.name}</span>
+                                            )}
+                                            <span className="item-unit-price">₹{item.unitPrice} each</span>
+                                        </div>
+
+                                        <div className="cart-item-controls">
+                                            <div className="quantity-control">
+                                                <button
+                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                    className="qty-btn"
+                                                >
+                                                    <Minus size={14} />
+                                                </button>
+                                                <span className="qty-val">{item.quantity}</span>
+                                                <button
+                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                    className="qty-btn"
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                            </div>
+
+                                            <span className="item-total">₹{item.total.toFixed(2)}</span>
+
+                                            <button
+                                                className="remove-btn"
+                                                onClick={() => removeItem(item.id)}
+                                                title="Remove item"
+                                            >
+                                                <X size={15} />
                                             </button>
                                         </div>
-                                        <span className="item-total">₹{item.total}</span>
-                                        <button className="remove-btn" onClick={() => removeItem(item.id)}>
-                                            <Trash2 size={16} />
-                                        </button>
+                                    </div>
+
+                                    {/* Item Cooking Modifiers / Notes */}
+                                    <div className="cart-item-notes-row">
+                                        {editingNoteItemId === item.id ? (
+                                            <div className="item-note-input-wrapper">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g., Less spicy, no onion"
+                                                    value={item.notes || ''}
+                                                    onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                                                    autoFocus
+                                                    onBlur={() => setEditingNoteItemId(null)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') setEditingNoteItemId(null);
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingNoteItemId(null)}
+                                                    className="note-done-btn"
+                                                >
+                                                    <Check size={14} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className={`item-note-toggle ${item.notes ? 'has-note' : ''}`}
+                                                onClick={() => setEditingNoteItemId(item.id)}
+                                            >
+                                                <FileText size={12} />
+                                                <span>{item.notes ? item.notes : '+ Add note / modifier'}</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </motion.div>
                             ))}
@@ -423,101 +617,132 @@ export default function POSPage() {
                     )}
                 </div>
 
-                {/* Customer Info Section (Optional) */}
+                {/* Collapsible Customer Info & Order Notes */}
                 {cartItems.length > 0 && (
-                    <div className="customer-info-section">
-                        <div className="customer-input-row">
-                            <div className="customer-input-group">
-                                <User size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Customer Name (optional)"
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                />
-                            </div>
-                            <div className="customer-input-group">
-                                <Phone size={16} />
-                                <input
-                                    type="tel"
-                                    placeholder="Phone (optional)"
-                                    value={customerPhone}
-                                    onChange={(e) => setCustomerPhone(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Order Notes Section */}
-                {cartItems.length > 0 && (
-                    <div className="order-notes-section">
-                        <div className="notes-input-group">
-                            <FileText size={16} />
-                            <input
-                                type="text"
-                                placeholder="Order notes (e.g., Strips - Parcel, Popcorn - Dine)"
-                                value={orderNotes}
-                                onChange={(e) => setOrderNotes(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Discount Input Section */}
-                {cartItems.length > 0 && (
-                    <div className="discount-section">
-                        <div className="discount-input-group">
-                            <Percent size={16} />
-                            <input
-                                type="number"
-                                placeholder="Discount %"
-                                value={discountInput}
-                                onChange={(e) => setDiscountInput(e.target.value)}
-                                min="0"
-                                max="100"
-                            />
-                            <button className="apply-discount-btn" onClick={applyDiscount}>
-                                Apply
-                            </button>
-                        </div>
-                        {discountType && discountValue > 0 && (
-                            <span className="discount-value">
-                                -{discountValue}% Applied
+                    <div className="cart-customer-panel">
+                        <button
+                            type="button"
+                            className="toggle-customer-btn"
+                            onClick={() => setShowCustomerInputs(!showCustomerInputs)}
+                        >
+                            <span>
+                                {customerName || customerPhone
+                                    ? `Customer: ${customerName || customerPhone}`
+                                    : '+ Add Customer / Order Note'}
                             </span>
+                            {showCustomerInputs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+
+                        {showCustomerInputs && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="customer-fields-container"
+                            >
+                                <div className="customer-input-row">
+                                    <div className="customer-input-group">
+                                        <User size={14} />
+                                        <input
+                                            type="text"
+                                            placeholder="Customer Name"
+                                            value={customerName}
+                                            onChange={(e) => setCustomerName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="customer-input-group">
+                                        <Phone size={14} />
+                                        <input
+                                            type="tel"
+                                            placeholder="Phone"
+                                            value={customerPhone}
+                                            onChange={(e) => setCustomerPhone(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="order-notes-input-group">
+                                    <FileText size={14} />
+                                    <input
+                                        type="text"
+                                        placeholder="Order notes (e.g. Table 4, Pack with cutlery)"
+                                        value={orderNotes}
+                                        onChange={(e) => setOrderNotes(e.target.value)}
+                                    />
+                                </div>
+                            </motion.div>
                         )}
                     </div>
                 )}
 
-                {/* Cart Summary */}
-                <div className="cart-summary">
-                    <div className="summary-row">
-                        <span>Subtotal</span>
-                        <span>₹{getSubtotal().toFixed(2)}</span>
-                    </div>
-                    {getDiscountAmount() > 0 && (
-                        <div className="summary-row discount">
-                            <span>Discount ({discountValue}%)</span>
-                            <span>-₹{getDiscountAmount().toFixed(2)}</span>
-                        </div>
-                    )}
-                    <div className="summary-row total">
-                        <span>Total</span>
-                        <span>₹{getTotal().toFixed(2)}</span>
-                    </div>
-                </div>
+                {/* Sticky Cart Summary & Settlement Footer */}
+                <div className="cart-footer">
+                    {/* Inline Discount Switcher (₹ vs %) */}
+                    <div className="inline-discount-row">
+                        <span className="discount-label">Discount</span>
+                        <div className="discount-controls">
+                            <div className="discount-mode-toggle">
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${discountMode === 'FIXED' ? 'active' : ''}`}
+                                    onClick={() => toggleDiscountMode('FIXED')}
+                                >
+                                    ₹
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${discountMode === 'PERCENTAGE' ? 'active' : ''}`}
+                                    onClick={() => toggleDiscountMode('PERCENTAGE')}
+                                >
+                                    %
+                                </button>
+                            </div>
 
-                {/* Action Buttons */}
-                <div className="cart-actions">
-                    <button className="btn btn-secondary" onClick={clearCart} disabled={cartItems.length === 0}>
-                        Clear
-                    </button>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="0"
+                                value={discountInput}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                                    handleDiscountChange(val, discountMode);
+                                }}
+                                className="discount-input-box"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Totals Breakdown */}
+                    <div className="cart-totals">
+                        <div className="summary-row">
+                            <span>Subtotal</span>
+                            <span>₹{getSubtotal().toFixed(2)}</span>
+                        </div>
+
+                        {getDiscountAmount() > 0 && (
+                            <div className="summary-row discount">
+                                <span>
+                                    Discount ({discountType === 'PERCENTAGE' ? `${discountValue}%` : `₹${discountValue}`})
+                                </span>
+                                <span>-₹{getDiscountAmount().toFixed(2)}</span>
+                            </div>
+                        )}
+
+                        <div className="summary-row total-row">
+                            <span className="total-label">TOTAL</span>
+                            <span className="total-amount">₹{getTotal().toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    {/* Complete Bill CTA Button */}
                     <button
-                        className="btn btn-primary btn-lg"
+                        className="complete-bill-btn"
                         onClick={openPaymentModal}
                         disabled={cartItems.length === 0}
                     >
-                        Pay ₹{getTotal().toFixed(2)}
+                        <Sparkles size={18} />
+                        <span>COMPLETE BILL • ₹{getTotal().toFixed(2)}</span>
+                        <span className="shortcut-hint">F4</span>
                     </button>
                 </div>
             </div>
@@ -534,19 +759,19 @@ export default function POSPage() {
                     >
                         <motion.div
                             className="payment-modal bill-modal"
-                            initial={{ scale: 0.9, opacity: 0 }}
+                            initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="modal-header">
-                                <h2><Receipt size={22} /> Bill Summary</h2>
+                                <h2><Receipt size={22} /> Bill Summary & Settlement</h2>
                                 <button className="close-btn" onClick={() => setShowPayment(false)}>
                                     <X size={24} />
                                 </button>
                             </div>
 
-                            {/* Customer Details (Optional) */}
+                            {/* Customer Details in Modal */}
                             <div className="customer-details">
                                 <h3>Customer Details (Optional)</h3>
                                 <div className="customer-inputs">
@@ -571,7 +796,7 @@ export default function POSPage() {
                                 </div>
                             </div>
 
-                            {/* Online Platform Selection - Only for Online orders */}
+                            {/* Online Platform Selection */}
                             {orderType === 'ONLINE' && (
                                 <div className="online-platform-section">
                                     <h3>Select Platform</h3>
@@ -621,12 +846,13 @@ export default function POSPage() {
                                     <span>Price</span>
                                     <span>Total</span>
                                 </div>
-                                <div className="bill-items-list">
+                                <div className="bill-items-list custom-scrollbar">
                                     {cartItems.map((item) => (
                                         <div key={item.id} className="bill-item-row">
                                             <span className="bill-item-name">
                                                 {formatProductName(item.menuItem.name)}
                                                 {item.variant && <small> ({item.variant.name})</small>}
+                                                {item.notes && <small className="bill-note"> [{item.notes}]</small>}
                                             </span>
                                             <span className="bill-item-qty">x{item.quantity}</span>
                                             <span className="bill-item-price">₹{item.unitPrice}</span>
@@ -636,7 +862,7 @@ export default function POSPage() {
                                 </div>
                             </div>
 
-                            {/* Bill Summary */}
+                            {/* Bill Summary in Modal */}
                             <div className="bill-summary">
                                 <div className="bill-row">
                                     <span>Subtotal ({getItemCount()} items)</span>
@@ -644,7 +870,7 @@ export default function POSPage() {
                                 </div>
                                 {getDiscountAmount() > 0 && (
                                     <div className="bill-row discount-row">
-                                        <span>Discount ({discountValue}%)</span>
+                                        <span>Discount ({discountType === 'PERCENTAGE' ? `${discountValue}%` : `₹${discountValue}`})</span>
                                         <span>-₹{getDiscountAmount().toFixed(2)}</span>
                                     </div>
                                 )}
@@ -654,49 +880,33 @@ export default function POSPage() {
                                 </div>
                             </div>
 
-                            {/* Discount Input in Modal */}
-                            <div className="modal-discount">
-                                <label>Apply Discount:</label>
-                                <div className="discount-input-inline">
-                                    <input
-                                        type="number"
-                                        placeholder="0"
-                                        value={discountInput}
-                                        onChange={(e) => setDiscountInput(e.target.value)}
-                                        min="0"
-                                        max="100"
-                                    />
-                                    <span>%</span>
-                                    <button onClick={applyDiscount}>Apply</button>
-                                </div>
-                            </div>
-
+                            {/* Instant Payment Selection */}
                             <div className="payment-methods">
-                                <h3>Select Payment Method</h3>
+                                <h3>Select Payment Tender</h3>
                                 <div className="payment-grid">
                                     <button
-                                        className="payment-method-btn"
+                                        className="payment-method-btn cash"
                                         onClick={() => handleSubmitOrder('CASH')}
                                         disabled={submitting}
                                     >
-                                        <Banknote size={32} />
-                                        <span>Cash</span>
+                                        <Banknote size={30} />
+                                        <span>CASH</span>
                                     </button>
                                     <button
-                                        className="payment-method-btn"
-                                        onClick={() => handleSubmitOrder('CARD')}
-                                        disabled={submitting}
-                                    >
-                                        <CreditCard size={32} />
-                                        <span>Card</span>
-                                    </button>
-                                    <button
-                                        className="payment-method-btn"
+                                        className="payment-method-btn upi"
                                         onClick={() => handleSubmitOrder('UPI')}
                                         disabled={submitting}
                                     >
-                                        <Smartphone size={32} />
-                                        <span>UPI</span>
+                                        <Smartphone size={30} />
+                                        <span>UPI / QR</span>
+                                    </button>
+                                    <button
+                                        className="payment-method-btn card"
+                                        onClick={() => handleSubmitOrder('CARD')}
+                                        disabled={submitting}
+                                    >
+                                        <CreditCard size={30} />
+                                        <span>CARD</span>
                                     </button>
                                 </div>
                             </div>
@@ -704,7 +914,7 @@ export default function POSPage() {
                             {submitting && (
                                 <div className="submitting-overlay">
                                     <div className="spinner" />
-                                    <p>Processing order...</p>
+                                    <p>Processing and finalizing order...</p>
                                 </div>
                             )}
                         </motion.div>
@@ -720,6 +930,5 @@ export default function POSPage() {
                 onNewOrder={handleNewOrder}
             />
         </div>
-
     );
 }
