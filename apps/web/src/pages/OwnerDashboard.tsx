@@ -109,7 +109,7 @@ export function OwnerDashboard() {
                     </span>
                 </div>
                 <button className="od-refresh-btn" onClick={fetchData} disabled={loading}>
-                    <RefreshCw size={14} className={loading ? 'od-spin' : ''} />
+                    <RefreshCw size={13} className={loading ? 'od-spin' : ''} />
                     {loading ? 'Refreshing…' : 'Refresh'}
                 </button>
             </header>

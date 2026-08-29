@@ -130,10 +130,15 @@ export default function TablesPage() {
                     <div className="spinner" />
                 </div>
             ) : tables.length === 0 ? (
-                <div className="empty-state" style={{ textAlign: 'center', padding: '60px 20px', opacity: 0.6 }}>
-                    <Grid3X3 size={48} strokeWidth={1} />
-                    <p style={{ marginTop: 12, fontSize: 15, color: 'var(--text-secondary)' }}>No tables configured yet</p>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Click "Add Table" to set up your dine-in area</span>
+                <div className="empty-state">
+                    <div className="empty-state-icon-box">
+                        <Grid3X3 size={42} strokeWidth={1.5} />
+                    </div>
+                    <h3>No Tables Configured</h3>
+                    <p>Set up your dine-in floor plan to manage tables and generate self-ordering QR codes</p>
+                    <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginTop: 8 }}>
+                        <Plus size={16} /> Add First Table
+                    </button>
                 </div>
             ) : (
                 <div className="tables-grid">

@@ -174,7 +174,9 @@ export default function AddonsPage() {
                 <div className="loading-state"><div className="spinner" /></div>
             ) : filteredAddons.length === 0 ? (
                 <div className="empty-state">
-                    <Tag size={48} />
+                    <div className="empty-state-icon-box">
+                        <Tag size={36} strokeWidth={1.5} />
+                    </div>
                     <h3>No Addons Yet</h3>
                     <p>Create addons like "Extra Cheese", "No Onion", etc.</p>
                 </div>

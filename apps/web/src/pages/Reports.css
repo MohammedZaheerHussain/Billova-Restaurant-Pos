@@ -1,11 +1,11 @@
 /* =======================================================
-   Reports Page — KPI Cards + Bar Charts + Data Tables
+   Reports Page — Icebox Style Analytics & KPI Cards
    ======================================================= */
 
 .reports-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 52px);
+    height: calc(100vh - 54px);
     overflow-y: auto;
     background: var(--bg-root);
     padding: 0;
@@ -17,7 +17,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    height: 52px;
+    height: 54px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-canvas);
     flex-shrink: 0;
@@ -25,9 +25,10 @@
 }
 
 .page-header h1 {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .page-header p {
@@ -39,23 +40,26 @@
 /* ── Period Tabs ── */
 .period-tabs {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px;
+    border-radius: 100px;
+    padding: 3px;
 }
 
 .period-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 5px 14px;
     background: none;
     border: none;
-    border-radius: 16px;
+    border-radius: 100px;
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 160ms ease;
     white-space: nowrap;
 }
 
@@ -75,8 +79,8 @@
 .summary-cards {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    padding: 16px 24px;
+    gap: 14px;
+    padding: 20px 24px;
     background: transparent;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -91,15 +95,15 @@
     align-items: center;
     gap: 14px;
     cursor: default;
-    transition: all var(--transition-fast);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 160ms ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .summary-card:hover {
     background: var(--bg-surface-hover);
     border-color: var(--border-light);
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .card-icon {
@@ -115,21 +119,25 @@
 /* Gradient variants */
 .gradient-green .card-icon {
     background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.2);
     color: var(--success);
 }
 
 .gradient-blue .card-icon {
     background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.2);
     color: #60a5fa;
 }
 
 .gradient-purple .card-icon {
     background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.2);
     color: #a78bfa;
 }
 
 .gradient-orange .card-icon {
-    background: var(--primary-glow);
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.05) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.25);
     color: var(--primary);
 }
 
@@ -144,41 +152,56 @@
     font-size: 20px;
     font-weight: 800;
     color: var(--text-primary);
-    line-height: 1;
+    line-height: 1.1;
     letter-spacing: -0.02em;
     font-family: var(--font-mono);
 }
 
 .card-label {
-    font-size: 11px;
+    font-size: 11.5px;
     color: var(--text-muted);
     font-weight: 500;
+}
+
+.trend-up {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.trend-down {
+    color: var(--danger);
+    font-weight: 700;
 }
 
 /* ── Charts Row ── */
 .charts-row {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: 20px;
+    gap: 16px;
     padding: 20px 24px;
     flex-shrink: 0;
 }
 
 .chart-card {
-    background: var(--bg-canvas);
+    background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 16px 20px;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .chart-card h3 {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 13.5px;
+    font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.chart-card h3 svg {
+    color: var(--primary);
 }
 
 /* ── Bar Chart ── */
@@ -186,8 +209,8 @@
     display: flex;
     align-items: flex-end;
     gap: 4px;
-    height: 120px;
-    padding-bottom: 20px;
+    height: 130px;
+    padding-bottom: 22px;
     position: relative;
 }
 
@@ -205,23 +228,30 @@
 .bar {
     width: 100%;
     background: var(--primary);
-    border-radius: 3px 3px 0 0;
+    border-radius: 4px 4px 0 0;
     min-height: 2px;
-    transition: background var(--transition-fast);
-    opacity: 0.8;
+    transition: all 160ms ease;
+    opacity: 0.85;
 }
 
 .bar:hover {
     opacity: 1;
+    background: var(--primary-hover);
+    box-shadow: 0 0 10px rgba(249, 115, 22, 0.4);
 }
 
 .bar-value {
     position: absolute;
-    top: -18px;
-    font-size: 9px;
-    color: var(--text-muted);
+    top: -20px;
+    font-size: 9.5px;
+    color: var(--text-primary);
+    font-weight: 700;
     white-space: nowrap;
     display: none;
+    background: var(--bg-canvas);
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
 }
 
 .bar-container:hover .bar-value {
@@ -229,7 +259,7 @@
 }
 
 .bar-label {
-    font-size: 9px;
+    font-size: 9.5px;
     color: var(--text-muted);
     position: absolute;
     bottom: 0;
@@ -237,10 +267,11 @@
 }
 
 .no-data {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--text-muted);
     text-align: center;
-    padding: 32px;
+    padding: 36px 16px;
+    width: 100%;
 }
 
 /* ── Order Types ── */
@@ -271,8 +302,8 @@
 
 .order-type-name {
     flex: 1;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 12.5px;
+    font-weight: 600;
     color: var(--text-secondary);
 }
 
@@ -284,15 +315,15 @@
 }
 
 .order-type-bar {
-    height: 4px;
+    height: 5px;
     background: var(--border);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
 }
 
 .order-type-fill {
     height: 100%;
-    border-radius: 2px;
+    border-radius: 3px;
     transition: width 0.5s ease;
 }
 
@@ -303,67 +334,131 @@
     color: var(--text-muted);
 }
 
-/* ── Table Section ── */
-.reports-table-section {
+/* ── Bottom Row: Top Selling & Payment Methods ── */
+.bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
     padding: 0 24px 24px;
+    flex-shrink: 0;
 }
 
-.reports-table-section h3 {
-    font-size: 13px;
-    font-weight: 600;
+.report-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.report-card h3 {
+    font-size: 13.5px;
+    font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: 10px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.reports-table-container {
+.report-card h3 svg {
+    color: var(--primary);
+}
+
+/* ── Top Selling Items List ── */
+.items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.item-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
     background: var(--bg-canvas);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    border-radius: 12px;
+    font-size: 12.5px;
+    transition: all 140ms ease;
 }
 
-.reports-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-}
-
-.reports-table thead th {
-    padding: 10px 16px;
-    text-align: left;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-canvas);
-}
-
-.reports-table tbody tr {
-    border-bottom: 1px solid var(--border-subtle);
-    transition: background var(--transition-fast);
-}
-
-.reports-table tbody tr:hover {
+.item-row:hover {
     background: var(--bg-surface-hover);
+    border-color: var(--border-light);
 }
 
-.reports-table tbody td {
-    padding: 9px 16px;
-    color: var(--text-secondary);
-    vertical-align: middle;
+.rank {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
 }
 
-.reports-table tbody td:first-child {
-    color: var(--text-primary);
-    font-weight: 500;
-}
+.rank.rank-1 { background: rgba(249, 115, 22, 0.15); color: var(--primary); }
+.rank.rank-2 { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.rank.rank-3 { background: rgba(16, 185, 129, 0.15); color: var(--success); }
 
-.reports-table .mono {
-    font-family: var(--font-mono);
+.item-name {
+    flex: 1;
     font-weight: 600;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-qty {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.item-total {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+/* ── Payment Methods List ── */
+.payment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.payment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 12.5px;
+    transition: all 140ms ease;
+}
+
+.payment-item:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
+}
+
+.payment-mode {
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.payment-amount {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
 }
 
 /* ── Loading ── */
@@ -389,7 +484,8 @@
     .summary-cards {
         grid-template-columns: repeat(2, 1fr);
     }
-    .charts-row {
+    .charts-row,
+    .bottom-row {
         grid-template-columns: 1fr;
     }
 }

@@ -1,11 +1,11 @@
 /* =======================================================
-   Inventory Page — Stock Management Table
+   Inventory Page — Icebox Style Stock Management
    ======================================================= */
 
 .inventory-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 52px);
+    height: calc(100vh - 54px);
     overflow: hidden;
     background: var(--bg-root);
 }
@@ -16,7 +16,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    height: 52px;
+    height: 54px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-canvas);
     flex-shrink: 0;
@@ -24,9 +24,10 @@
 }
 
 .page-header h1 {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .page-header p {
@@ -38,7 +39,7 @@
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
@@ -46,8 +47,8 @@
 .filters-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 24px;
+    gap: 10px;
+    padding: 10px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-canvas);
     flex-shrink: 0;
@@ -57,61 +58,66 @@
 
 .filters-bar::-webkit-scrollbar { display: none; }
 
-/* ── Search Box ── */
+/* ── Search Box (Icebox pill style) ── */
 .search-box {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 12px;
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    min-width: 200px;
+    max-width: 300px;
     flex: 1;
-    min-width: 180px;
-    max-width: 280px;
-    transition: border-color var(--transition-fast);
-}
-
-.search-box:focus-within {
-    border-color: var(--primary);
 }
 
 .search-box svg {
+    position: absolute;
+    left: 12px;
     color: var(--text-muted);
+    pointer-events: none;
     flex-shrink: 0;
 }
 
 .search-box input {
-    flex: 1;
-    background: none;
-    border: none;
-    outline: none;
+    width: 100%;
+    padding: 7px 14px 7px 34px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12.5px;
     font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: all 160ms ease;
+}
+
+.search-box input:focus {
+    border-color: var(--primary);
+    background: var(--bg-surface-hover);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 .search-box input::placeholder {
     color: var(--text-muted);
 }
 
-/* ── Filter Select ── */
+/* ── Filter Select (pill style) ── */
 .filter-select {
-    padding: 7px 10px;
-    background: var(--bg-input);
+    padding: 7px 14px;
+    background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: 100px;
     color: var(--text-secondary);
     font-size: 12px;
+    font-weight: 600;
     font-family: 'Inter', sans-serif;
     outline: none;
     cursor: pointer;
-    transition: border-color var(--transition-fast);
+    transition: all 160ms ease;
     white-space: nowrap;
 }
 
 .filter-select:focus {
     border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 .filter-select option {
@@ -126,7 +132,7 @@
     overflow-x: auto;
 }
 
-/* ── Inventory Table ── */
+/* ── Inventory Table (Icebox clean) ── */
 .inventory-table {
     width: 100%;
     border-collapse: collapse;
@@ -144,8 +150,8 @@
 .inventory-table thead th {
     padding: 10px 16px;
     text-align: left;
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 10.5px;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -155,7 +161,7 @@
 
 .inventory-table tbody tr {
     border-bottom: 1px solid var(--border-subtle);
-    transition: background var(--transition-fast);
+    transition: background 120ms ease;
 }
 
 .inventory-table tbody tr:hover {
@@ -187,12 +193,12 @@
 .category-badge {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
+    padding: 3px 10px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 100px;
     font-size: 10px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-secondary);
     white-space: nowrap;
 }
@@ -252,12 +258,12 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     background: var(--primary-glow);
     border: 1px solid rgba(249, 115, 22, 0.2);
-    border-radius: 4px;
+    border-radius: 100px;
     font-size: 10px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--primary);
     white-space: nowrap;
 }
@@ -271,7 +277,7 @@
     display: flex;
     align-items: center;
     opacity: 0.6;
-    transition: opacity var(--transition-fast);
+    transition: opacity 140ms ease;
 }
 
 .unlink-btn:hover {
@@ -291,14 +297,14 @@
 }
 
 .btn-link-small {
-    padding: 3px 8px;
+    padding: 3px 10px;
     background: var(--bg-surface);
     border: 1px dashed var(--border);
-    border-radius: 4px;
+    border-radius: 100px;
     font-size: 10px;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 140ms ease;
     white-space: nowrap;
 }
 
@@ -312,20 +318,20 @@
 .action-buttons {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
 }
 
 .btn-action {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: none;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: 10px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 140ms ease;
     color: var(--text-muted);
     flex-shrink: 0;
 }
@@ -359,14 +365,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
+    min-width: 18px;
     height: 18px;
+    padding: 0 5px;
     background: var(--danger);
     color: #fff;
     font-size: 10px;
     font-weight: 700;
-    border-radius: 50%;
-    margin-left: 2px;
+    border-radius: 100px;
+    margin-left: 4px;
 }
 
 /* ── Shared Buttons ── */
@@ -421,11 +428,37 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 12px;
-    padding: 60px;
+    padding: 80px 20px;
     color: var(--text-muted);
-    font-size: 13px;
     text-align: center;
+}
+
+.empty-state-icon-box {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.empty-state h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    font-size: 13px;
+    color: var(--text-muted);
+    max-width: 340px;
+    line-height: 1.4;
 }
 
 /* ── Spinner ── */
@@ -482,6 +515,9 @@
     font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .close-btn {
@@ -492,10 +528,10 @@
     justify-content: center;
     background: none;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: 10px;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 140ms ease;
 }
 
 .close-btn:hover {
@@ -542,7 +578,7 @@
     font-size: 13px;
     font-family: 'Inter', sans-serif;
     outline: none;
-    transition: border-color var(--transition-fast);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
     width: 100%;
 }
 
@@ -567,7 +603,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    padding: 12px 20px;
+    padding: 14px 20px;
     border-top: 1px solid var(--border);
     flex-shrink: 0;
 }
@@ -581,7 +617,7 @@
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 140ms ease;
 }
 
 .btn-secondary:hover:not(:disabled) {

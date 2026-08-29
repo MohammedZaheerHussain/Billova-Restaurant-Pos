@@ -1,11 +1,11 @@
 /* =======================================================
-   Tables Page — Floor Plan Grid with Status Cards
+   Tables Page — Icebox Style Dine-In Grid
    ======================================================= */
 
 .tables-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 52px);
+    height: calc(100vh - 54px);
     overflow-y: auto;
     background: var(--bg-root);
 }
@@ -16,7 +16,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    height: 52px;
+    height: 54px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-canvas);
     flex-shrink: 0;
@@ -24,9 +24,10 @@
 }
 
 .page-header h1 {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .header-actions {
@@ -39,21 +40,25 @@
 .table-legend {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 5px 14px;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
 }
 
 .legend-item span {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     display: inline-block;
 }
@@ -274,9 +279,37 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    gap: 12px;
+    padding: 80px 20px;
     color: var(--text-muted);
+    text-align: center;
+}
+
+.empty-state-icon-box {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.empty-state h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.empty-state p {
     font-size: 13px;
+    color: var(--text-muted);
+    max-width: 340px;
+    line-height: 1.4;
 }
 
 /* ── Spinner ── */

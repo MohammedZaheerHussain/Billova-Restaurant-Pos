@@ -106,48 +106,59 @@ export default function UsersPage() {
         <div className="users-page">
             <div className="page-header">
                 <div>
-                    <h1>Users</h1>
-                    <p>Manage staff and permissions • <span style={{ color: canAdd ? '#22c55e' : '#f59e0b' }}>{limitText}</span></p>
+                    <h1>Team & Permissions</h1>
+                    <p>Manage staff accounts • <span style={{ color: canAdd ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>{limitText}</span></p>
                 </div>
                 <button
                     className={`btn ${canAdd ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => canAdd ? setShowAddModal(true) : toast.error(`Upgrade to ${currentPlan === 'BASIC' ? 'Plus' : 'Premium'} to add more employees`)}
                 >
-                    <Plus size={18} /> Add User
+                    <Plus size={16} /> Add Employee
                 </button>
             </div>
 
             {loading ? (
                 <div className="loading-state"><div className="spinner" /></div>
             ) : users.length === 0 ? (
-                <div className="empty-state" style={{ textAlign: 'center', padding: '60px 20px', opacity: 0.6 }}>
-                    <UsersIcon size={48} strokeWidth={1} />
-                    <p style={{ marginTop: 12, fontSize: 15, color: 'var(--text-secondary)' }}>No team members yet</p>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add your first employee to get started</span>
+                <div className="empty-state">
+                    <div className="empty-state-icon-box">
+                        <UsersIcon size={42} strokeWidth={1.5} />
+                    </div>
+                    <h3>No Team Members Yet</h3>
+                    <p>Add your staff members to assign cashiers, managers, and kitchen staff roles</p>
+                    <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginTop: 8 }}>
+                        <Plus size={16} /> Add First Employee
+                    </button>
                 </div>
             ) : (
                 <div className="users-grid">
-                    {users.map((user) => (
-                        <div key={user.id} className="user-card">
+                    {users.map((u) => (
+                        <div key={u.id} className="user-card">
                             <div className="user-avatar">
-                                {user.name.charAt(0)}
+                                {u.name.charAt(0)}
                             </div>
                             <div className="user-info">
-                                <h3>{user.name}</h3>
-                                <p>{user.email}</p>
+                                <h3>{u.name}</h3>
+                                <p>{u.email}</p>
                                 <span
                                     className="role-badge"
-                                    style={{ backgroundColor: getRoleBadgeColor(user.role) + '20', color: getRoleBadgeColor(user.role) }}
+                                    style={{
+                                        backgroundColor: `${getRoleBadgeColor(u.role)}18`,
+                                        color: getRoleBadgeColor(u.role),
+                                        border: `1px solid ${getRoleBadgeColor(u.role)}33`
+                                    }}
                                 >
-                                    <Shield size={12} />
-                                    {user.role}
+                                    <Shield size={11} />
+                                    {u.role.replace('_', ' ')}
                                 </span>
                             </div>
                             <div className="user-actions">
-                                <button className="btn-icon-sm"><Edit2 size={16} /></button>
-                                {user.role !== 'OWNER' && (
-                                    <button className="btn-icon-sm danger" onClick={() => handleDeleteUser(user.id)}>
-                                        <Trash2 size={16} />
+                                <button className="btn-action-icon edit" title="Edit user">
+                                    <Edit2 size={15} />
+                                </button>
+                                {u.role !== 'OWNER' && (
+                                    <button className="btn-action-icon delete" onClick={() => handleDeleteUser(u.id)} title="Delete user">
+                                        <Trash2 size={15} />
                                     </button>
                                 )}
                             </div>

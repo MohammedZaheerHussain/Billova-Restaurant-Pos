@@ -85,6 +85,7 @@ export default function OrdersPage() {
     const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
     const [bulkClosing, setBulkClosing] = useState(false);
 
+    const [orderSearch, setOrderSearch] = useState('');
     const user = useAuthStore((state) => state.user);
 
     useEffect(() => {
@@ -95,7 +96,7 @@ export default function OrdersPage() {
     // Clear selection when filter/date changes
     useEffect(() => {
         setSelectedOrderIds(new Set());
-    }, [filter, selectedDate]);
+    }, [filter, selectedDate, orderSearch]);
 
     const fetchOrders = async () => {
         try {
@@ -123,13 +124,24 @@ export default function OrdersPage() {
         item.name.toLowerCase().includes(menuSearch.toLowerCase()) && item.isAvailable
     ).slice(0, 8);
 
-    // Filter orders based on status
+    // Filter orders based on status & search
     const filteredOrders = orders.filter((order) => {
-        if (filter === 'all') return true;
-        if (filter === 'PENDING') {
-            return ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status);
+        let matchesStatus = true;
+        if (filter === 'all') matchesStatus = true;
+        else if (filter === 'PENDING') {
+            matchesStatus = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status);
+        } else {
+            matchesStatus = order.status === filter;
         }
-        return order.status === filter;
+
+        const q = orderSearch.trim().toLowerCase();
+        const matchesSearch = !q ||
+            String(order.orderNumber).includes(q) ||
+            (order.customerName && order.customerName.toLowerCase().includes(q)) ||
+            (order.customerPhone && order.customerPhone.includes(q)) ||
+            (order.table?.name && order.table.name.toLowerCase().includes(q));
+
+        return matchesStatus && matchesSearch;
     });
 
     // Update order status
@@ -371,8 +383,22 @@ export default function OrdersPage() {
                     <p>{filteredOrders.length} orders · ₹{totalSales.toFixed(2)} sales</p>
                 </div>
                 <div className="header-actions">
+                    <div className="orders-search-box">
+                        <Search size={15} />
+                        <input
+                            type="text"
+                            placeholder="Search orders, customers, tables..."
+                            value={orderSearch}
+                            onChange={(e) => setOrderSearch(e.target.value)}
+                        />
+                        {orderSearch && (
+                            <button className="search-clear-btn" onClick={() => setOrderSearch('')}>
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
                     <div className="date-picker" onClick={() => dateInputRef.current?.showPicker?.()}>
-                        <Calendar size={18} />
+                        <Calendar size={16} />
                         <input
                             ref={dateInputRef}
                             type="date"
@@ -404,7 +430,7 @@ export default function OrdersPage() {
                             onClick={bulkCloseOrders}
                             disabled={bulkClosing}
                         >
-                            <CheckCircle size={18} />
+                            <CheckCircle size={16} />
                             {bulkClosing ? 'Closing...' : `Close ${selectedOrderIds.size} Selected`}
                         </button>
                     )}
@@ -415,8 +441,15 @@ export default function OrdersPage() {
                 <OrdersSkeleton />
             ) : filteredOrders.length === 0 ? (
                 <div className="empty-state">
-                    <ShoppingBag size={48} strokeWidth={1} />
-                    <p>No orders found for this date</p>
+                    <div className="empty-state-icon-box">
+                        <ShoppingBag size={42} strokeWidth={1.5} />
+                    </div>
+                    <h3>No Orders Found</h3>
+                    <p>
+                        {orderSearch
+                            ? `No orders matching "${orderSearch}" on this date`
+                            : `There are no ${filter !== 'all' ? filter.toLowerCase() : ''} orders recorded for ${selectedDate}`}
+                    </p>
                 </div>
             ) : (
                 <div className="orders-table-wrapper">

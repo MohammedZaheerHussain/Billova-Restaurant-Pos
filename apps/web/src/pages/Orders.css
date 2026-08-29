@@ -1,13 +1,12 @@
 /* =======================================================
-   Orders Page — Linear / Stripe Table Density Design
-   Structure: Sticky toolbar → full-height table → detail modal
+   Orders Page — Icebox Style Table & Search Bar
    ======================================================= */
 
 /* ── Root ── */
 .orders-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 52px);
+    height: calc(100vh - 54px);
     overflow: hidden;
     background: var(--bg-root);
 }
@@ -18,7 +17,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    height: 52px;
+    height: 54px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-canvas);
     flex-shrink: 0;
@@ -27,10 +26,11 @@
 }
 
 .page-header > div:first-child h1 {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
     display: inline;
+    letter-spacing: -0.01em;
 }
 
 .page-header > div:first-child p {
@@ -43,8 +43,45 @@
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-shrink: 0;
+}
+
+/* ── Orders Search Box ── */
+.orders-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 240px;
+}
+
+.orders-search-box svg {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.orders-search-box input {
+    width: 100%;
+    padding: 7px 32px 7px 34px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--text-primary);
+    font-size: 12.5px;
+    outline: none;
+    transition: all 160ms ease;
+}
+
+.orders-search-box input:focus {
+    border-color: var(--primary);
+    background: var(--bg-surface-hover);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.orders-search-box input::placeholder {
+    color: var(--text-muted);
 }
 
 /* ── Date Picker ── */
@@ -55,8 +92,8 @@
     padding: 6px 14px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    border-radius: 100px;
+    transition: all 160ms ease;
     cursor: pointer;
 }
 
@@ -76,11 +113,11 @@
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
-    font-family: 'Inter', sans-serif;
+    font-family: inherit;
     cursor: pointer;
-    width: 135px;
+    width: 130px;
     color-scheme: dark;
 }
 
@@ -92,23 +129,23 @@
 /* ── Filter Tabs ── */
 .filter-tabs {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px;
+    border-radius: 100px;
+    padding: 3px;
 }
 
 .filter-tab {
     padding: 5px 14px;
     background: none;
     border: none;
-    border-radius: 16px;
+    border-radius: 100px;
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 160ms ease;
     white-space: nowrap;
 }
 
@@ -129,15 +166,15 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     background: var(--success-bg);
     border: 1px solid rgba(16, 185, 129, 0.25);
-    border-radius: var(--radius-sm);
+    border-radius: 100px;
     color: var(--success);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 160ms ease;
     animation: pulse-in 0.2s ease;
     white-space: nowrap;
 }
@@ -165,12 +202,35 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
+    padding: 60px 20px;
     color: var(--text-muted);
-    font-size: 13px;
+    text-align: center;
 }
 
-.empty-state svg {
-    opacity: 0.2;
+.empty-state-icon-box {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.empty-state h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    font-size: 13px;
+    color: var(--text-muted);
+    max-width: 320px;
+    line-height: 1.4;
 }
 
 /* ── Orders Table Wrapper ── */
