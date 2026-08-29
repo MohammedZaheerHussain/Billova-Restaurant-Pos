@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     TrendingUp, DollarSign, ShoppingBag,
-    Calendar, BarChart3, PieChart, Award
+    Calendar, BarChart3, PieChart, Award, CreditCard, Activity, Layers
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsAPI } from '../api';
@@ -91,8 +91,8 @@ export default function ReportsPage() {
         <div className="reports-page">
             <div className="page-header">
                 <div>
-                    <h1>📊 Reports Dashboard</h1>
-                    <p>Business analytics and insights</p>
+                    <h1>Reports & Analytics</h1>
+                    <p>Business revenue and operational insights</p>
                 </div>
                 <div className="period-tabs">
                     <button
@@ -245,9 +245,10 @@ export default function ReportsPage() {
                             key={`chart-${period}`}
                         >
                             <h3>
-                                {period === 'today' && '📈 Hourly Sales Trend'}
-                                {period === 'week' && '📈 Weekly Sales Trend'}
-                                {period === 'month' && '📈 This Week Overview'}
+                                <Activity size={18} />
+                                {period === 'today' && 'Hourly Sales Trend'}
+                                {period === 'week' && 'Weekly Sales Trend'}
+                                {period === 'month' && 'This Week Overview'}
                             </h3>
                             <div className="bar-chart">
                                 {period === 'today' && hourlyData.length > 0 && (() => {
@@ -307,9 +308,10 @@ export default function ReportsPage() {
                             transition={{ delay: 0.5 }}
                         >
                             <h3>
-                                {period === 'today' && '🍕 Order Types (Today)'}
-                                {period === 'week' && '🍕 Order Types (This Week)'}
-                                {period === 'month' && '🍕 Order Types (This Month)'}
+                                <Layers size={18} />
+                                {period === 'today' && 'Order Types (Today)'}
+                                {period === 'week' && 'Order Types (This Week)'}
+                                {period === 'month' && 'Order Types (This Month)'}
                             </h3>
                             <div className="order-types">
                                 {dailyData?.orderTypeBreakdown && Object.entries(dailyData.orderTypeBreakdown).map(([type, data]) => {
@@ -397,7 +399,7 @@ export default function ReportsPage() {
                             transition={{ delay: 0.7 }}
                         >
                             <h3>
-                                💳 Payment Methods
+                                <CreditCard size={18} /> Payment Methods
                                 {period === 'today' && ' (Today)'}
                                 {period === 'week' && ' (This Week)'}
                                 {period === 'month' && ' (This Month)'}

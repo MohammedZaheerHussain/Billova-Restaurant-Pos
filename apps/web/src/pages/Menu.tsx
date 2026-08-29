@@ -1,7 +1,7 @@
 // Menu Management Page
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, Upload, Image as ImageIcon, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Upload, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed, Search, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuAPI, categoriesAPI } from '../api';
 import { useAuthStore, MenuItem, Category } from '../store';
@@ -49,6 +49,7 @@ export default function MenuPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const user = useAuthStore((state) => state.user);
 
     // Modal state
@@ -390,12 +391,15 @@ export default function MenuPage() {
         setExtractedItems(extractedItems.filter((_, i) => i !== index));
     };
 
-    const filteredItems = items.filter((item) =>
-        !selectedCategory || item.categoryId === selectedCategory
-    );
+    const filteredItems = items.filter((item) => {
+        const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+        const matchesSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+    });
 
     return (
         <div className="menu-page">
+            {/* Header Area */}
             <div className="page-header">
                 <div>
                     <h1>Menu Management</h1>
@@ -403,26 +407,45 @@ export default function MenuPage() {
                 </div>
                 <div className="header-actions">
                     <button className="btn btn-secondary" onClick={() => setShowManageCategoriesModal(true)}>
-                        <FolderCog size={18} /> Manage Categories
+                        <FolderCog size={16} /> Categories
                     </button>
                     <button className="btn btn-secondary" onClick={() => setShowCategoryModal(true)}>
-                        <FolderPlus size={18} /> Add Category
+                        <FolderPlus size={16} /> + Category
                     </button>
                     <button className="btn btn-secondary" onClick={() => setShowMenuCardModal(true)}>
-                        <FileImage size={18} /> Upload Menu Card
+                        <FileImage size={16} /> Upload Menu Card
                     </button>
                     <button className="btn btn-primary" onClick={openAddModal}>
-                        <Plus size={18} /> Add Item
+                        <Plus size={16} /> Add Item
                     </button>
                 </div>
             </div>
 
+            {/* Icebox Style Search & Action Bar */}
+            <div className="menu-search-bar-row">
+                <div className="menu-search-box">
+                    <Search size={16} className="search-icon" />
+                    <input
+                        type="text"
+                        placeholder="Search products or menu items..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                        <button className="search-clear-btn" onClick={() => setSearchQuery('')}>
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Category Filter Pills */}
             <div className="menu-filters">
                 <button
                     className={`filter-btn ${!selectedCategory ? 'active' : ''}`}
                     onClick={() => setSelectedCategory(null)}
                 >
-                    All
+                    All Items
                 </button>
                 {Array.from(new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()).map((cat) => (
                     <button
@@ -441,19 +464,20 @@ export default function MenuPage() {
                 <div className="empty-state" style={{ textAlign: 'center', padding: '60px 20px', opacity: 0.6 }}>
                     <UtensilsCrossed size={48} strokeWidth={1} />
                     <p style={{ marginTop: 12, fontSize: 15, color: 'var(--text-secondary)' }}>No menu items found</p>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add your first item or try a different category</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        {searchQuery ? `No results matching "${searchQuery}"` : 'Add your first item or try a different category'}
+                    </span>
                 </div>
             ) : (
                 <div className="menu-table-container">
                     <table className="menu-table">
                         <thead>
                             <tr>
-                                <th>Image</th>
-                                <th>Item</th>
-                                <th>Category</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th>PRODUCT</th>
+                                <th>CATEGORY</th>
+                                <th>PRICE</th>
+                                <th>STATUS</th>
+                                <th style={{ textAlign: 'right' }}>ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -465,55 +489,64 @@ export default function MenuPage() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                     >
-                                        <td>
-                                            <div className="item-image">
-                                                {item.image ? (
-                                                    <img src={item.image} alt={item.name} />
-                                                ) : (
-                                                    <div className="no-image">
-                                                        <ImageIcon size={18} />
+                                        <td className="product-col">
+                                            <div className="product-item-cell">
+                                                <div className="item-image-wrapper">
+                                                    {item.image ? (
+                                                        <img src={item.image} alt={item.name} className="product-thumb" />
+                                                    ) : (
+                                                        <div className="product-thumb-fallback">
+                                                            <span>{cat?.icon || '🍽️'}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="product-meta">
+                                                    <span className="product-name">{item.name}</span>
+                                                    <div className="product-badges-row">
+                                                        <span className={item.isVeg ? 'dietary-dot veg' : 'dietary-dot nonveg'}>
+                                                            {item.isVeg ? '🟢 Veg' : '🔴 Non-Veg'}
+                                                        </span>
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         </td>
-                                        <td>
-                                            <div className="item-cell">
-                                                <span className="item-name">{item.name}</span>
-                                                <span className={item.isVeg ? 'veg-badge' : 'nonveg-badge'}>
-                                                    {item.isVeg ? '🟢 Veg' : '🔴 Non-Veg'}
-                                                </span>
-                                            </div>
+                                        <td className="category-col">
+                                            <span className="category-text">{cat?.name || 'General'}</span>
                                         </td>
-                                        <td>
-                                            <span className="category-badge">
-                                                {cat?.icon || '🍽️'} {cat?.name || 'General'}
-                                            </span>
+                                        <td className="price-col">
+                                            <span className="price-val">₹{item.price}</span>
                                         </td>
-                                        <td className="price-cell">₹{item.price}</td>
-                                        <td>
+                                        <td className="status-col">
                                             <button
-                                                className={`status-toggle ${item.isAvailable ? 'available' : 'unavailable'}`}
+                                                className={`status-pill ${item.isAvailable ? 'active' : 'inactive'}`}
                                                 onClick={() => handleToggleAvailability(item.id)}
+                                                title="Click to toggle availability"
                                             >
-                                                {item.isAvailable ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                                                {item.isAvailable ? 'Available' : 'Unavailable'}
+                                                {item.isAvailable ? 'ACTIVE' : 'INACTIVE'}
                                             </button>
                                         </td>
-                                        <td>
-                                            <div className="action-buttons">
+                                        <td className="actions-col" style={{ textAlign: 'right' }}>
+                                            <div className="action-buttons" style={{ justifyContent: 'flex-end' }}>
                                                 <button
-                                                    className="btn-icon-sm"
+                                                    className="btn-action-icon edit"
                                                     onClick={() => openEditModal(item)}
                                                     title="Edit item"
                                                 >
-                                                    <Edit2 size={15} />
+                                                    <Edit2 size={16} />
                                                 </button>
                                                 <button
-                                                    className="btn-icon-sm danger"
+                                                    className={`btn-action-icon power ${item.isAvailable ? 'on' : 'off'}`}
+                                                    onClick={() => handleToggleAvailability(item.id)}
+                                                    title={item.isAvailable ? 'Deactivate item' : 'Activate item'}
+                                                >
+                                                    <Power size={16} />
+                                                </button>
+                                                <button
+                                                    className="btn-action-icon delete"
                                                     onClick={() => setDeleteConfirm(item.id)}
                                                     title="Delete item"
                                                 >
-                                                    <Trash2 size={15} />
+                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         </td>
