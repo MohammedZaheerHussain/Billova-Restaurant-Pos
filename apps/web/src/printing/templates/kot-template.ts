@@ -1,5 +1,4 @@
-// KOT (Kitchen Order Ticket) Template Generator
-// Creates formatted KOT for kitchen printers
+// KOT (Kitchen Order Ticket) Template Generator — 3-Inch (80mm) Thermal Printing Standard
 
 import { ESCPOSEncoder, TextAlign, FontSize, CutType } from '../escpos/escpos-encoder';
 
@@ -18,13 +17,13 @@ export interface KOTData {
     orderNumber?: number | string;
     billNumber?: string;
     tableName?: string;
-    orderType: 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY' | 'ONLINE';
+    orderType: 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY' | 'ONLINE' | string;
 
     // Items
     items: KOTItem[];
 
     // Metadata
-    createdAt: Date;
+    createdAt: Date | string;
     serverName?: string;
     priority?: 'NORMAL' | 'RUSH' | 'VIP';
 
@@ -32,171 +31,140 @@ export interface KOTData {
     orderNotes?: string;
 }
 
+// Clean helper to format KOT / Order No
+function formatCleanKotNo(kotNo?: number | string, orderNo?: number | string): string {
+    if (kotNo && !String(kotNo).includes('undefined') && String(kotNo).trim() !== '') {
+        return `#${String(kotNo).replace(/^#/, '').padStart(3, '0')}`;
+    }
+    if (orderNo && !String(orderNo).includes('undefined') && String(orderNo).trim() !== '') {
+        return `#${String(orderNo).padStart(3, '0')}`;
+    }
+    return `#${Date.now().toString().slice(-4)}`;
+}
+
+function getOrderTypeLabel(type: string): string {
+    switch (type) {
+        case 'DINE_IN': return 'DINE IN';
+        case 'TAKEAWAY': return 'TAKEAWAY';
+        case 'DELIVERY': return 'DELIVERY';
+        case 'ONLINE': return 'ONLINE ORDER';
+        default: return (type || 'DINE IN').toUpperCase();
+    }
+}
+
 export function generateKOT(data: KOTData, printerWidth: 48 | 32 = 48): ESCPOSEncoder {
     const encoder = new ESCPOSEncoder({ width: printerWidth });
+    const displayKotNo = formatCleanKotNo(data.kotNumber, data.orderNumber);
+    const kotDate = new Date(data.createdAt || Date.now());
 
     encoder.initialize();
 
     // ==================== HEADER ====================
     encoder.align(TextAlign.CENTER);
 
-    // KOT Title (large, inverted for visibility)
+    // KOT Title Banner
     encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
-
-    // Priority indicator
-    if (data.priority === 'RUSH') {
-        encoder.invert(true);
-        encoder.line(' * RUSH ORDER * ');
-        encoder.invert(false);
-    } else if (data.priority === 'VIP') {
-        encoder.invert(true);
-        encoder.line(' ** VIP ** ');
-        encoder.invert(false);
-    }
-
-    // Order Type Header
-    const orderTypeLabels: Record<string, string> = {
-        'DINE_IN': 'DINE IN',
-        'TAKEAWAY': 'PARCEL',
-        'DELIVERY': 'DELIVERY',
-        'ONLINE': 'ONLINE',
-    };
-    encoder.line(orderTypeLabels[data.orderType] || data.orderType);
-
-    // Table/Counter
-    if (data.tableName || data.orderType === 'DINE_IN') {
-        encoder.line(data.tableName || 'Counter');
-    }
-
+    encoder.line('*** KITCHEN ORDER ***');
     encoder.setFontSize(FontSize.NORMAL).bold(false);
+
+    // Table / Token
+    encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
+    if (data.tableName && data.orderType === 'DINE_IN') {
+        encoder.line(`TABLE: ${data.tableName.toUpperCase()}`);
+    } else {
+        encoder.line(`TOKEN: ${displayKotNo}`);
+    }
+    encoder.setFontSize(FontSize.NORMAL).bold(false);
+
+    encoder.line(`TYPE: ${getOrderTypeLabel(data.orderType)}`);
     encoder.divider('=');
     encoder.align(TextAlign.LEFT);
 
-    // ==================== ORDER INFO ====================
-    const kotDate = new Date(data.createdAt);
-
+    // Order Info
     encoder.bold(true);
-    encoder.printRow('KOT No:', String(data.kotNumber));
+    encoder.printRow('KOT No:', displayKotNo);
     encoder.bold(false);
-
-    if (data.orderNumber) {
-        encoder.printRow('Order:', String(data.orderNumber));
-    }
-
-    encoder.printRow('Time:', kotDate.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    }));
+    encoder.printRow('Time:', kotDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
+    encoder.printRow('Date:', kotDate.toLocaleDateString('en-IN'));
 
     if (data.serverName) {
         encoder.printRow('Server:', data.serverName);
     }
 
-    encoder.divider('-');
+    encoder.divider('=');
 
-    // ==================== ITEMS ====================
-    encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
+    // Items (Double Size for Kitchen Visibility)
+    encoder.bold(true).setFontSize(FontSize.DOUBLE_HEIGHT);
+    let totalItemsCount = 0;
 
     for (const item of data.items) {
-        // Quantity and Item Name (LARGE for kitchen visibility)
-        const qtyStr = `${item.quantity}x `;
-        let itemName = item.name;
-
-        // Truncate long names
-        const maxLen = printerWidth >= 48 ? 18 : 12;
-        if (itemName.length > maxLen) {
-            itemName = itemName.substring(0, maxLen - 1) + '…';
-        }
+        totalItemsCount += item.quantity;
+        const qtyStr = `[ ${item.quantity}x ] `;
+        let itemName = item.name.toUpperCase();
+        if (item.variant) itemName += ` (${item.variant.toUpperCase()})`;
 
         encoder.line(qtyStr + itemName);
 
-        encoder.setFontSize(FontSize.DOUBLE_HEIGHT).bold(false);
-
-        // Veg indicator
-        if (item.isVeg !== undefined) {
-            encoder.text(item.isVeg ? '  [VEG]' : '  [NON-VEG]');
-            encoder.feed(1);
-        }
-
-        // Variant
-        if (item.variant) {
-            encoder.line(`  > ${item.variant}`);
-        }
-
-        // Addons
         if (item.addons && item.addons.length > 0) {
             for (const addon of item.addons) {
-                encoder.line(`  + ${addon}`);
+                encoder.line(`   + ${addon.toUpperCase()}`);
             }
         }
 
-        // Notes (highlighted)
         if (item.notes) {
-            encoder.bold(true).underline(true);
-            encoder.line(`  ** ${item.notes.toUpperCase()} **`);
-            encoder.bold(false).underline(false);
+            encoder.underline(true);
+            encoder.line(`   ** ${item.notes.toUpperCase()} **`);
+            encoder.underline(false);
         }
-
-        encoder.setFontSize(FontSize.DOUBLE_BOTH).bold(true);
         encoder.feed(1);
     }
 
     encoder.setFontSize(FontSize.NORMAL).bold(false);
-
-    // ==================== ORDER NOTES ====================
-    if (data.orderNotes) {
-        encoder.divider('-');
-        encoder.bold(true);
-        encoder.line('SPECIAL INSTRUCTIONS:');
-        encoder.bold(false);
-        encoder.line(data.orderNotes);
-    }
-
-    // ==================== FOOTER ====================
     encoder.divider('=');
+
+    // Summary
+    encoder.bold(true);
+    encoder.printRow('TOTAL ITEMS:', `${totalItemsCount} ITEMS`);
+    encoder.bold(false);
+
     encoder.align(TextAlign.CENTER);
+    encoder.feed(1);
+    encoder.line('*** END OF KOT ***');
+    encoder.feed(3);
 
-    // Timestamp for verification
-    encoder.line(`Printed: ${kotDate.toLocaleString('en-IN')}`);
+    // Auto-cut
+    encoder.cut(CutType.FULL);
 
-    // Cut paper
-    encoder.cut(CutType.PARTIAL);
-
-    // Beep to alert kitchen
+    // Beep kitchen
     encoder.beep(2, 100);
 
     return encoder;
 }
 
-// Generate HTML KOT for browser printing
 export function generateKOTHTML(data: KOTData): string {
-    const orderTypeLabels: Record<string, string> = {
-        'DINE_IN': 'DINE IN',
-        'TAKEAWAY': 'PARCEL',
-        'DELIVERY': 'DELIVERY',
-        'ONLINE': 'ONLINE',
-    };
+    const displayKotNo = formatCleanKotNo(data.kotNumber, data.orderNumber);
+    const kotDate = new Date(data.createdAt || Date.now());
+    const formatTime = (d: Date) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const formatDate = (d: Date) => d.toLocaleDateString('en-IN');
 
-    const formatTime = (date: Date) => new Date(date).toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    });
-
+    let totalItemsCount = 0;
     const itemsHTML = data.items.map(item => {
-        const addonsHTML = item.addons ? item.addons.map(a => `<div class="addon">+ ${a}</div>`).join('') : '';
-        const notesHTML = item.notes ? `<div class="note">** ${item.notes.toUpperCase()} **</div>` : '';
-        const vegBadge = item.isVeg !== undefined
-            ? `<span class="veg-badge ${item.isVeg ? 'veg' : 'nonveg'}">${item.isVeg ? 'VEG' : 'NON-VEG'}</span>`
+        totalItemsCount += item.quantity;
+        let name = item.name.toUpperCase();
+        if (item.variant) name += ` (${item.variant.toUpperCase()})`;
+
+        const addonsHTML = item.addons && item.addons.length > 0
+            ? item.addons.map(a => `<div class="kot-addon">+ ${a.toUpperCase()}</div>`).join('')
+            : '';
+        const notesHTML = item.notes
+            ? `<div class="kot-special-note">** ${item.notes.toUpperCase()} **</div>`
             : '';
 
         return `
-            <div class="kot-item">
-                <div class="qty">${item.quantity}x</div>
-                <div class="details">
-                    <div class="name">${item.name} ${vegBadge}</div>
-                    ${item.variant ? `<div class="variant">&gt; ${item.variant}</div>` : ''}
+            <div class="kot-item-card">
+                <span class="kot-qty-badge">[ ${item.quantity}x ]</span>
+                <div class="kot-item-details">
+                    <span class="kot-item-name">${name}</span>
                     ${addonsHTML}
                     ${notesHTML}
                 </div>
@@ -204,94 +172,116 @@ export function generateKOTHTML(data: KOTData): string {
         `;
     }).join('');
 
-    const priorityClass = data.priority?.toLowerCase() || 'normal';
-
     return `
-        <div class="kot ${priorityClass}">
-            <div class="header">
-                ${data.priority === 'RUSH' ? '<div class="priority rush">* RUSH ORDER *</div>' : ''}
-                ${data.priority === 'VIP' ? '<div class="priority vip">** VIP **</div>' : ''}
-                <h1>${orderTypeLabels[data.orderType] || data.orderType}</h1>
-                <h2>${data.tableName || 'Counter'}</h2>
+        <div class="thermal-kot-doc">
+            <div class="thermal-center">
+                <div class="kot-header-tag">*** KITCHEN ORDER ***</div>
+                <div class="kot-table-banner">
+                    ${data.tableName && data.orderType === 'DINE_IN'
+                        ? `<div class="kot-table-name">TABLE: ${data.tableName.toUpperCase()}</div>`
+                        : `<div class="kot-table-name">TOKEN: ${displayKotNo}</div>`
+                    }
+                </div>
+                <div class="kot-type-pill">TYPE: ${getOrderTypeLabel(data.orderType)}</div>
             </div>
 
-            <div class="divider"></div>
+            <div class="thermal-divider solid"></div>
 
-            <div class="info">
-                <div class="row"><span>KOT No:</span><strong>${data.kotNumber}</strong></div>
-                ${data.orderNumber ? `<div class="row"><span>Order:</span><span>${data.orderNumber}</span></div>` : ''}
-                <div class="row"><span>Time:</span><span>${formatTime(data.createdAt)}</span></div>
-                ${data.serverName ? `<div class="row"><span>Server:</span><span>${data.serverName}</span></div>` : ''}
+            <div class="thermal-meta-list">
+                <div class="thermal-meta-row"><span class="meta-label">KOT No:</span><strong class="meta-val">${displayKotNo}</strong></div>
+                <div class="thermal-meta-row"><span class="meta-label">Time:</span><strong class="meta-val">${formatTime(kotDate)}</strong></div>
+                <div class="thermal-meta-row"><span class="meta-label">Date:</span><span class="meta-val">${formatDate(kotDate)}</span></div>
+                ${data.serverName ? `<div class="thermal-meta-row"><span class="meta-label">Server:</span><span class="meta-val">${data.serverName}</span></div>` : ''}
             </div>
 
-            <div class="divider"></div>
+            <div class="thermal-divider double"></div>
 
-            <div class="items">
+            <div class="kot-items-container">
                 ${itemsHTML}
             </div>
 
-            ${data.orderNotes ? `
-                <div class="divider dashed"></div>
-                <div class="order-notes">
-                    <strong>SPECIAL INSTRUCTIONS:</strong>
-                    <p>${data.orderNotes}</p>
-                </div>
-            ` : ''}
+            <div class="thermal-divider solid"></div>
 
-            <div class="divider"></div>
-            <div class="footer">
-                Printed: ${new Date(data.createdAt).toLocaleString('en-IN')}
+            <div class="thermal-meta-row kot-summary-row">
+                <span>TOTAL ITEMS:</span>
+                <strong>${totalItemsCount} ITEMS</strong>
+            </div>
+
+            <div class="thermal-footer kot-footer">
+                <div>*** END OF KOT ***</div>
             </div>
         </div>
 
         <style>
-            .kot {
-                font-family: 'Courier New', monospace;
-                font-size: 14px;
-                width: 80mm;
-                padding: 5mm;
-                background: #fff;
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                color: #000000 !important;
+                -webkit-font-smoothing: antialiased;
             }
-            .kot.rush { border: 3px solid #f00; }
-            .kot.vip { border: 3px solid #ffd700; }
-            .header { text-align: center; }
-            .header h1 { font-size: 28px; margin: 5px 0; }
-            .header h2 { font-size: 24px; margin: 5px 0; }
-            .priority { 
-                font-size: 18px; font-weight: bold; 
-                padding: 5px; margin-bottom: 5px;
+
+            .thermal-kot-doc {
+                width: 76mm;
+                max-width: 80mm;
+                margin: 0 auto;
+                background: #ffffff;
+                font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+                font-size: 13px;
+                line-height: 1.35;
+                font-weight: 700;
+                padding: 3mm 2mm;
+                color: #000000 !important;
             }
-            .priority.rush { background: #f00; color: #fff; }
-            .priority.vip { background: #ffd700; color: #000; }
-            .divider { border-top: 2px solid #000; margin: 10px 0; }
-            .divider.dashed { border-style: dashed; }
-            .info .row { display: flex; justify-content: space-between; }
-            .kot-item { 
-                display: flex; gap: 10px; 
-                margin: 15px 0; 
-                font-size: 20px;
-                font-weight: bold;
+
+            @media print {
+                @page { margin: 0; size: 80mm auto; }
+                body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: #ffffff !important;
+                    color: #000000 !important;
+                }
             }
-            .kot-item .qty { font-size: 24px; min-width: 40px; }
-            .kot-item .name { font-size: 22px; }
-            .variant, .addon { font-size: 16px; font-weight: normal; padding-left: 5px; }
-            .note { 
-                font-size: 16px; font-weight: bold; 
-                text-decoration: underline; 
-                background: #ff0; 
-                padding: 2px 5px;
-                margin-top: 5px;
+
+            .thermal-divider.solid { border-top: 1.5px solid #000; margin: 6px 0; }
+            .thermal-divider.double { border-top: 3px double #000; margin: 6px 0; }
+
+            .thermal-center {
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
             }
-            .veg-badge { 
-                font-size: 10px; 
-                padding: 1px 4px; 
-                border-radius: 3px;
-                margin-left: 5px;
+
+            .kot-header-tag { font-size: 16px; font-weight: 900; letter-spacing: 0.05em; }
+
+            .kot-table-banner {
+                margin: 4px 0;
+                padding: 4px 8px;
+                border: 2px solid #000;
+                width: 100%;
+                text-align: center;
             }
-            .veg-badge.veg { background: #0a0; color: #fff; }
-            .veg-badge.nonveg { background: #c00; color: #fff; }
-            .order-notes { background: #ffc; padding: 10px; }
-            .footer { text-align: center; font-size: 12px; color: #666; }
+
+            .kot-table-name { font-size: 18px; font-weight: 900; }
+            .kot-type-pill { font-size: 12px; font-weight: 800; }
+
+            .thermal-meta-list { display: flex; flex-direction: column; gap: 2px; }
+            .thermal-meta-row { display: flex; justify-content: space-between; font-size: 12px; }
+            .meta-label { font-weight: 700; }
+            .meta-val { font-weight: 800; }
+
+            .kot-items-container { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; }
+            .kot-item-card { display: flex; gap: 8px; align-items: baseline; }
+            .kot-qty-badge { font-size: 16px; font-weight: 900; min-width: 44px; }
+            .kot-item-details { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+            .kot-item-name { font-size: 15px; font-weight: 900; line-height: 1.25; }
+            .kot-addon { font-size: 11px; font-weight: 700; }
+            .kot-special-note { font-size: 12px; font-weight: 900; text-decoration: underline; margin-top: 2px; }
+            .kot-summary-row { font-size: 14px; font-weight: 900; padding: 4px 0; }
+            .kot-footer { text-align: center; font-size: 11px; font-weight: 800; margin-top: 10px; }
         </style>
     `;
 }

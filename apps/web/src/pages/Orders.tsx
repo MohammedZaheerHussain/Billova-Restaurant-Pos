@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { ordersAPI, menuAPI } from '../api';
 import { useAuthStore, MenuItem } from '../store';
+import { useBranchSettingsStore } from '../store/branch-settings-store';
 import { reprintReceipt, ReceiptData } from '../printing';
 import './Orders.css';
 import { OrdersSkeleton } from '../components/Skeleton';
@@ -300,14 +301,19 @@ export default function OrdersPage() {
     // Print bill for an order
     const handlePrintBill = async (order: Order) => {
         const user = useAuthStore.getState().user;
+        const branchSettings = useBranchSettingsStore.getState().settings;
+
+        const cleanOrderNumber = order.orderNumber || 1;
+        const cleanBillNumber = `#${String(cleanOrderNumber).padStart(3, '0')}`;
 
         const receiptData: ReceiptData = {
-            businessName: user?.branch?.name || 'Billova POS',
-            branchName: '',
-            address: '',
-            phone: '',
-            orderNumber: order.orderNumber,
-            billNumber: `ORD-${String(order.orderNumber).padStart(4, '0')}`,
+            businessName: branchSettings.name || user?.branch?.name || 'Billova POS',
+            branchName: branchSettings.name || user?.branch?.name || '',
+            address: branchSettings.address || '',
+            phone: branchSettings.phone || '',
+            gstNumber: branchSettings.gstEnabled ? branchSettings.gstNumber : undefined,
+            orderNumber: cleanOrderNumber,
+            billNumber: cleanBillNumber,
             orderType: order.orderType as 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY' | 'ONLINE',
             orderDate: new Date(order.createdAt),
             customerName: order.customerName,
@@ -324,6 +330,7 @@ export default function OrdersPage() {
             gstAmount: Number(order.gstAmount || 0),
             total: Number(order.total),
             paymentMode: order.payments?.[0]?.mode || 'CASH',
+            includeKOT: true,
         };
 
         try {

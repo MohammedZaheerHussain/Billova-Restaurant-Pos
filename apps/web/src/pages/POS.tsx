@@ -14,6 +14,7 @@ import { logger } from '../utils/logger';
 import { OrderCompleteModal, OrderCompleteData } from '../components/order';
 import { ReceiptData } from '../printing';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
+import { useBranchSettingsStore } from '../store/branch-settings-store';
 import './POS.css';
 import { POSSkeleton } from '../components/Skeleton';
 
@@ -234,17 +235,24 @@ export default function POSPage() {
             });
 
             // Prepare receipt data for printing
+            const branchSettings = useBranchSettingsStore.getState().settings;
+            const cleanOrderNumber = response.data.orderNumber || response.data.dailyOrderNo || response.data.daily_order_no || 1;
+            const cleanBillNumber = response.data.billNumber || response.data.bill_number || `#${String(cleanOrderNumber).padStart(3, '0')}`;
+
             const receiptData: ReceiptData = {
-                businessName: user?.branch?.name || 'Billova POS',
-                branchName: '',
-                address: '',
-                phone: '',
-                orderNumber: response.data.orderNumber || 0,
-                billNumber: response.data.billNumber || `B-${response.data.orderNumber}`,
+                businessName: branchSettings.name || user?.branch?.name || 'Billova POS',
+                branchName: branchSettings.name || user?.branch?.name || '',
+                address: branchSettings.address || '',
+                phone: branchSettings.phone || '',
+                gstNumber: branchSettings.gstEnabled ? branchSettings.gstNumber : undefined,
+                orderNumber: cleanOrderNumber,
+                billNumber: cleanBillNumber,
                 orderType: orderType,
+                tableName: (orderType === 'DINE_IN' && orderNotes.trim()) ? orderNotes.trim() : (orderType === 'DINE_IN' ? 'Counter' : undefined),
                 orderDate: new Date(),
                 customerName: customerName.trim() || undefined,
                 customerPhone: customerPhone.trim() || undefined,
+                cashierName: user?.name || undefined,
                 items: cartItems.map((item) => ({
                     name: item.menuItem.name,
                     variant: item.variant?.name,
@@ -259,20 +267,21 @@ export default function POSPage() {
                 gstAmount: 0,
                 total: getTotal(),
                 paymentMode: paymentMode,
+                includeKOT: true,
             };
 
             // Save order details for modal
             setCompletedOrderData({
                 orderId: response.data.id,
-                orderNumber: response.data.orderNumber || 0,
-                billNumber: response.data.billNumber || `B-${response.data.orderNumber}`,
+                orderNumber: cleanOrderNumber,
+                billNumber: cleanBillNumber,
                 total: getTotal(),
                 customerName: customerName.trim() || undefined,
                 customerPhone: customerPhone.trim() || undefined,
                 receiptData,
             });
 
-            toast.success(`Order #${response.data.orderNumber || 'Created'} completed!`);
+            toast.success(`Order #${cleanOrderNumber} completed!`);
             setShowPayment(false);
             setShowSuccess(true);
 

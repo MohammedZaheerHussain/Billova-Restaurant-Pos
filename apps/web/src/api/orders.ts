@@ -70,9 +70,26 @@ export const ordersAPI = {
                 status: 'PENDING',
             }]).select().single();
             if (error) throw error;
-            return { data: order };
+            const num = order?.daily_order_no || order?.order_number || Math.floor(100 + Math.random() * 900);
+            return {
+                data: {
+                    ...order,
+                    orderNumber: num,
+                    dailyOrderNo: num,
+                    billNumber: order?.bill_number || `#${String(num).padStart(3, '0')}`,
+                }
+            };
         } catch {
-            return { data: { id: 'temp-' + Date.now(), ...data } };
+            const tempNum = Math.floor(100 + Math.random() * 900);
+            return {
+                data: {
+                    id: 'temp-' + Date.now(),
+                    ...data,
+                    orderNumber: tempNum,
+                    dailyOrderNo: tempNum,
+                    billNumber: `#${tempNum}`,
+                }
+            };
         }
     },
     addPayment: (id: string, data: AddPaymentDTO) => {
