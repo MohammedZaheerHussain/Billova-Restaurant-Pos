@@ -1,5 +1,5 @@
 /* =======================================================
-   Settings Page — Icebox Style Clean Cards & Toggles
+   Settings Page — Icebox POS Configuration Standard
    ======================================================= */
 
 .settings-page {
@@ -10,7 +10,7 @@
     background: var(--bg-root);
 }
 
-/* ── Page Header ── */
+/* ── Page Header Toolbar ── */
 .page-header {
     display: flex;
     align-items: center;
@@ -23,235 +23,363 @@
     gap: 12px;
 }
 
-.page-header h1 {
+.header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.header-left h1 {
     font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+    margin: 0;
+    white-space: nowrap;
 }
 
-.page-header p {
+.settings-header-sub {
     font-size: 12px;
     color: var(--text-muted);
-    margin-top: 1px;
+    white-space: nowrap;
+}
+
+.save-all-btn {
+    padding: 7px 18px;
+    border-radius: 100px;
+    font-weight: 700;
+    background: var(--gradient-primary);
+    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+}
+
+.save-all-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.45);
+    transform: translateY(-1px);
+}
+
+/* ── Navigation Tabs ── */
+.settings-nav-section {
+    padding: 16px 24px 0;
+    background: var(--bg-canvas);
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs-pillbar {
+    display: inline-flex;
+    gap: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+}
+
+.settings-nav-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 100px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 140ms ease;
+    white-space: nowrap;
+}
+
+.settings-nav-tab:hover {
+    color: var(--text-primary);
+}
+
+.settings-nav-tab.active {
+    background: var(--primary);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
 }
 
 /* ── Settings Grid ── */
 .settings-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 18px;
-    padding: 22px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 20px;
+    padding: 24px;
     align-content: start;
 }
 
 /* ── Settings Card ── */
 .settings-card {
-    background: var(--bg-canvas);
+    background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    transition: box-shadow 160ms ease;
+    transition: all 160ms ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .settings-card:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    background: var(--bg-surface-hover);
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .settings-card.highlight {
-    border-color: rgba(249, 115, 22, 0.25);
+    border-color: rgba(249, 115, 22, 0.3);
 }
 
 /* ── Card Header ── */
 .settings-card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
+    gap: 12px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border);
-    background: var(--bg-root);
+    background: var(--bg-canvas);
 }
 
-.settings-card-header svg {
-    color: var(--primary);
+.card-header-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
-.settings-card-header h3 {
-    font-size: 13px;
+.card-header-icon-box.orange {
+    background: var(--primary-glow);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    color: var(--primary);
+}
+
+.card-header-icon-box.cyan {
+    background: rgba(6, 182, 212, 0.12);
+    border: 1px solid rgba(6, 182, 212, 0.25);
+    color: #06b6d4;
+}
+
+.card-header-icon-box.purple {
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+}
+
+.card-header-icon-box.blue {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+}
+
+.card-header-icon-box.green {
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    color: #22c55e;
+}
+
+.card-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.card-header-text h3 {
+    font-size: 14px;
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.card-header-text p {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin: 0;
 }
 
 /* ── Settings Form ── */
 .settings-form {
-    padding: 16px 18px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
 }
 
-/* ── Form Group ── */
+.settings-desc {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* ── Form Groups ── */
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
 .form-group label {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
-    padding: 8px 12px;
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-icon .input-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.input-with-icon input {
+    width: 100%;
+    padding: 9px 12px 9px 36px;
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-size: 13px;
-    font-family: 'Inter', sans-serif;
+    font-family: inherit;
     outline: none;
-    transition: border-color 140ms ease, box-shadow 140ms ease;
-    width: 100%;
+    transition: all 140ms ease;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.input-with-icon input:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-glow);
+    background: var(--bg-surface);
 }
 
-.form-group input::placeholder,
-.form-group textarea::placeholder {
-    color: var(--text-muted);
-}
-
-.form-group select option {
-    background: var(--bg-canvas);
-    color: var(--text-primary);
-}
-
-/* ── Toggle Row ── */
+/* ── Toggle Rows ── */
 .toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     padding: 4px 0;
 }
 
-.toggle-row > div:first-child {
+.toggle-text-wrap {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex: 1;
 }
 
 .toggle-label {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
 }
 
 .toggle-desc {
-    font-size: 11px;
+    font-size: 11.5px;
     color: var(--text-muted);
 }
 
-/* Native toggle styled like iOS */
-.toggle-switch {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0;
+/* ── Sync Status Box ── */
+.sync-status-box {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--bg-canvas);
+    border: 1px solid;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.toggle-switch .slider {
-    position: absolute;
-    inset: 0;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    cursor: pointer;
-    transition: all 160ms ease;
-}
-
-.toggle-switch .slider::before {
-    content: '';
-    position: absolute;
-    height: 16px;
-    width: 16px;
-    left: 2px;
-    bottom: 2px;
-    background: var(--text-muted);
-    border-radius: 50%;
-    transition: all 160ms ease;
-}
-
-.toggle-switch input:checked + .slider {
-    background: var(--primary);
-    border-color: var(--primary);
-}
-
-.toggle-switch input:checked + .slider::before {
-    transform: translateX(18px);
-    background: #fff;
-}
-
-/* ── Info Row ── */
-.info-row {
+.sync-status-main {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
-    color: var(--text-secondary);
-    gap: 8px;
 }
 
-/* ── Badge ── */
-.badge {
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 11px;
+.sync-status-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sync-pulsing-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sync-status-title {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.sync-status-sub {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+.sync-pending-strip {
+    display: flex;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+}
+
+.pending-badge {
+    color: var(--text-secondary);
+}
+
+.pending-badge strong {
+    color: var(--primary);
+}
+
+.sync-license-warning {
+    font-size: 11.5px;
+    color: var(--danger);
     font-weight: 600;
 }
 
-.badge-success {
-    background: var(--success-bg);
-    color: var(--success);
+.sync-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 100px;
+    font-weight: 700;
 }
 
-.badge-warning {
-    background: var(--warning-bg);
-    color: var(--warning);
+.last-sync-note {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    text-align: center;
 }
 
-.badge-info {
-    background: rgba(59, 130, 246, 0.1);
-    color: #60a5fa;
+.sync-highlight {
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
-/* ── Settings Description ── */
-.settings-desc {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: 10px;
+.sync-error-text {
+    color: var(--danger);
+    margin-top: 2px;
 }
 
 /* ── Menu Link Box ── */
@@ -259,117 +387,95 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
-    background: var(--bg-input);
+    padding: 6px 8px;
+    background: var(--bg-canvas);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
 }
 
-.menu-link-box span {
+.menu-link-box input {
     flex: 1;
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ── Sync Status Box ── */
-.sync-status-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    font-size: 12px;
-    font-weight: 500;
-}
-
-/* ── Buttons ── */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 140ms ease;
+    background: none;
     border: none;
-    white-space: nowrap;
-    text-decoration: none;
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: #fff;
-}
-
-.btn-primary:hover:not(:disabled) {
-    background: var(--primary-hover);
-}
-
-.btn-secondary {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
     color: var(--text-secondary);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    outline: none;
+    padding: 4px 6px;
 }
 
-.btn-secondary:hover:not(:disabled) {
-    border-color: var(--border-light);
-    color: var(--text-primary);
-}
-
-.btn-icon {
+.btn-icon-action {
     width: 32px;
     height: 32px;
-    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 6px;
     color: var(--text-muted);
+    cursor: pointer;
     transition: all 140ms ease;
+    flex-shrink: 0;
 }
 
-.btn-icon:hover {
-    border-color: var(--primary);
+.btn-icon-action:hover:not(:disabled) {
     color: var(--primary);
+    border-color: var(--primary);
+    background: var(--primary-glow);
 }
 
-.btn:disabled {
-    opacity: 0.5;
+.btn-icon-action:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
 }
 
-.save-all-btn {
-    background: var(--gradient-primary);
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+/* ── Info Pill Rows & Dividers ── */
+.settings-info-pill-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
-.save-all-btn:hover:not(:disabled) {
-    box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
-    transform: translateY(-1px);
+.ice-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
 }
 
-/* ── Divider ── */
-.divider {
-    border-top: 1px solid var(--border);
-    margin: 12px 0;
+.ice-badge-pill.green {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
-/* ── Spin Animation ── */
-.spin {
-    animation: settings-spin 1s linear infinite;
+.ice-badge-pill.amber {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-@keyframes settings-spin { to { transform: rotate(360deg); } }
+.settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+.advanced-printer-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    border-radius: 100px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
 }

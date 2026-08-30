@@ -1,6 +1,9 @@
-// Settings Page
 import { useState } from 'react';
-import { Store, Printer, Database, Globe, Share2, Copy, ExternalLink, Settings as SettingsIcon, Save, RefreshCw } from 'lucide-react';
+import {
+    Store, Printer, Database, Globe, Share2, Copy, ExternalLink,
+    Settings as SettingsIcon, Save, RefreshCw, Building2, MapPin,
+    Phone, ShieldCheck
+} from 'lucide-react';
 import { useAuthStore } from '../store';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import { useBranchSettingsStore } from '../store/branch-settings-store';
@@ -11,6 +14,8 @@ import toast from 'react-hot-toast';
 import { Switch } from '../components/ui/Switch';
 import './Settings.css';
 
+type SettingsTab = 'all' | 'branch' | 'sync' | 'printer' | 'orders' | 'menu';
+
 // Cloud Sync Status Component
 function CloudSyncStatus() {
     const { isOnline, licenseExpiredHard, pendingOrders, pendingPayments, pendingKOTs } = useSyncStore();
@@ -18,51 +23,36 @@ function CloudSyncStatus() {
     const totalPending = pendingOrders + pendingPayments + pendingKOTs;
 
     return (
-        <div className="sync-status-box" style={{
-            padding: '16px 18px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-            border: `1px solid ${display.color}33`,
-            boxShadow: `0 4px 16px ${display.color}10`,
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        backgroundColor: display.color,
-                        boxShadow: `0 0 10px ${display.color}`,
-                        animation: isOnline ? 'pulse 2s infinite' : 'none',
-                    }} />
+        <div className="sync-status-box" style={{ borderColor: `${display.color}40` }}>
+            <div className="sync-status-main">
+                <div className="sync-status-left">
+                    <div
+                        className="sync-pulsing-dot"
+                        style={{
+                            backgroundColor: display.color,
+                            boxShadow: `0 0 10px ${display.color}`
+                        }}
+                    />
                     <div>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: display.color }}>{display.text}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 2 }}>
-                            {isOnline ? '🌐 Connected to cloud servers' : '📡 Offline mode (local storage active)'}
+                        <div className="sync-status-title" style={{ color: display.color }}>{display.text}</div>
+                        <div className="sync-status-sub">
+                            {isOnline ? 'Connected to cloud servers (real-time sync)' : 'Offline mode (local storage active)'}
                         </div>
                     </div>
                 </div>
             </div>
 
             {totalPending > 0 && (
-                <div style={{
-                    marginTop: 12,
-                    paddingTop: 10,
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex',
-                    gap: 16,
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)'
-                }}>
-                    {pendingOrders > 0 && <span>📦 Orders: <strong>{pendingOrders}</strong></span>}
-                    {pendingPayments > 0 && <span>💳 Payments: <strong>{pendingPayments}</strong></span>}
-                    {pendingKOTs > 0 && <span>🍳 KOTs: <strong>{pendingKOTs}</strong></span>}
+                <div className="sync-pending-strip">
+                    {pendingOrders > 0 && <span className="pending-badge">📦 Orders: <strong>{pendingOrders}</strong></span>}
+                    {pendingPayments > 0 && <span className="pending-badge">💳 Payments: <strong>{pendingPayments}</strong></span>}
+                    {pendingKOTs > 0 && <span className="pending-badge">🍳 KOTs: <strong>{pendingKOTs}</strong></span>}
                 </div>
             )}
 
             {licenseExpiredHard && (
-                <div style={{ fontSize: 12, color: '#ef4444', marginTop: 8 }}>
-                    ⚠️ License expired - please renew to sync
+                <div className="sync-license-warning">
+                    ⚠️ License expired - please renew to resume cloud synchronization
                 </div>
             )}
         </div>
@@ -72,10 +62,7 @@ function CloudSyncStatus() {
 // Auto Sync Toggle Component
 function AutoSyncToggle() {
     const { autoSyncEnabled, setAutoSync } = useSyncStore();
-
-    return (
-        <Switch enabled={autoSyncEnabled} onChange={setAutoSync} />
-    );
+    return <Switch enabled={autoSyncEnabled} onChange={setAutoSync} />;
 }
 
 // Sync Now Button Component
@@ -90,11 +77,11 @@ function SyncNowButton() {
         try {
             const result = await syncAll();
             if (result.synced > 0) {
-                toast.success(`Synced ${result.synced} items!`);
+                toast.success(`Synced ${result.synced} items with cloud!`);
             } else if (result.failed > 0) {
                 toast.error(`${result.failed} items failed to sync`);
             } else if (pending === 0) {
-                toast.success('All data is already up to date!');
+                toast.success('All restaurant data is already up to date!');
             }
         } finally {
             setSyncing(false);
@@ -105,23 +92,12 @@ function SyncNowButton() {
 
     return (
         <button
-            className="btn btn-primary"
-            style={{
-                marginTop: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                justifyContent: 'center',
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                fontWeight: 600
-            }}
+            className="btn btn-primary sync-action-btn"
             onClick={handleSync}
             disabled={disabled}
         >
-            <RefreshCw size={16} className={syncing || isSyncing ? 'spin' : ''} />
-            {syncing || isSyncing ? 'Syncing with cloud...' : `Sync Now${pending > 0 ? ` (${pending} pending)` : ''}`}
+            <RefreshCw size={15} className={syncing || isSyncing ? 'spin' : ''} />
+            <span>{syncing || isSyncing ? 'Syncing data…' : `Sync Now${pending > 0 ? ` (${pending} pending)` : ''}`}</span>
         </button>
     );
 }
@@ -131,8 +107,8 @@ function LastSyncInfo() {
     const { lastSyncAt, lastSyncError } = useSyncStore();
 
     if (!lastSyncAt) return (
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-            No previous sync recorded
+        <div className="last-sync-note">
+            No previous sync recorded on this device
         </div>
     );
 
@@ -140,10 +116,10 @@ function LastSyncInfo() {
     const timeAgo = getTimeAgo(syncDate);
 
     return (
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-            <div>Last synced: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{timeAgo}</span></div>
+        <div className="last-sync-note">
+            <div>Last synced: <span className="sync-highlight">{timeAgo}</span></div>
             {lastSyncError && (
-                <div style={{ color: '#ef4444', marginTop: 4 }}>⚠️ {lastSyncError}</div>
+                <div className="sync-error-text">⚠️ {lastSyncError}</div>
             )}
         </div>
     );
@@ -163,21 +139,19 @@ function getTimeAgo(date: Date): string {
 export default function SettingsPage() {
     const user = useAuthStore((state) => state.user);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState<SettingsTab>('all');
 
-    // Printer settings from store (already persisted)
+    // Printer settings from store
     const { settings: printerSettings, updateSettings: updatePrinterSettings, printers } = usePrinterConfigStore();
 
-    // Branch settings from store (persisted to localStorage)
+    // Branch settings from store
     const { settings: branchSettings, updateSettings: updateBranchSettings } = useBranchSettingsStore();
 
-    // Save all settings (just shows confirmation since Zustand auto-saves)
     const handleSaveChanges = async () => {
         try {
             setSaving(true);
-            // Zustand with persist middleware already saves to localStorage automatically
-            // This is just a UX confirmation
             await new Promise(resolve => setTimeout(resolve, 300));
-            toast.success('Settings saved successfully!');
+            toast.success('All settings saved successfully!');
         } catch (error) {
             toast.error('Failed to save settings');
         } finally {
@@ -185,244 +159,362 @@ export default function SettingsPage() {
         }
     };
 
+    const onlineMenuUrl = user?.branch?.id ? `${window.location.origin}/m/${user.branch.id}` : '';
+
     return (
         <div className="settings-page">
+            {/* ── Page Header Toolbar (Icebox Style) ── */}
             <div className="page-header">
-                <div>
-                    <h1>Settings</h1>
-                    <p>Configure your POS system</p>
+                <div className="header-left">
+                    <h1>Settings & Configuration</h1>
+                    <span className="settings-header-sub">Manage store profile, cloud sync, orders, printers & taxes</span>
                 </div>
-                {/* Save All Button */}
-                <button
-                    className="btn btn-primary save-all-btn"
-                    onClick={handleSaveChanges}
-                    disabled={saving}
-                >
-                    {saving ? (
-                        <>Saving...</>
-                    ) : (
-                        <>
-                            <Save size={18} /> Save Changes
-                        </>
-                    )}
-                </button>
+
+                <div className="header-actions">
+                    <button
+                        className="btn btn-primary save-all-btn"
+                        onClick={handleSaveChanges}
+                        disabled={saving}
+                    >
+                        {saving ? (
+                            <div className="spinner" />
+                        ) : (
+                            <>
+                                <Save size={16} />
+                                <span>Save Changes</span>
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
 
+            {/* ── Filter / Navigation Tabs ── */}
+            <div className="settings-nav-section">
+                <div className="settings-tabs-pillbar">
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'all' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('all')}
+                    >
+                        All Settings
+                    </button>
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'branch' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('branch')}
+                    >
+                        Branch Profile
+                    </button>
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'sync' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('sync')}
+                    >
+                        Cloud Sync
+                    </button>
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'orders' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('orders')}
+                    >
+                        Orders & GST
+                    </button>
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'printer' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('printer')}
+                    >
+                        Printers
+                    </button>
+                    <button
+                        className={`settings-nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('menu')}
+                    >
+                        Online Menu
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Settings Cards Grid ── */}
             <div className="settings-grid">
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <Store size={20} />
-                        <h3>Branch Details</h3>
-                    </div>
-                    <div className="settings-form">
-                        <div className="form-group">
-                            <label>Branch Name</label>
-                            <input
-                                type="text"
-                                value={branchSettings.name}
-                                onChange={(e) => updateBranchSettings({ name: e.target.value })}
-                                placeholder="Enter branch name"
-                            />
+                {/* 1. Branch Details Card */}
+                {(activeTab === 'all' || activeTab === 'branch') && (
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box orange">
+                                <Store size={18} />
+                            </div>
+                            <div className="card-header-text">
+                                <h3>Branch Details</h3>
+                                <p>Restaurant name, address and billing contact</p>
+                            </div>
                         </div>
-                        <div className="form-group">
-                            <label>Address</label>
-                            <input
-                                type="text"
-                                value={branchSettings.address}
-                                onChange={(e) => updateBranchSettings({ address: e.target.value })}
-                                placeholder="Enter address"
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label>Phone</label>
-                            <input
-                                type="text"
-                                value={branchSettings.phone}
-                                onChange={(e) => updateBranchSettings({ phone: e.target.value })}
-                                placeholder="+91 XXXXXXXXXX"
-                            />
-                        </div>
-                    </div>
-                </div>
 
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <SettingsIcon size={20} />
-                        <h3>Order Settings</h3>
-                    </div>
-                    <div className="settings-form">
-                        <div className="toggle-row">
-                            <div>
-                                <span className="toggle-label">Daily Order Reset</span>
-                                <span className="toggle-desc">Order numbers reset to #1 at midnight</span>
-                            </div>
-                            <Switch
-                                enabled={printerSettings.dailyOrderReset}
-                                onChange={(v) => updatePrinterSettings({ dailyOrderReset: v })}
-                            />
-                        </div>
-                        {printerSettings.dailyOrderReset && (
-                            <div className="info-row" style={{ marginTop: 8 }}>
-                                <span>Reset Time</span>
-                                <span className="badge badge-success">12:00 AM (Midnight)</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <Globe size={20} />
-                        <h3>GST Settings</h3>
-                    </div>
-                    <div className="settings-form">
-                        <div className="toggle-row">
-                            <div>
-                                <span className="toggle-label">Enable GST</span>
-                                <span className="toggle-desc">Apply GST to applicable items</span>
-                            </div>
-                            <Switch
-                                enabled={branchSettings.gstEnabled}
-                                onChange={(v) => updateBranchSettings({ gstEnabled: v })}
-                            />
-                        </div>
-                        {branchSettings.gstEnabled && (
+                        <div className="settings-form">
                             <div className="form-group">
-                                <label>GST Number</label>
-                                <input
-                                    type="text"
-                                    placeholder="Enter GSTIN"
-                                    value={branchSettings.gstNumber}
-                                    onChange={(e) => updateBranchSettings({ gstNumber: e.target.value })}
+                                <label>Branch / Store Name</label>
+                                <div className="input-with-icon">
+                                    <Building2 size={15} className="input-icon" />
+                                    <input
+                                        type="text"
+                                        value={branchSettings.name}
+                                        onChange={(e) => updateBranchSettings({ name: e.target.value })}
+                                        placeholder="e.g. Billova Bistro (Main Branch)"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Store Address</label>
+                                <div className="input-with-icon">
+                                    <MapPin size={15} className="input-icon" />
+                                    <input
+                                        type="text"
+                                        value={branchSettings.address}
+                                        onChange={(e) => updateBranchSettings({ address: e.target.value })}
+                                        placeholder="e.g. 123 Food Street, Downtown"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Contact Phone Number</label>
+                                <div className="input-with-icon">
+                                    <Phone size={15} className="input-icon" />
+                                    <input
+                                        type="text"
+                                        value={branchSettings.phone}
+                                        onChange={(e) => updateBranchSettings({ phone: e.target.value })}
+                                        placeholder="+91 98765 43210"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. Cloud Backup & Sync Card */}
+                {(activeTab === 'all' || activeTab === 'sync') && (
+                    <div className="settings-card highlight">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box cyan">
+                                <Database size={18} />
+                            </div>
+                            <div className="card-header-text">
+                                <h3>Cloud Backup & Sync</h3>
+                                <p>Offline queue & cloud data synchronization</p>
+                            </div>
+                        </div>
+
+                        <div className="settings-form">
+                            {/* Sync Status Box */}
+                            <CloudSyncStatus />
+
+                            {/* Auto Sync Toggle */}
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Auto-Sync Data</span>
+                                    <span className="toggle-desc">Automatically upload orders when connected to internet</span>
+                                </div>
+                                <AutoSyncToggle />
+                            </div>
+
+                            {/* Manual Sync Button */}
+                            <SyncNowButton />
+
+                            {/* Last Sync Info */}
+                            <LastSyncInfo />
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. Order Settings Card */}
+                {(activeTab === 'all' || activeTab === 'orders') && (
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box purple">
+                                <SettingsIcon size={18} />
+                            </div>
+                            <div className="card-header-text">
+                                <h3>Order Configuration</h3>
+                                <p>Order numbering, daily reset and sound alerts</p>
+                            </div>
+                        </div>
+
+                        <div className="settings-form">
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Daily Order Reset</span>
+                                    <span className="toggle-desc">Reset order counter back to #1 at midnight</span>
+                                </div>
+                                <Switch
+                                    enabled={printerSettings.dailyOrderReset}
+                                    onChange={(v) => updatePrinterSettings({ dailyOrderReset: v })}
                                 />
                             </div>
-                        )}
-                    </div>
-                </div>
 
-                <div className="settings-card highlight">
-                    <div className="settings-card-header">
-                        <Share2 size={20} />
-                        <h3>Online Menu</h3>
-                    </div>
-                    <div className="settings-form">
-                        <p className="settings-desc">Share your menu online with customers. They can view your menu without needing to download an app.</p>
-                        <div className="menu-link-box">
-                            <input
-                                type="text"
-                                readOnly
-                                value={user?.branch?.id ? `${window.location.origin}/m/${user.branch.id}` : 'Branch not configured — log out and log back in'}
-                            />
-                            <button
-                                className="btn btn-icon"
-                                disabled={!user?.branch?.id}
-                                onClick={() => {
-                                    if (user?.branch?.id) {
-                                        navigator.clipboard.writeText(`${window.location.origin}/m/${user.branch.id}`);
-                                        toast.success('Menu link copied!');
-                                    }
-                                }}
-                            >
-                                <Copy size={16} />
-                            </button>
-                            <button
-                                className="btn btn-icon"
-                                disabled={!user?.branch?.id}
-                                onClick={() => user?.branch?.id && window.open(`/m/${user.branch.id}`, '_blank')}
-                            >
-                                <ExternalLink size={16} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                            {printerSettings.dailyOrderReset && (
+                                <div className="settings-info-pill-row">
+                                    <span>Reset Schedule:</span>
+                                    <span className="ice-badge-pill green">12:00 AM (Midnight)</span>
+                                </div>
+                            )}
 
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <Printer size={20} />
-                        <h3>Printer Settings</h3>
-                    </div>
-                    <div className="settings-form">
-                        {/* Auto-Print Bill Toggle */}
-                        <div className="toggle-row">
-                            <div>
-                                <span className="toggle-label">Auto-Print Bill</span>
-                                <span className="toggle-desc">Print bill automatically after payment</span>
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Order Notification Chime</span>
+                                    <span className="toggle-desc">Play chime sound when online / dine-in orders arrive</span>
+                                </div>
+                                <Switch
+                                    enabled={printerSettings.playPrintSound}
+                                    onChange={(v) => updatePrinterSettings({ playPrintSound: v })}
+                                />
                             </div>
-                            <Switch
-                                enabled={printerSettings.autoPrintBill}
-                                onChange={(v) => updatePrinterSettings({ autoPrintBill: v })}
-                            />
                         </div>
-
-                        {/* Auto-Print KOT Toggle */}
-                        <div className="toggle-row">
-                            <div>
-                                <span className="toggle-label">Auto-Print KOT</span>
-                                <span className="toggle-desc">Print kitchen order ticket on order</span>
-                            </div>
-                            <Switch
-                                enabled={printerSettings.autoPrintKOT}
-                                onChange={(v) => updatePrinterSettings({ autoPrintKOT: v })}
-                            />
-                        </div>
-
-                        {/* Play Print Sound Toggle */}
-                        <div className="toggle-row">
-                            <div>
-                                <span className="toggle-label">Print Sound</span>
-                                <span className="toggle-desc">Play sound when printing</span>
-                            </div>
-                            <Switch
-                                enabled={printerSettings.playPrintSound}
-                                onChange={(v) => updatePrinterSettings({ playPrintSound: v })}
-                            />
-                        </div>
-
-                        <div className="divider" style={{ margin: '16px 0', borderTop: '1px solid rgba(255,255,255,0.1)' }} />
-
-                        {/* Printer count info */}
-                        <div className="info-row">
-                            <span>Configured Printers</span>
-                            <span className={`badge ${printers.length > 0 ? 'badge-success' : 'badge-warning'}`}>
-                                {printers.length > 0 ? `${printers.length} printer${printers.length > 1 ? 's' : ''}` : 'None'}
-                            </span>
-                        </div>
-
-                        {/* Link to detailed printer settings */}
-                        <Link to="/printer-settings" className="btn btn-secondary" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', textDecoration: 'none' }}>
-                            <SettingsIcon size={16} />
-                            Advanced Printer Settings
-                        </Link>
                     </div>
-                </div>
+                )}
 
-                <div className="settings-card highlight">
-                    <div className="settings-card-header">
-                        <Database size={20} />
-                        <h3>Cloud Backup</h3>
-                    </div>
-                    <div className="settings-form">
-                        {/* Sync Status Display */}
-                        <CloudSyncStatus />
-
-                        {/* Auto-Sync Toggle */}
-                        <div className="toggle-row" style={{ marginTop: 16 }}>
-                            <div>
-                                <span className="toggle-label">Auto-Sync</span>
-                                <span className="toggle-desc">Automatically sync when connected to internet</span>
+                {/* 4. GST Settings Card */}
+                {(activeTab === 'all' || activeTab === 'orders') && (
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box blue">
+                                <Globe size={18} />
                             </div>
-                            <AutoSyncToggle />
+                            <div className="card-header-text">
+                                <h3>GST & Tax Settings</h3>
+                                <p>Apply tax calculations on dine-in & takeaway receipts</p>
+                            </div>
                         </div>
 
-                        {/* Manual Sync Button */}
-                        <SyncNowButton />
+                        <div className="settings-form">
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Enable GST Billing</span>
+                                    <span className="toggle-desc">Calculate CGST & SGST on applicable menu items</span>
+                                </div>
+                                <Switch
+                                    enabled={branchSettings.gstEnabled}
+                                    onChange={(v) => updateBranchSettings({ gstEnabled: v })}
+                                />
+                            </div>
 
-                        {/* Last Sync Info */}
-                        <LastSyncInfo />
+                            {branchSettings.gstEnabled && (
+                                <div className="form-group" style={{ marginTop: 4 }}>
+                                    <label>GST Identification Number (GSTIN)</label>
+                                    <div className="input-with-icon">
+                                        <ShieldCheck size={15} className="input-icon" />
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 29AAAAA0000A1Z5"
+                                            value={branchSettings.gstNumber}
+                                            onChange={(e) => updateBranchSettings({ gstNumber: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {/* 5. Online Menu Card */}
+                {(activeTab === 'all' || activeTab === 'menu') && (
+                    <div className="settings-card highlight">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box orange">
+                                <Share2 size={18} />
+                            </div>
+                            <div className="card-header-text">
+                                <h3>Contactless Online Menu</h3>
+                                <p>Self-ordering digital link for guests</p>
+                            </div>
+                        </div>
+
+                        <div className="settings-form">
+                            <p className="settings-desc">
+                                Share your live menu online with customers. Guests can view items, allergens, and order from their mobile browser without downloading any apps.
+                            </p>
+
+                            <div className="menu-link-box">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={onlineMenuUrl || 'Branch not configured — log out and log back in'}
+                                />
+                                <button
+                                    className="btn-icon-action"
+                                    disabled={!onlineMenuUrl}
+                                    onClick={() => {
+                                        if (onlineMenuUrl) {
+                                            navigator.clipboard.writeText(onlineMenuUrl);
+                                            toast.success('Online menu URL copied!');
+                                        }
+                                    }}
+                                    title="Copy Menu Link"
+                                >
+                                    <Copy size={15} />
+                                </button>
+                                <button
+                                    className="btn-icon-action"
+                                    disabled={!onlineMenuUrl}
+                                    onClick={() => onlineMenuUrl && window.open(onlineMenuUrl, '_blank')}
+                                    title="Open Menu in New Tab"
+                                >
+                                    <ExternalLink size={15} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 6. Printer Settings Card */}
+                {(activeTab === 'all' || activeTab === 'printer') && (
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <div className="card-header-icon-box green">
+                                <Printer size={18} />
+                            </div>
+                            <div className="card-header-text">
+                                <h3>Receipt & KOT Printers</h3>
+                                <p>Thermal printers and automated print triggers</p>
+                            </div>
+                        </div>
+
+                        <div className="settings-form">
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Auto-Print Receipt Bill</span>
+                                    <span className="toggle-desc">Generate customer invoice automatically after payment</span>
+                                </div>
+                                <Switch
+                                    enabled={printerSettings.autoPrintBill}
+                                    onChange={(v) => updatePrinterSettings({ autoPrintBill: v })}
+                                />
+                            </div>
+
+                            <div className="toggle-row">
+                                <div className="toggle-text-wrap">
+                                    <span className="toggle-label">Auto-Print Kitchen KOT</span>
+                                    <span className="toggle-desc">Send KOT print job to kitchen on order creation</span>
+                                </div>
+                                <Switch
+                                    enabled={printerSettings.autoPrintKOT}
+                                    onChange={(v) => updatePrinterSettings({ autoPrintKOT: v })}
+                                />
+                            </div>
+
+                            <div className="settings-divider" />
+
+                            <div className="settings-info-pill-row">
+                                <span>Configured Hardware:</span>
+                                <span className={`ice-badge-pill ${printers.length > 0 ? 'green' : 'amber'}`}>
+                                    {printers.length > 0 ? `${printers.length} Printer${printers.length > 1 ? 's' : ''} Connected` : 'No Printers Added'}
+                                </span>
+                            </div>
+
+                            <Link to="/printer-settings" className="btn btn-secondary advanced-printer-link">
+                                <SettingsIcon size={15} />
+                                <span>Advanced Printer Configuration</span>
+                            </Link>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
-
