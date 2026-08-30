@@ -1,8 +1,7 @@
-// Orders Page - View and manage orders with full bill details
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ShoppingBag, Clock, Calendar, X, User, Phone, CreditCard,
+    ShoppingBag, Clock, X, User, Phone, CreditCard,
     Banknote, Smartphone, Receipt, CheckCircle, XCircle, Edit,
     Plus, FileText, Search, Minus, CheckSquare, Square, Printer
 } from 'lucide-react';
@@ -12,6 +11,7 @@ import { useAuthStore, MenuItem } from '../store';
 import { reprintReceipt, ReceiptData } from '../printing';
 import './Orders.css';
 import { OrdersSkeleton } from '../components/Skeleton';
+import { DatePicker } from '../components/ui';
 import { logger } from '../utils/logger';
 
 interface OrderItem {
@@ -65,16 +65,27 @@ export default function OrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     // Use local date to avoid timezone issues (toISOString uses UTC)
-    const getLocalDateString = () => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
+    const getLocalDateString = (d = new Date()) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
-    const dateInputRef = useRef<HTMLInputElement>(null);
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+
+    const formatDateHuman = (dateStr: string) => {
+        if (!dateStr) return '';
+        const today = getLocalDateString();
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        const formatted = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        if (dateStr === today) return `Today (${formatted})`;
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (dateStr === getLocalDateString(yesterday)) return `Yesterday (${formatted})`;
+        return formatted;
+    };
 
     // Edit modal state
     const [menuSearch, setMenuSearch] = useState('');
@@ -397,15 +408,12 @@ export default function OrdersPage() {
                             </button>
                         )}
                     </div>
-                    <div className="date-picker" onClick={() => dateInputRef.current?.showPicker?.()}>
-                        <Calendar size={16} />
-                        <input
-                            ref={dateInputRef}
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                        />
-                    </div>
+
+                    <DatePicker
+                        value={selectedDate}
+                        onChange={(newDate) => setSelectedDate(newDate)}
+                    />
+
                     <div className="filter-tabs">
                         {[
                             { key: 'all', label: 'All' },
@@ -447,8 +455,8 @@ export default function OrdersPage() {
                     <h3>No Orders Found</h3>
                     <p>
                         {orderSearch
-                            ? `No orders matching "${orderSearch}" on this date`
-                            : `There are no ${filter !== 'all' ? filter.toLowerCase() : ''} orders recorded for ${selectedDate}`}
+                            ? `No orders matching "${orderSearch}" on ${formatDateHuman(selectedDate)}`
+                            : `There are no ${filter !== 'all' ? filter.toLowerCase() : ''} orders recorded for ${formatDateHuman(selectedDate)}`}
                     </p>
                 </div>
             ) : (
