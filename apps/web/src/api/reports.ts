@@ -217,6 +217,20 @@ export const dashboardAPI = {
         const todayOrders = orders.filter((o: any) => (o.created_at || '').startsWith(todayStr));
         const todayRevenue = todayOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
 
+        // Compute top items
+        const itemMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
+        orders.forEach((o: any) => {
+            (o.items || []).forEach((it: any) => {
+                const name = it.name || it.item_name || 'Item';
+                const qty = Number(it.quantity || 1);
+                const price = Number(it.price || it.unit_price || 0);
+                if (!itemMap[name]) itemMap[name] = { name, quantity: 0, revenue: 0 };
+                itemMap[name].quantity += qty;
+                itemMap[name].revenue += (qty * price);
+            });
+        });
+        const topItems = Object.values(itemMap).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+
         const paymentSplit: Record<string, number> = {};
         todayOrders.forEach((o: any) => {
             const pm = o.payment_method || o.paymentMethod || 'CASH';
@@ -233,6 +247,15 @@ export const dashboardAPI = {
             };
         });
 
+        let peak = { hour: 13, label: '1:00 PM', orders: 0 };
+        hourlySales.forEach(h => {
+            if (h.orders > peak.orders) {
+                const h12 = h.hour % 12 || 12;
+                const ampm = h.hour >= 12 ? 'PM' : 'AM';
+                peak = { hour: h.hour, label: `${h12}:00 ${ampm}`, orders: h.orders };
+            }
+        });
+
         return {
             data: {
                 today: {
@@ -242,13 +265,13 @@ export const dashboardAPI = {
                 },
                 yesterday: { revenue: 0 },
                 revenueChange: 0,
-                topItems: [],
+                topItems,
                 slowItems: [],
                 lowStockAlerts: [],
                 lowStockCount: 0,
                 paymentSplit,
                 hourlySales,
-                peakHour: { hour: 13, label: '1:00 PM', orders: 0 },
+                peakHour: peak,
                 profitEstimate: { revenue: todayRevenue, estimatedCost: Math.round(todayRevenue * 0.4), estimatedProfit: Math.round(todayRevenue * 0.6), margin: 60 },
                 generatedAt: new Date().toISOString(),
             }

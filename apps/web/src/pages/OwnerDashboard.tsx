@@ -1,15 +1,10 @@
-// Owner Dashboard — SaaS Business Intelligence
-// Layout: KPI command strip → hourly chart → 3-column data
-// Philosophy: answer the owner's 3 questions in 3 seconds:
-//   1. How much money did I make today?
-//   2. What's selling / not selling?
-//   3. Do I have any urgent issues?
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
     TrendingUp, TrendingDown, DollarSign,
     Clock, AlertTriangle, Package,
-    RefreshCw, ArrowUpRight, ArrowDownRight
+    RefreshCw, ArrowUpRight, ArrowDownRight,
+    ShoppingBag, CreditCard, CheckCircle2,
+    Percent
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { dashboardAPI } from '../api';
@@ -30,11 +25,12 @@ interface OwnerSummary {
     generatedAt: string;
 }
 
-export function OwnerDashboard() {
+export default function OwnerDashboard() {
     const [data, setData] = useState<OwnerSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+    const [hoveredHour, setHoveredHour] = useState<number | null>(null);
 
     const fetchData = async () => {
         try {
@@ -57,10 +53,9 @@ export function OwnerDashboard() {
         return () => clearInterval(interval);
     }, []);
 
-    const fmt = (v: number) => new Intl.NumberFormat('en-IN', {
-        style: 'currency', currency: 'INR',
-        minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(v);
+    const fmt = (v: number) => {
+        return `₹${Number(v || 0).toLocaleString('en-IN')}`;
+    };
 
     const fmtTime = (h: number) => `${h % 12 || 12}${h >= 12 ? 'PM' : 'AM'}`;
 
@@ -92,231 +87,287 @@ export function OwnerDashboard() {
     const paymentSplit = data.paymentSplit || {};
     const today = data.today || { revenue: 0, orders: 0, avgBill: 0 };
     const yesterday = data.yesterday || { revenue: 0 };
-    const peakHour = data.peakHour || { hour: 12, label: '12:00 PM', orders: 0 };
-    const profitEstimate = data.profitEstimate || { revenue: 0, estimatedCost: 0, estimatedProfit: 0, margin: 0 };
+    const peakHour = data.peakHour || { hour: 13, label: '1:00 PM', orders: 0 };
+    const profitEstimate = data.profitEstimate || { revenue: 0, estimatedCost: 0, estimatedProfit: 0, margin: 60 };
 
     const maxHourly = Math.max(...hourlySales.map(h => h.revenue || 0), 1);
     const hourlyFiltered = hourlySales.filter(h => h.hour >= 6 && h.hour <= 23);
 
+    const paymentMethodsList = [
+        { label: 'Cash', amount: paymentSplit['CASH'] || 0 },
+        { label: 'UPI', amount: paymentSplit['UPI'] || 0 },
+        { label: 'Card', amount: paymentSplit['CARD'] || 0 },
+        { label: 'Online', amount: paymentSplit['ONLINE'] || 0 },
+    ];
+
     return (
         <div className="od-root">
-            {/* ── Page Header ── */}
+            {/* ── Page Header (Icebox Style) ── */}
             <header className="od-header">
                 <div className="od-header-left">
                     <h1>Business Overview</h1>
-                    <span className="od-date">
-                        {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </span>
+                    <div className="od-header-meta">
+                        <span className="od-date">
+                            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                        <span className="od-live-chip">
+                            <span className="od-live-dot" />
+                            Live POS Engine
+                        </span>
+                    </div>
                 </div>
-                <button className="od-refresh-btn" onClick={fetchData} disabled={loading}>
-                    <RefreshCw size={13} className={loading ? 'od-spin' : ''} />
-                    {loading ? 'Refreshing…' : 'Refresh'}
-                </button>
+
+                <div className="od-header-right">
+                    <button className="od-refresh-btn" onClick={fetchData} disabled={loading}>
+                        <RefreshCw size={13} className={loading ? 'od-spin' : ''} />
+                        <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
+                    </button>
+                </div>
             </header>
 
-            {/* ── KPI Command Strip ── */}
-            <motion.div className="od-kpi-strip" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                {/* Revenue */}
-                <div className="od-kpi">
-                    <span className="od-kpi-label">Revenue Today</span>
+            {/* ── KPI Command Cards Strip ── */}
+            <div className="od-kpi-cards-grid">
+                {/* 1. Revenue */}
+                <div className="od-kpi-card">
+                    <div className="kpi-card-top">
+                        <span className="od-kpi-label">Revenue Today</span>
+                        <div className="kpi-icon-box orange">
+                            <DollarSign size={16} />
+                        </div>
+                    </div>
                     <span className="od-kpi-value">{fmt(today.revenue)}</span>
                     <span className={`od-kpi-change ${(data.revenueChange || 0) >= 0 ? 'up' : 'down'}`}>
                         {(data.revenueChange || 0) >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {Math.abs(data.revenueChange || 0).toFixed(1)}% vs yesterday
+                        <span>{Math.abs(data.revenueChange || 0).toFixed(1)}% vs yesterday</span>
                     </span>
                 </div>
-                {/* Orders */}
-                <div className="od-kpi">
-                    <span className="od-kpi-label">Orders Today</span>
+
+                {/* 2. Orders */}
+                <div className="od-kpi-card">
+                    <div className="kpi-card-top">
+                        <span className="od-kpi-label">Orders Today</span>
+                        <div className="kpi-icon-box purple">
+                            <ShoppingBag size={16} />
+                        </div>
+                    </div>
                     <span className="od-kpi-value">{today.orders}</span>
                     <span className="od-kpi-sub">Yesterday: {fmt(yesterday.revenue)}</span>
                 </div>
-                {/* Avg Bill */}
-                <div className="od-kpi">
-                    <span className="od-kpi-label">Avg Bill Value</span>
+
+                {/* 3. Avg Bill */}
+                <div className="od-kpi-card">
+                    <div className="kpi-card-top">
+                        <span className="od-kpi-label">Avg Bill Value</span>
+                        <div className="kpi-icon-box blue">
+                            <TrendingUp size={16} />
+                        </div>
+                    </div>
                     <span className="od-kpi-value">{fmt(today.avgBill)}</span>
-                    <span className="od-kpi-sub">Per order</span>
+                    <span className="od-kpi-sub">Per completed order</span>
                 </div>
-                {/* Peak Hour */}
-                <div className="od-kpi">
-                    <span className="od-kpi-label">Peak Hour</span>
+
+                {/* 4. Peak Hour */}
+                <div className="od-kpi-card">
+                    <div className="kpi-card-top">
+                        <span className="od-kpi-label">Peak Hour</span>
+                        <div className="kpi-icon-box amber">
+                            <Clock size={16} />
+                        </div>
+                    </div>
                     <span className="od-kpi-value">{peakHour.label}</span>
-                    <span className="od-kpi-sub">{peakHour.orders} orders</span>
+                    <span className="od-kpi-sub">{peakHour.orders} orders recorded</span>
                 </div>
-                {/* Profit */}
-                <div className="od-kpi">
-                    <span className="od-kpi-label">Est. Profit</span>
-                    <span className="od-kpi-value" style={{ color: 'var(--success)' }}>
-                        {fmt(profitEstimate.estimatedProfit)}
-                    </span>
+
+                {/* 5. Profit */}
+                <div className="od-kpi-card">
+                    <div className="kpi-card-top">
+                        <span className="od-kpi-label">Est. Profit</span>
+                        <div className="kpi-icon-box green">
+                            <Percent size={16} />
+                        </div>
+                    </div>
+                    <span className="od-kpi-value profit">{fmt(profitEstimate.estimatedProfit)}</span>
                     <span className="od-kpi-sub">{profitEstimate.margin}% margin</span>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* ── Main Content ── */}
+            {/* ── Main Content Area ── */}
             <div className="od-content">
-                {/* Hourly Chart */}
-                <motion.div className="od-chart-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                {/* ── Hourly Sales Hero Chart ── */}
+                <div className="od-chart-card">
                     <div className="od-chart-header">
-                        <Clock size={14} style={{ color: 'var(--primary)' }} />
-                        <h3>Hourly Sales</h3>
-                        <span className="od-chart-sub">
-                            Peak: <strong style={{ color: 'var(--primary)' }}>{peakHour.label}</strong>
+                        <div className="od-chart-title-wrap">
+                            <Clock size={15} className="chart-icon" />
+                            <h3>Hourly Sales Trend</h3>
+                        </div>
+                        <span className="od-peak-badge">
+                            Peak Hour: <strong>{peakHour.label}</strong>
                         </span>
                     </div>
-                    <div className="od-chart-bars">
-                        {hourlyFiltered.map((hour) => (
-                            <div
-                                key={hour.hour}
-                                className={`od-bar-wrap ${hour.hour === peakHour.hour ? 'peak' : ''}`}
-                                title={`${fmtTime(hour.hour)}: ${fmt(hour.revenue)} (${hour.orders} orders)`}
-                            >
-                                <div
-                                    className="od-bar"
-                                    style={{ height: `${Math.max(((hour.revenue || 0) / maxHourly) * 100, 2)}%` }}
-                                />
-                                <span className="od-bar-label">{fmtTime(hour.hour)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
 
-                {/* 3-Column Data Panels */}
-                <div className="od-columns">
+                    <div className="od-chart-bars-track">
+                        {hourlyFiltered.map((hour) => {
+                            const isPeak = hour.hour === peakHour.hour;
+                            const isHovered = hoveredHour === hour.hour;
+                            const heightPercent = maxHourly > 0 ? Math.min(100, Math.max(3, (hour.revenue / maxHourly) * 100)) : 3;
+
+                            return (
+                                <div
+                                    key={hour.hour}
+                                    className={`od-bar-column ${isPeak ? 'peak' : ''} ${isHovered ? 'hovered' : ''}`}
+                                    onMouseEnter={() => setHoveredHour(hour.hour)}
+                                    onMouseLeave={() => setHoveredHour(null)}
+                                >
+                                    {/* Tooltip */}
+                                    {isHovered && (
+                                        <div className="od-bar-tooltip">
+                                            <span className="tooltip-time">{fmtTime(hour.hour)}</span>
+                                            <span className="tooltip-rev">{fmt(hour.revenue)}</span>
+                                            <span className="tooltip-orders">{hour.orders} orders</span>
+                                        </div>
+                                    )}
+
+                                    <div className="od-bar-bg-pillar" />
+                                    <div className="od-bar-fill-wrap">
+                                        <div
+                                            className={`od-bar-fill ${isPeak ? 'peak-fill' : ''}`}
+                                            style={{ height: `${heightPercent}%` }}
+                                        />
+                                    </div>
+                                    <span className="od-bar-x-label">{fmtTime(hour.hour)}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* ── 3-Column Performance Grid ── */}
+                <div className="od-tri-grid">
                     {/* Column 1: Top Selling Items */}
-                    <motion.div className="od-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                    <div className="od-panel-card">
                         <div className="od-panel-header">
-                            <TrendingUp size={14} />
-                            <h3>Top Selling</h3>
-                            <span className="od-panel-badge neutral">7 days</span>
+                            <div className="panel-title-left">
+                                <TrendingUp size={15} />
+                                <h3>Top Selling</h3>
+                            </div>
+                            <span className="od-panel-badge">7 days</span>
                         </div>
+
                         <div className="od-panel-body">
                             {topItems.length > 0 ? (
                                 topItems.map((item, i) => (
-                                    <div key={i} className="od-item-row">
-                                        <span className={`od-rank ${i === 0 ? 'top' : ''}`}>#{i + 1}</span>
+                                    <div key={i} className="od-ranked-row">
+                                        <div className={`od-rank-badge rank-${i + 1}`}>{i + 1}</div>
                                         <span className="od-item-name">{item.name}</span>
                                         <span className="od-item-qty">{item.quantity}×</span>
                                         <span className="od-item-rev">{fmt(item.revenue)}</span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="od-empty">No sales data yet</div>
+                                <div className="od-empty-state">
+                                    <TrendingUp size={28} />
+                                    <span>No product sales recorded yet</span>
+                                </div>
                             )}
 
-                            {/* Divider + Slow Items */}
                             {slowItems.length > 0 && (
-                                <>
-                                    <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }} />
-                                    <div className="od-panel-header" style={{ border: 'none', padding: '4px 16px 4px' }}>
-                                        <TrendingDown size={13} style={{ color: 'var(--warning)' }} />
-                                        <h3 style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dead Stock</h3>
-                                        <span className="od-panel-badge warn">7+ days</span>
+                                <div className="od-slow-items-section">
+                                    <div className="slow-section-header">
+                                        <TrendingDown size={13} />
+                                        <span>Slow Moving Items (7+ days)</span>
                                     </div>
                                     {slowItems.map((item, i) => (
                                         <div key={i} className="od-slow-row">
                                             <span className="od-slow-name">{item.name}</span>
-                                            <span className="od-slow-days">{item.daysSinceLastSale}d</span>
+                                            <span className="od-slow-days">{item.daysSinceLastSale}d inactive</span>
                                         </div>
                                     ))}
-                                </>
-                            )}
-                            {slowItems.length === 0 && topItems.length > 0 && (
-                                <div className="od-empty success">All items selling ✓</div>
+                                </div>
                             )}
                         </div>
-                    </motion.div>
+                    </div>
 
                     {/* Column 2: Stock Alerts */}
-                    <motion.div
-                        className={`od-panel ${(data.lowStockCount || 0) > 0 ? 'alert' : ''}`}
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    >
+                    <div className="od-panel-card">
                         <div className="od-panel-header">
-                            <Package size={14} />
-                            <h3>Stock Alerts</h3>
-                            {(data.lowStockCount || 0) > 0 && (
-                                <span className="od-panel-badge danger">{data.lowStockCount}</span>
+                            <div className="panel-title-left">
+                                <Package size={15} />
+                                <h3>Stock Alerts</h3>
+                            </div>
+                            {(data.lowStockCount || 0) > 0 ? (
+                                <span className="od-panel-badge danger">{data.lowStockCount} Low</span>
+                            ) : (
+                                <span className="od-panel-badge success">Healthy</span>
                             )}
                         </div>
+
                         <div className="od-panel-body">
                             {lowStockAlerts.length > 0 ? (
-                                lowStockAlerts.map((item) => {
-                                    const cls = item.status === 'OUT_OF_STOCK' ? 'critical' : item.status === 'CRITICAL' ? 'critical' : '';
-                                    return (
-                                        <div key={item.id} className={`od-stock-row ${cls}`}>
-                                            <AlertTriangle size={13} />
-                                            <span className="od-stock-name">{item.name}</span>
-                                            <span className="od-stock-qty">{item.quantity}{item.unit}</span>
-                                            <span className={`od-stock-status ${(item.status || '').toLowerCase()}`}>
-                                                {(item.status || '').replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="od-empty success">Stock levels healthy ✓</div>
-                            )}
-                        </div>
-                    </motion.div>
-
-                    {/* Column 3: Payment Split + Profit */}
-                    <motion.div className="od-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-                        <div className="od-panel-header">
-                            <DollarSign size={14} />
-                            <h3>Payment Split</h3>
-                        </div>
-                        <div className="od-panel-body">
-                            {Object.keys(paymentSplit).length > 0 ? (
-                                Object.entries(paymentSplit).map(([mode, amount]) => (
-                                    <div key={mode} className="od-payment-row">
-                                        <div className="od-payment-top">
-                                            <span className="od-payment-mode">{mode}</span>
-                                            <span className="od-payment-amount">{fmt(amount)}</span>
-                                        </div>
-                                        <div className="od-payment-bar">
-                                            <div
-                                                className="od-payment-fill"
-                                                style={{ width: `${today.revenue > 0 ? (amount / today.revenue) * 100 : 0}%` }}
-                                            />
-                                        </div>
+                                lowStockAlerts.map((item) => (
+                                    <div key={item.id} className="od-stock-alert-row">
+                                        <AlertTriangle size={14} className="alert-icon" />
+                                        <span className="od-stock-name">{item.name}</span>
+                                        <span className="od-stock-qty">{item.quantity} {item.unit} left</span>
                                     </div>
                                 ))
                             ) : (
-                                <div className="od-empty">No payments today</div>
+                                <div className="od-empty-state healthy">
+                                    <CheckCircle2 size={32} />
+                                    <h4>Stock Levels Healthy</h4>
+                                    <p>All ingredient thresholds are sufficient for active shifts</p>
+                                </div>
                             )}
+                        </div>
+                    </div>
 
-                            {/* Profit micro-strip */}
-                            <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }} />
-                            <div className="od-profit-strip">
-                                <div className="od-profit-item">
-                                    <span className="od-profit-label">Revenue</span>
-                                    <span className="od-profit-value positive">{fmt(data.profitEstimate.revenue)}</span>
+                    {/* Column 3: Payment Split & Margin */}
+                    <div className="od-panel-card">
+                        <div className="od-panel-header">
+                            <div className="panel-title-left">
+                                <CreditCard size={15} />
+                                <h3>Payment Split</h3>
+                            </div>
+                            <span className="od-panel-badge">Today</span>
+                        </div>
+
+                        <div className="od-panel-body">
+                            <div className="payment-split-list">
+                                {paymentMethodsList.map((pm) => (
+                                    <div key={pm.label} className="od-payment-pill-row">
+                                        <span className="payment-label">{pm.label}</span>
+                                        <span className="payment-amount">{fmt(pm.amount)}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Margin Summary Box */}
+                            <div className="od-margin-summary-box">
+                                <div className="margin-summary-item">
+                                    <span className="margin-label">Revenue</span>
+                                    <span className="margin-val">{fmt(profitEstimate.revenue)}</span>
                                 </div>
-                                <div className="od-profit-item">
-                                    <span className="od-profit-label">Est. Cost</span>
-                                    <span className="od-profit-value negative">{fmt(data.profitEstimate.estimatedCost)}</span>
+                                <div className="margin-summary-item">
+                                    <span className="margin-label">Est. Cost</span>
+                                    <span className="margin-val">{fmt(profitEstimate.estimatedCost)}</span>
                                 </div>
-                                <div className="od-profit-item">
-                                    <span className="od-profit-label">Profit</span>
-                                    <span className="od-profit-value accent">{fmt(data.profitEstimate.estimatedProfit)}</span>
+                                <div className="margin-summary-item">
+                                    <span className="margin-label">Net Profit</span>
+                                    <span className="margin-val profit">{fmt(profitEstimate.estimatedProfit)}</span>
                                 </div>
-                                <div className="od-profit-item">
-                                    <span className="od-profit-label">Margin</span>
-                                    <span className="od-profit-value">{data.profitEstimate.margin}%</span>
+                                <div className="margin-summary-item">
+                                    <span className="margin-label">Margin</span>
+                                    <span className="margin-val highlight">{profitEstimate.margin}%</span>
                                 </div>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
+                </div>
+
+                {/* Footer Sync Note */}
+                <div className="od-footer-note">
+                    <span>Last updated: {lastRefresh.toLocaleTimeString()} · Auto-refreshes every 5 minutes</span>
                 </div>
             </div>
-
-            {/* ── Footer ── */}
-            <footer className="od-footer">
-                Last updated: {lastRefresh.toLocaleTimeString('en-IN')} · Auto-refreshes every 5 minutes
-            </footer>
         </div>
     );
 }
-
-export default OwnerDashboard;
