@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, X, Sparkles } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import './PWAUpdatePrompt.css';
 import { logger } from '../../utils/logger';
 
@@ -124,7 +124,7 @@ export function PWAUpdatePrompt() {
                 >
                     <div className="pwa-update-card">
                         <div className="pwa-update-icon-box">
-                            <Sparkles size={20} />
+                            <img src="/billova-logo.png" alt="Billova" className="pwa-update-logo" />
                         </div>
                         <div className="pwa-update-info">
                             <div className="pwa-update-title-row">
