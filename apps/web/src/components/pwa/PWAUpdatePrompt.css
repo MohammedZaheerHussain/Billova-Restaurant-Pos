@@ -1,125 +1,177 @@
-/* PWA Update Prompt Styles */
+/* =======================================================
+   PWA Update Prompt — Icebox Modern Floating Pill Banner
+   ======================================================= */
 
 .pwa-update-prompt {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 24px;
+    right: 24px;
     z-index: 10000;
-    animation: slideIn 0.3s ease;
+    pointer-events: auto;
 }
 
-@keyframes slideIn {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-.pwa-update-content {
+/* ── Card Container ── */
+.pwa-update-card {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid rgba(220, 38, 38, 0.3);
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    max-width: 400px;
+    gap: 14px;
+    padding: 14px 18px;
+    background: rgba(18, 20, 26, 0.94);
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    border-radius: 18px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(249, 115, 22, 0.15);
+    backdrop-filter: blur(16px);
+    max-width: 440px;
+    min-width: 340px;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.pwa-update-icon {
+.pwa-update-card:hover {
+    border-color: rgba(249, 115, 22, 0.55);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 30px rgba(249, 115, 22, 0.25);
+}
+
+/* ── Icon Box ── */
+.pwa-update-icon-box {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
-    background: rgba(220, 38, 38, 0.15);
-    border-radius: 10px;
-    color: #dc2626;
+    width: 42px;
+    height: 42px;
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(249, 115, 22, 0.05) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    border-radius: 12px;
+    color: var(--primary);
     flex-shrink: 0;
+    animation: pwa-pulse-glow 2.5s infinite ease-in-out;
 }
 
-.pwa-update-text h4 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 600;
-    color: #fff;
+@keyframes pwa-pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 12px rgba(249, 115, 22, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(249, 115, 22, 0.45);
+    }
 }
 
-.pwa-update-text p {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
+/* ── Info Column ── */
+.pwa-update-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
-.pwa-update-actions {
+.pwa-update-title-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-left: auto;
+}
+
+.pwa-update-info h4 {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.pwa-new-badge {
+    padding: 1px 6px;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 100px;
+    color: #22c55e;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.pwa-update-info p {
+    margin: 0;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+/* ── Actions ── */
+.pwa-update-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 .pwa-update-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
-    background: #dc2626;
-    color: white;
+    padding: 7px 14px;
+    background: var(--gradient-primary);
+    color: #fff;
     border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s;
+    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+    transition: all 140ms ease;
     white-space: nowrap;
 }
 
-.pwa-update-btn:hover {
-    background: #b91c1c;
+.pwa-update-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.5);
     transform: translateY(-1px);
+}
+
+.pwa-update-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.pwa-spin {
+    animation: pwa-spin 0.8s linear infinite;
+}
+
+@keyframes pwa-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .pwa-dismiss-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.6);
-    border: none;
-    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 140ms ease;
 }
 
 .pwa-dismiss-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
+    background: var(--bg-surface-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
 }
 
-/* Mobile responsive */
+/* ── Mobile Responsive ── */
 @media (max-width: 480px) {
     .pwa-update-prompt {
-        bottom: 10px;
-        left: 10px;
-        right: 10px;
+        bottom: 12px;
+        left: 12px;
+        right: 12px;
     }
 
-    .pwa-update-content {
-        flex-wrap: wrap;
-        padding: 12px 16px;
-    }
-
-    .pwa-update-actions {
-        width: 100%;
-        justify-content: flex-end;
-        margin-top: 8px;
+    .pwa-update-card {
+        min-width: unset;
+        max-width: 100%;
+        padding: 12px 14px;
     }
 }
