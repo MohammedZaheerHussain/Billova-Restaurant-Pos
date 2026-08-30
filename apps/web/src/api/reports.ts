@@ -49,7 +49,21 @@ export const reportsAPI = {
         if (hasExpressBackend()) {
             try { return await api.get('/reports/item-sales', { params: { startDate, endDate } }); } catch { /* fallback */ }
         }
-        return { data: { items: [], categories: [] } };
+        const orders = await getSupabaseOrders();
+        const itemMap: Record<string, { name: string; quantity: number; total: number }> = {};
+        orders.forEach((o: any) => {
+            const items = o.items || [];
+            items.forEach((it: any) => {
+                const name = it.name || it.item_name || 'Item';
+                const qty = Number(it.quantity || 1);
+                const price = Number(it.price || it.unit_price || 0);
+                if (!itemMap[name]) itemMap[name] = { name, quantity: 0, total: 0 };
+                itemMap[name].quantity += qty;
+                itemMap[name].total += (qty * price);
+            });
+        });
+        const items = Object.values(itemMap).sort((a, b) => b.quantity - a.quantity);
+        return { data: { items, categories: [] } };
     },
     categorySales: async (startDate?: string, endDate?: string) => {
         if (hasExpressBackend()) {
@@ -69,6 +83,55 @@ export const reportsAPI = {
             hourly[h].total += Number(o.total_amount || o.total || o.subtotal || 0);
         });
         return { data: hourly };
+    },
+    daily14Days: async () => {
+        if (hasExpressBackend()) {
+            try { return await api.get('/reports/daily-14-days'); } catch { /* fallback */ }
+        }
+        const orders = await getSupabaseOrders();
+        const days: { date: string; label: string; sales: number; orders: number }[] = [];
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        for (let i = 13; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const label = `${d.getDate()} ${monthNames[d.getMonth()]}`;
+            const dayOrders = orders.filter((o: any) => (o.created_at || '').startsWith(dateStr));
+            const sales = dayOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
+            days.push({
+                date: dateStr,
+                label,
+                sales,
+                orders: dayOrders.length,
+            });
+        }
+        return { data: days };
+    },
+    weekly4Weeks: async () => {
+        if (hasExpressBackend()) {
+            try { return await api.get('/reports/weekly-4-weeks'); } catch { /* fallback */ }
+        }
+        const orders = await getSupabaseOrders();
+        const weeks: { label: string; sales: number; orders: number }[] = [];
+        const weekLabels = ['4w ago', '3w ago', '2w ago', 'This week'];
+        const now = Date.now();
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        for (let w = 3; w >= 0; w--) {
+            const startMs = now - (w + 1) * 7 * MS_PER_DAY;
+            const endMs = now - w * 7 * MS_PER_DAY;
+            const weekOrders = orders.filter((o: any) => {
+                const orderMs = new Date(o.created_at || Date.now()).getTime();
+                return orderMs >= startMs && (w === 0 ? orderMs <= now : orderMs < endMs);
+            });
+            const sales = weekOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
+            weeks.push({
+                label: weekLabels[3 - w],
+                sales,
+                orders: weekOrders.length,
+            });
+        }
+        return { data: weeks };
     },
     weeklySummary: async () => {
         if (hasExpressBackend()) {
@@ -105,18 +168,34 @@ export const reportsAPI = {
         }
         const orders = await getSupabaseOrders();
         const now = new Date();
-        const monthStr = now.toISOString().slice(0, 7);
-        const monthOrders = orders.filter((o: any) => (o.created_at || '').startsWith(monthStr));
-        const totalSales = monthOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months: { label: string; sales: number; orders: number }[] = [];
+        
+        // Past 3 months + current month
+        for (let m = 3; m >= 0; m--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+            const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const mOrders = orders.filter((o: any) => (o.created_at || '').startsWith(monthPrefix));
+            const sales = mOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
+            months.push({
+                label: `${monthNames[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
+                sales,
+                orders: mOrders.length,
+            });
+        }
+
+        const currentMonthOrders = orders.filter((o: any) => (o.created_at || '').startsWith(now.toISOString().slice(0, 7)));
+        const totalSales = currentMonthOrders.reduce((s: number, o: any) => s + Number(o.total_amount || o.total || o.subtotal || 0), 0);
         const daysElapsed = now.getDate();
         return {
             data: {
                 month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
                 totalSales,
-                totalOrders: monthOrders.length,
+                totalOrders: currentMonthOrders.length,
                 trend: 0,
                 avgDaily: daysElapsed ? Math.round(totalSales / daysElapsed) : 0,
                 daysElapsed,
+                months,
             }
         };
     },
