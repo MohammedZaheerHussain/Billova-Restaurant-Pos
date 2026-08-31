@@ -8,6 +8,8 @@ import { logger } from '../utils/logger';
 
 const LOCAL_ORDERS_KEY = 'billova_local_orders_v2';
 
+const isValidUUID = (str?: string | null): boolean => Boolean(str && typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
 export function getStoredLocalOrders(): any[] {
     try {
         const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
@@ -56,7 +58,7 @@ export async function syncLocalOrdersToSupabase() {
 
     for (const localOrd of unsynced) {
         try {
-            const syncOrderUuid = (localOrd.id && !localOrd.id.startsWith('ord-') && !localOrd.id.startsWith('temp-'))
+            const syncOrderUuid = (localOrd.id && isValidUUID(localOrd.id))
                 ? localOrd.id
                 : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined);
 
@@ -80,8 +82,7 @@ export async function syncLocalOrdersToSupabase() {
                 completed_at: localOrd.completedAt || (localOrd.status === 'COMPLETED' ? localOrd.createdAt : null),
             };
 
-            if (branchId) insertPayload.branch_id = branchId;
-            if (user?.id) insertPayload.user_id = user.id;
+            if (isValidUUID(branchId)) insertPayload.branch_id = branchId;
 
             const { data: serverOrder, error: orderErr } = await supabase
                 .from('orders')
@@ -98,11 +99,12 @@ export async function syncLocalOrdersToSupabase() {
                 if (localOrd.items && localOrd.items.length > 0) {
                     const itemsPayload = localOrd.items.map((it: any) => {
                         const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
-                        return {
-                            ...(itemUuid ? { id: itemUuid } : {}),
-                            order_id: serverOrder.id,
-                            menu_item_id: it.menuItem?.id || it.menuItemId || null,
-                            quantity: Number(it.quantity || 1),
+                            const rawMenuId = it.menuItem?.id || it.menuItemId || it.id;
+                            return {
+                                ...(itemUuid ? { id: itemUuid } : {}),
+                                order_id: serverOrder.id,
+                                menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
+                                quantity: Number(it.quantity || 1),
                             unit_price: Number(it.unitPrice || 0),
                             total: Number(it.total || 0),
                             notes: it.notes || null,
@@ -495,15 +497,11 @@ export const ordersAPI = {
                 insertPayload.discount_value = data.discountValue || 0;
             }
 
-            if (branchId) {
+            if (isValidUUID(branchId)) {
                 insertPayload.branch_id = branchId;
             }
 
-            if (user?.id) {
-                insertPayload.user_id = user.id;
-            }
-
-            if (data.tableId) {
+            if (isValidUUID(data.tableId)) {
                 insertPayload.table_id = data.tableId;
             }
 
@@ -524,10 +522,11 @@ export const ordersAPI = {
                     try {
                         const orderItemsPayload = items.map((it: any) => {
                             const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                            const rawMenuId = it.menuItemId || it.id || (it as any).menuItem?.id;
                             return {
                                 ...(itemUuid ? { id: itemUuid } : {}),
                                 order_id: finalOrderId,
-                                menu_item_id: it.menuItemId || it.id || null,
+                                menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
                                 quantity: Number(it.quantity || 1),
                                 unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
                                 total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
