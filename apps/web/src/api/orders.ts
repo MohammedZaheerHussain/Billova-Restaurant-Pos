@@ -56,7 +56,12 @@ export async function syncLocalOrdersToSupabase() {
 
     for (const localOrd of unsynced) {
         try {
+            const syncOrderUuid = (localOrd.id && !localOrd.id.startsWith('ord-') && !localOrd.id.startsWith('temp-'))
+                ? localOrd.id
+                : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined);
+
             const insertPayload: any = {
+                ...(syncOrderUuid ? { id: syncOrderUuid } : {}),
                 order_number: localOrd.orderNumber || 1,
                 daily_order_no: localOrd.dailyOrderNo || localOrd.orderNumber || 1,
                 order_type: localOrd.orderType || 'DINE_IN',
@@ -91,26 +96,34 @@ export async function syncLocalOrdersToSupabase() {
 
                 // Insert items
                 if (localOrd.items && localOrd.items.length > 0) {
-                    const itemsPayload = localOrd.items.map((it: any) => ({
-                        order_id: serverOrder.id,
-                        menu_item_id: it.menuItem?.id || it.menuItemId || null,
-                        quantity: Number(it.quantity || 1),
-                        unit_price: Number(it.unitPrice || 0),
-                        total: Number(it.total || 0),
-                        notes: it.notes || null,
-                        status: 'PENDING',
-                    }));
+                    const itemsPayload = localOrd.items.map((it: any) => {
+                        const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                        return {
+                            ...(itemUuid ? { id: itemUuid } : {}),
+                            order_id: serverOrder.id,
+                            menu_item_id: it.menuItem?.id || it.menuItemId || null,
+                            quantity: Number(it.quantity || 1),
+                            unit_price: Number(it.unitPrice || 0),
+                            total: Number(it.total || 0),
+                            notes: it.notes || null,
+                            status: 'PENDING',
+                        };
+                    });
                     await supabase.from('order_items').insert(itemsPayload);
                 }
 
                 // Insert payments
                 if (localOrd.payments && localOrd.payments.length > 0) {
-                    const paymentsPayload = localOrd.payments.map((p: any) => ({
-                        order_id: serverOrder.id,
-                        mode: p.mode || 'CASH',
-                        amount: Number(p.amount || localOrd.total || 0),
-                        created_at: p.createdAt || new Date().toISOString(),
-                    }));
+                    const paymentsPayload = localOrd.payments.map((p: any) => {
+                        const payUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                        return {
+                            ...(payUuid ? { id: payUuid } : {}),
+                            order_id: serverOrder.id,
+                            mode: p.mode || 'CASH',
+                            amount: Number(p.amount || localOrd.total || 0),
+                            created_at: p.createdAt || new Date().toISOString(),
+                        };
+                    });
                     await supabase.from('payments').insert(paymentsPayload);
                 }
                 logger.info(`[Sync] Order #${localOrd.orderNumber} successfully synced to Supabase:`, serverOrder.id);
@@ -456,7 +469,10 @@ export const ordersAPI = {
 
         // ── 2. Insert into Supabase table (PRIMARY PERSISTENCE) ──
         try {
+            const clientGeneratedOrderId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+
             const insertPayload: any = {
+                ...(clientGeneratedOrderId ? { id: clientGeneratedOrderId } : {}),
                 order_number: nextOrderNumber,
                 daily_order_no: nextOrderNumber,
                 order_type: data.orderType || 'DINE_IN',
@@ -497,29 +513,35 @@ export const ordersAPI = {
                 .select()
                 .single();
 
-            if (!orderErr && serverOrder) {
-                assignedOrderId = serverOrder.id;
-                baseOrder.id = serverOrder.id;
+            const finalOrderId = serverOrder?.id || clientGeneratedOrderId || assignedOrderId;
+
+            if (!orderErr && finalOrderId) {
+                assignedOrderId = finalOrderId;
+                baseOrder.id = finalOrderId;
 
                 // Insert items into Supabase
                 if (items.length > 0) {
                     try {
-                        const orderItemsPayload = items.map((it: any) => ({
-                            order_id: serverOrder.id,
-                            menu_item_id: it.menuItemId || it.id || null,
-                            quantity: Number(it.quantity || 1),
-                            unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
-                            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-                            notes: it.notes || null,
-                            status: 'PENDING',
-                        }));
+                        const orderItemsPayload = items.map((it: any) => {
+                            const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                            return {
+                                ...(itemUuid ? { id: itemUuid } : {}),
+                                order_id: finalOrderId,
+                                menu_item_id: it.menuItemId || it.id || null,
+                                quantity: Number(it.quantity || 1),
+                                unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
+                                total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                                notes: it.notes || null,
+                                status: 'PENDING',
+                            };
+                        });
 
                         await supabase.from('order_items').insert(orderItemsPayload);
                     } catch (itemInsertErr) {
                         logger.warn('Could not insert items into order_items table:', itemInsertErr);
                     }
                 }
-                logger.info(`[POS] Order #${nextOrderNumber} saved to Supabase:`, serverOrder.id);
+                logger.info(`[POS] Order #${nextOrderNumber} saved to Supabase:`, finalOrderId);
             } else if (orderErr) {
                 logger.error('[POS] Supabase order insert error:', orderErr);
             }
@@ -561,7 +583,9 @@ export const ordersAPI = {
         try {
             if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
                 try {
+                    const payUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
                     await supabase.from('payments').insert([{
+                        ...(payUuid ? { id: payUuid } : {}),
                         order_id: id,
                         mode: data.mode || 'CASH',
                         amount: data.amount,
