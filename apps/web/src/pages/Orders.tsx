@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Clock, X, User, Phone, CreditCard,
@@ -103,6 +103,8 @@ export default function OrdersPage() {
     useEffect(() => {
         fetchOrders();
         fetchMenuItems();
+        const interval = setInterval(fetchOrders, 10000);
+        return () => clearInterval(interval);
     }, [selectedDate]);
 
     // Clear selection when filter/date changes
@@ -130,6 +132,12 @@ export default function OrdersPage() {
             logger.error('Failed to fetch menu items');
         }
     };
+
+    // Tab counts
+    const pendingCount = useMemo(() => orders.filter(o => ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(o.status)).length, [orders]);
+    const completedCount = useMemo(() => orders.filter(o => o.status === 'COMPLETED').length, [orders]);
+    const cancelledCount = useMemo(() => orders.filter(o => o.status === 'CANCELLED').length, [orders]);
+    const allCount = orders.length;
 
     // Filter menu items for search
     const filteredMenuItems = menuItems.filter(item =>
@@ -222,7 +230,7 @@ export default function OrdersPage() {
             setAddingItems(true);
             const items = newItems.map(ni => ({
                 menuItemId: ni.menuItem.id,
-                variantId: ni.variantId || null,
+                variantId: ni.variantId || undefined,
                 quantity: ni.quantity,
             }));
 
@@ -423,17 +431,18 @@ export default function OrdersPage() {
 
                     <div className="filter-tabs">
                         {[
-                            { key: 'all', label: 'All' },
-                            { key: 'PENDING', label: 'Pending' },
-                            { key: 'COMPLETED', label: 'Completed' },
-                            { key: 'CANCELLED', label: 'Cancelled' },
+                            { key: 'all', label: 'All', count: allCount },
+                            { key: 'PENDING', label: 'Pending', count: pendingCount },
+                            { key: 'COMPLETED', label: 'Completed', count: completedCount },
+                            { key: 'CANCELLED', label: 'Cancelled', count: cancelledCount },
                         ].map((f) => (
                             <button
                                 key={f.key}
                                 className={`filter-tab ${filter === f.key ? 'active' : ''}`}
                                 onClick={() => setFilter(f.key)}
                             >
-                                {f.label}
+                                <span>{f.label}</span>
+                                <span className="filter-count-badge">{f.count}</span>
                             </button>
                         ))}
                     </div>

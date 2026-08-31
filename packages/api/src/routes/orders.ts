@@ -10,9 +10,12 @@ const router = Router();
 
 // Helper to transform order for frontend compatibility
 function transformOrder(order: any) {
+    const num = order.order_number || 1;
     return {
         id: order.id,
-        orderNumber: order.order_number,
+        orderNumber: num,
+        dailyOrderNo: num,
+        billNumber: `#${String(num).padStart(3, '0')}`,
         branchId: order.branch_id,
         tableId: order.table_id,
         userId: order.user_id,
