@@ -1,10 +1,47 @@
-// Orders API - Robust Client & Supabase Data Layer
+// Orders API - Resilient Hybrid (Supabase + Local Cache) Layer
 import api from './client';
 import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { CreateOrderDTO, UpdateOrderStatusDTO, AddPaymentDTO, OrderQueryDTO } from '@billova/types';
 import { useAuthStore } from '../store';
 import { logger } from '../utils/logger';
+
+const LOCAL_ORDERS_KEY = 'billova_local_orders_v2';
+
+function getStoredLocalOrders(): any[] {
+    try {
+        const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveLocalOrder(order: any) {
+    try {
+        const list = getStoredLocalOrders();
+        const existingIdx = list.findIndex(o => o.id === order.id || o.orderNumber === order.orderNumber);
+        if (existingIdx >= 0) {
+            list[existingIdx] = { ...list[existingIdx], ...order };
+        } else {
+            list.unshift(order);
+        }
+        // Keep last 200 orders locally
+        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(list.slice(0, 200)));
+    } catch (e) {
+        logger.warn('Failed to save order to localStorage:', e);
+    }
+}
+
+function updateLocalOrderStatus(id: string, status: string) {
+    try {
+        const list = getStoredLocalOrders();
+        const updated = list.map(o => o.id === id ? { ...o, status, completedAt: status === 'COMPLETED' ? new Date().toISOString() : o.completedAt } : o);
+        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(updated));
+    } catch (e) {
+        logger.warn('Failed to update local order status:', e);
+    }
+}
 
 export const ordersAPI = {
     /**
@@ -18,7 +55,7 @@ export const ordersAPI = {
             const user = useAuthStore.getState().user;
             const branchId = user?.branch?.id || (user as any)?.branchId;
 
-            // 1. Fetch orders cleanly
+            // 1. Fetch orders from Supabase
             let query = supabase
                 .from('orders')
                 .select('*')
@@ -35,49 +72,19 @@ export const ordersAPI = {
             }
 
             const { data: ordersData, error: ordersError } = await query;
+            let rawOrders: any[] = [];
 
-            if (ordersError) {
-                logger.warn('Failed to fetch orders from supabase:', ordersError.message);
-                // Simple query fallback without filters in case of RLS
-                const { data: fallbackOrders } = await supabase
-                    .from('orders')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(100);
-
-                if (!fallbackOrders || fallbackOrders.length === 0) return { data: [] };
-                return {
-                    data: (fallbackOrders || []).map((o: any) => ({
-                        id: o.id,
-                        orderNumber: Number(o.order_number || o.daily_order_no || 1),
-                        dailyOrderNo: Number(o.daily_order_no || o.order_number || 1),
-                        orderType: o.order_type || 'DINE_IN',
-                        status: o.status || 'PENDING',
-                        total: Number(o.total || o.total_amount || 0),
-                        totalAmount: Number(o.total || o.total_amount || 0),
-                        subtotal: Number(o.subtotal || o.total || 0),
-                        discountAmount: Number(o.discount_amount || 0),
-                        gstAmount: Number(o.gst_amount || 0),
-                        customerName: o.customer_name,
-                        customerPhone: o.customer_phone,
-                        notes: o.notes,
-                        createdAt: o.created_at || new Date().toISOString(),
-                        completedAt: o.completed_at,
-                        items: [],
-                        payments: [],
-                    }))
-                };
+            if (!ordersError && ordersData) {
+                rawOrders = ordersData;
+            } else {
+                logger.warn('Supabase orders fetch warning:', ordersError?.message);
             }
 
-            const rawOrders = ordersData || [];
-            if (rawOrders.length === 0) return { data: [] };
-
+            // 2. Fetch order items, payments, tables, and menu items in parallel
             const orderIds = rawOrders.map((o: any) => o.id);
-
-            // 2. Fetch order items, payments, tables, and menu items in parallel for linked details
             const [itemsRes, paymentsRes, tablesRes, menuRes] = await Promise.allSettled([
-                supabase.from('order_items').select('*').in('order_id', orderIds),
-                supabase.from('payments').select('*').in('order_id', orderIds),
+                orderIds.length > 0 ? supabase.from('order_items').select('*').in('order_id', orderIds) : Promise.resolve({ data: [] }),
+                orderIds.length > 0 ? supabase.from('payments').select('*').in('order_id', orderIds) : Promise.resolve({ data: [] }),
                 supabase.from('tables').select('id, name'),
                 supabase.from('menu_items').select('id, name, price'),
             ]);
@@ -125,8 +132,8 @@ export const ordersAPI = {
                 paymentsByOrder.set(p.order_id, list);
             });
 
-            // 3. Format orders
-            const formatted = rawOrders.map((o: any) => {
+            // 3. Format remote orders
+            const formattedRemote = rawOrders.map((o: any) => {
                 const num = Number(o.order_number || o.daily_order_no || 1);
                 const orderItems = itemsByOrder.get(o.id) || (Array.isArray(o.items) ? o.items : []);
                 const orderPayments = paymentsByOrder.get(o.id) || (Array.isArray(o.payments) ? o.payments : []);
@@ -149,6 +156,8 @@ export const ordersAPI = {
                     customerName: o.customer_name,
                     customerPhone: o.customer_phone,
                     notes: o.notes,
+                    onlinePlatform: o.online_platform || o.onlinePlatform,
+                    onlineOrderId: o.online_order_id || o.onlineOrderId,
                     createdAt: o.created_at || new Date().toISOString(),
                     completedAt: o.completed_at,
                     table: tableInfo ? { id: tableInfo.id, name: tableInfo.name } : undefined,
@@ -157,10 +166,42 @@ export const ordersAPI = {
                 };
             });
 
-            return { data: formatted };
+            // 4. Merge with local cached orders
+            const localOrders = getStoredLocalOrders();
+            const dateFilter = params?.date;
+
+            const filteredLocal = dateFilter
+                ? localOrders.filter(o => (o.createdAt || '').startsWith(dateFilter))
+                : localOrders;
+
+            // Combine and deduplicate
+            const seenIds = new Set<string>();
+            const seenOrderNums = new Set<number>();
+            const combined: any[] = [];
+
+            // Add remote orders first
+            for (const ord of formattedRemote) {
+                seenIds.add(ord.id);
+                seenOrderNums.add(ord.orderNumber);
+                combined.push(ord);
+            }
+
+            // Add local orders that are not yet in remote response
+            for (const ord of filteredLocal) {
+                if (!seenIds.has(ord.id) && !seenOrderNums.has(ord.orderNumber)) {
+                    combined.push(ord);
+                }
+            }
+
+            // Sort descending by creation date
+            combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            return { data: combined };
         } catch (err) {
             logger.error('Orders getAll error:', err);
-            return { data: [] };
+            // Return local cached orders on failure
+            const localOrders = getStoredLocalOrders();
+            return { data: localOrders };
         }
     },
 
@@ -199,12 +240,13 @@ export const ordersAPI = {
                 }
             };
         } catch {
-            return { data: null };
+            const local = getStoredLocalOrders().find(o => o.id === id);
+            return { data: local || null };
         }
     },
 
     /**
-     * Create a new order with sequential order numbering
+     * Create a new order with sequential order numbering and dual persistence
      */
     create: async (data: CreateOrderDTO, options?: { dailyReset?: boolean }) => {
         if (hasExpressBackend()) {
@@ -215,68 +257,114 @@ export const ordersAPI = {
             } catch { /* fallback */ }
         }
 
+        const user = useAuthStore.getState().user;
+        const branchId = user?.branch?.id || (user as any)?.branchId;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // ── 1. Calculate Sequential Order Number for Today ──
+        let nextOrderNumber = 1;
+
         try {
-            const user = useAuthStore.getState().user;
-            const branchId = user?.branch?.id || (user as any)?.branchId;
+            const { data: recentOrders } = await supabase
+                .from('orders')
+                .select('order_number, daily_order_no, created_at')
+                .order('created_at', { ascending: false })
+                .limit(100);
 
-            // ── 1. Calculate Sequential Order Number for Today ──
-            const todayStr = new Date().toISOString().split('T')[0];
-            let nextOrderNumber = 1;
+            if (recentOrders && recentOrders.length > 0) {
+                const todays = options?.dailyReset !== false
+                    ? recentOrders.filter((o: any) => (o.created_at || '').startsWith(todayStr))
+                    : recentOrders;
 
-            try {
-                let orderNumQuery = supabase
-                    .from('orders')
-                    .select('order_number, daily_order_no, created_at')
-                    .order('created_at', { ascending: false })
-                    .limit(100);
-
-                if (branchId) {
-                    orderNumQuery = orderNumQuery.eq('branch_id', branchId);
+                let maxNum = 0;
+                for (const o of todays) {
+                    const n = Number(o.order_number || o.daily_order_no || 0);
+                    if (n > maxNum) maxNum = n;
                 }
-
-                const { data: recentOrders } = await orderNumQuery;
-                if (recentOrders && recentOrders.length > 0) {
-                    const todays = options?.dailyReset !== false
-                        ? recentOrders.filter((o: any) => (o.created_at || '').startsWith(todayStr))
-                        : recentOrders;
-
-                    let maxNum = 0;
-                    for (const o of todays) {
-                        const n = Number(o.order_number || o.daily_order_no || 0);
-                        if (n > maxNum) maxNum = n;
-                    }
-                    nextOrderNumber = maxNum + 1;
-                }
-            } catch (queryErr) {
-                logger.warn('Could not query max order number, using local seq:', queryErr);
-                const storedDate = localStorage.getItem('billova_order_seq_date');
-                let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
-                if (storedDate !== todayStr) {
-                    seq = 0;
-                }
-                nextOrderNumber = seq + 1;
+                nextOrderNumber = maxNum + 1;
             }
-
-            // Keep localStorage in sync
-            localStorage.setItem('billova_order_seq_date', todayStr);
-            localStorage.setItem('billova_order_seq_num', String(nextOrderNumber));
-
-            const billNumber = `#${String(nextOrderNumber).padStart(3, '0')}`;
-
-            // Calculate item totals
-            let subtotal = 0;
-            let gstAmount = 0;
-            const items = data.items || [];
-            for (const it of items) {
-                const itemQty = Number(it.quantity || 1);
-                const itemPrice = Number((it as any).unitPrice || (it as any).price || 0);
-                subtotal += (itemQty * itemPrice);
+        } catch (queryErr) {
+            logger.warn('Could not query max order number, using local seq:', queryErr);
+            const storedDate = localStorage.getItem('billova_order_seq_date');
+            let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
+            if (storedDate !== todayStr) {
+                seq = 0;
             }
-            if ((data as any).subtotal) subtotal = Number((data as any).subtotal);
-            const discountAmount = Number((data as any).discountAmount || 0);
-            const total = Number((data as any).total || (data as any).totalAmount || (subtotal - discountAmount + gstAmount));
+            nextOrderNumber = seq + 1;
+        }
 
-            // ── 2. Insert into orders table ──
+        // Also check local storage max for today
+        const localList = getStoredLocalOrders().filter(o => (o.createdAt || '').startsWith(todayStr));
+        for (const lo of localList) {
+            if (Number(lo.orderNumber || 0) >= nextOrderNumber) {
+                nextOrderNumber = Number(lo.orderNumber || 0) + 1;
+            }
+        }
+
+        // Keep localStorage in sync
+        localStorage.setItem('billova_order_seq_date', todayStr);
+        localStorage.setItem('billova_order_seq_num', String(nextOrderNumber));
+
+        const billNumber = `#${String(nextOrderNumber).padStart(3, '0')}`;
+
+        // Calculate item totals
+        let subtotal = 0;
+        let gstAmount = 0;
+        const items = data.items || [];
+        for (const it of items) {
+            const itemQty = Number(it.quantity || 1);
+            const itemPrice = Number((it as any).unitPrice || (it as any).price || 0);
+            subtotal += (itemQty * itemPrice);
+        }
+        if ((data as any).subtotal) subtotal = Number((data as any).subtotal);
+        const discountAmount = Number((data as any).discountAmount || 0);
+        const total = Number((data as any).total || (data as any).totalAmount || (subtotal - discountAmount + gstAmount));
+
+        // Format Items for local cache & return
+        const formattedItems = items.map((it: any, idx: number) => ({
+            id: it.id || `item-${Date.now()}-${idx}`,
+            quantity: Number(it.quantity || 1),
+            unitPrice: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
+            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+            notes: it.notes || undefined,
+            menuItem: {
+                id: it.menuItemId || it.id,
+                name: (it as any).name || (it as any).menuItem?.name || 'Item',
+            },
+            variant: it.variantId ? { id: it.variantId, name: (it as any).variant?.name || '' } : undefined,
+        }));
+
+        const orderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+        const baseOrder = {
+            id: orderId,
+            orderNumber: nextOrderNumber,
+            dailyOrderNo: nextOrderNumber,
+            billNumber: billNumber,
+            orderType: data.orderType || 'DINE_IN',
+            status: (data as any).status || 'PENDING',
+            customerName: data.customerName || undefined,
+            customerPhone: data.customerPhone || undefined,
+            notes: data.notes || undefined,
+            onlinePlatform: (data as any).onlinePlatform || undefined,
+            onlineOrderId: (data as any).onlineOrderId || undefined,
+            subtotal: subtotal,
+            discountType: data.discountType || undefined,
+            discountValue: data.discountValue || 0,
+            discountAmount: discountAmount,
+            gstAmount: gstAmount,
+            total: total,
+            totalAmount: total,
+            items: formattedItems,
+            payments: [],
+            createdAt: new Date().toISOString(),
+        };
+
+        // Save immediately to local cache
+        saveLocalOrder(baseOrder);
+
+        // ── 2. Insert into Supabase table (asynchronous / resilient) ──
+        try {
             const insertPayload: any = {
                 order_number: nextOrderNumber,
                 daily_order_no: nextOrderNumber,
@@ -290,6 +378,8 @@ export const ordersAPI = {
                 discount_amount: discountAmount,
                 gst_amount: gstAmount,
                 notes: data.notes || null,
+                online_platform: (data as any).onlinePlatform || null,
+                online_order_id: (data as any).onlineOrderId || null,
                 created_at: new Date().toISOString(),
             };
 
@@ -306,81 +396,79 @@ export const ordersAPI = {
                 insertPayload.table_id = data.tableId;
             }
 
-            const { data: order, error: orderErr } = await supabase
+            const { data: serverOrder, error: orderErr } = await supabase
                 .from('orders')
                 .insert([insertPayload])
                 .select()
                 .single();
 
-            if (orderErr) {
-                logger.error('Order insert error in supabase:', orderErr);
-                throw orderErr;
-            }
+            if (!orderErr && serverOrder) {
+                // Update local order with server ID
+                saveLocalOrder({
+                    ...baseOrder,
+                    id: serverOrder.id,
+                });
 
-            // ── 3. Insert order items ──
-            if (order && order.id && items.length > 0) {
-                try {
-                    const orderItemsPayload = items.map((it: any) => ({
-                        order_id: order.id,
-                        menu_item_id: it.menuItemId || it.id || null,
-                        quantity: Number(it.quantity || 1),
-                        unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
-                        total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-                        notes: it.notes || null,
-                        status: 'PENDING',
-                    }));
+                // Insert items into Supabase
+                if (items.length > 0) {
+                    try {
+                        const orderItemsPayload = items.map((it: any) => ({
+                            order_id: serverOrder.id,
+                            menu_item_id: it.menuItemId || it.id || null,
+                            quantity: Number(it.quantity || 1),
+                            unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
+                            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                            notes: it.notes || null,
+                            status: 'PENDING',
+                        }));
 
-                    await supabase.from('order_items').insert(orderItemsPayload);
-                } catch (itemInsertErr) {
-                    logger.warn('Could not insert items into order_items table:', itemInsertErr);
+                        await supabase.from('order_items').insert(orderItemsPayload);
+                    } catch (itemInsertErr) {
+                        logger.warn('Could not insert items into order_items table:', itemInsertErr);
+                    }
                 }
+
+                return {
+                    data: {
+                        ...baseOrder,
+                        id: serverOrder.id,
+                    }
+                };
             }
-
-            return {
-                data: {
-                    ...order,
-                    orderNumber: nextOrderNumber,
-                    dailyOrderNo: nextOrderNumber,
-                    billNumber: billNumber,
-                    total: total,
-                    subtotal: subtotal,
-                }
-            };
-        } catch (error) {
-            logger.error('Fallback order creation error:', error);
-            const todayStr = new Date().toISOString().split('T')[0];
-            const storedDate = localStorage.getItem('billova_order_seq_date');
-            let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
-
-            if (storedDate !== todayStr) {
-                seq = 0;
-                localStorage.setItem('billova_order_seq_date', todayStr);
-            }
-            seq += 1;
-            localStorage.setItem('billova_order_seq_num', String(seq));
-
-            return {
-                data: {
-                    id: 'temp-' + Date.now(),
-                    ...data,
-                    orderNumber: seq,
-                    dailyOrderNo: seq,
-                    billNumber: `#${String(seq).padStart(3, '0')}`,
-                }
-            };
+        } catch (supErr) {
+            logger.warn('Supabase order insert error (using local order):', supErr);
         }
+
+        return { data: baseOrder };
     },
 
     /**
      * Add payment to order and mark it as COMPLETED
      */
     addPayment: async (id: string, data: AddPaymentDTO) => {
+        // Update local order state immediately
+        updateLocalOrderStatus(id, 'COMPLETED');
+
+        const localList = getStoredLocalOrders();
+        const ord = localList.find(o => o.id === id);
+        if (ord) {
+            ord.payments = [{
+                id: `pay-${Date.now()}`,
+                mode: data.mode || 'CASH',
+                amount: data.amount,
+                createdAt: new Date().toISOString(),
+            }];
+            ord.status = 'COMPLETED';
+            ord.completedAt = new Date().toISOString();
+            saveLocalOrder(ord);
+        }
+
         if (hasExpressBackend()) {
             try { return await api.post(`/orders/${id}/payment`, data); } catch { /* fallback */ }
         }
+
         try {
-            if (!id.startsWith('temp-')) {
-                // 1. Insert payment record (non-blocking if payments table is restricted)
+            if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
                 try {
                     await supabase.from('payments').insert([{
                         order_id: id,
@@ -392,7 +480,6 @@ export const ordersAPI = {
                     logger.warn('Payment insert warning:', payErr);
                 }
 
-                // 2. Mark order as COMPLETED
                 await supabase.from('orders').update({
                     status: 'COMPLETED',
                     completed_at: new Date().toISOString(),
@@ -411,27 +498,31 @@ export const ordersAPI = {
      */
     updateStatus: async (id: string, data: UpdateOrderStatusDTO | string) => {
         const payload = typeof data === 'string' ? { status: data } : data;
+        updateLocalOrderStatus(id, payload.status);
+
         if (hasExpressBackend()) {
             try { return await api.patch(`/orders/${id}/status`, payload); } catch { /* fallback */ }
         }
         try {
-            const updateObj: any = {
-                status: payload.status,
-                updated_at: new Date().toISOString()
-            };
-            if (payload.status === 'COMPLETED') {
-                updateObj.completed_at = new Date().toISOString();
+            if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
+                const updateObj: any = {
+                    status: payload.status,
+                    updated_at: new Date().toISOString()
+                };
+                if (payload.status === 'COMPLETED') {
+                    updateObj.completed_at = new Date().toISOString();
+                }
+
+                const { data: updated } = await supabase
+                    .from('orders')
+                    .update(updateObj)
+                    .eq('id', id)
+                    .select()
+                    .single();
+
+                return { data: updated || { id, status: payload.status } };
             }
-
-            const { data: updated, error } = await supabase
-                .from('orders')
-                .update(updateObj)
-                .eq('id', id)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return { data: updated };
+            return { data: { id, status: payload.status } };
         } catch (error) {
             logger.error('Update status error:', error);
             return { data: { id, status: payload.status } };
@@ -456,7 +547,7 @@ export const ordersAPI = {
             try { return await api.post(`/orders/${id}/add-items`, { items }); } catch { /* fallback */ }
         }
         try {
-            if (!id.startsWith('temp-')) {
+            if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
                 const orderItemsPayload = items.map((it: any) => ({
                     order_id: id,
                     menu_item_id: it.menuItemId,

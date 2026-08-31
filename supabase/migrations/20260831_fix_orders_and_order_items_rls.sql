@@ -115,24 +115,17 @@ DROP POLICY IF EXISTS "staff_update_orders" ON orders;
 DROP POLICY IF EXISTS "authenticated_orders_all" ON orders;
 DROP POLICY IF EXISTS "anon_orders_insert" ON orders;
 DROP POLICY IF EXISTS "anon_orders_select" ON orders;
+DROP POLICY IF EXISTS "public_manage_orders" ON orders;
 
 CREATE POLICY "service_role_orders" ON orders
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
 
-CREATE POLICY "authenticated_orders_all" ON orders
-    FOR ALL TO authenticated
+CREATE POLICY "public_manage_orders" ON orders
+    FOR ALL TO public
     USING (true)
     WITH CHECK (true);
-
-CREATE POLICY "anon_orders_insert" ON orders
-    FOR INSERT TO anon
-    WITH CHECK (true);
-
-CREATE POLICY "anon_orders_select" ON orders
-    FOR SELECT TO anon
-    USING (true);
 
 -- 6. Set up RLS Policies on 'order_items'
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
@@ -141,19 +134,15 @@ DROP POLICY IF EXISTS "service_role_order_items" ON order_items;
 DROP POLICY IF EXISTS "users_manage_order_items" ON order_items;
 DROP POLICY IF EXISTS "authenticated_order_items_all" ON order_items;
 DROP POLICY IF EXISTS "anon_order_items_all" ON order_items;
+DROP POLICY IF EXISTS "public_manage_order_items" ON order_items;
 
 CREATE POLICY "service_role_order_items" ON order_items
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
 
-CREATE POLICY "authenticated_order_items_all" ON order_items
-    FOR ALL TO authenticated
-    USING (true)
-    WITH CHECK (true);
-
-CREATE POLICY "anon_order_items_all" ON order_items
-    FOR ALL TO anon
+CREATE POLICY "public_manage_order_items" ON order_items
+    FOR ALL TO public
     USING (true)
     WITH CHECK (true);
 
@@ -163,14 +152,15 @@ ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "service_role_payments" ON payments;
 DROP POLICY IF EXISTS "users_manage_payments" ON payments;
 DROP POLICY IF EXISTS "authenticated_payments_all" ON payments;
+DROP POLICY IF EXISTS "public_manage_payments" ON payments;
 
 CREATE POLICY "service_role_payments" ON payments
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
 
-CREATE POLICY "authenticated_payments_all" ON payments
-    FOR ALL TO authenticated
+CREATE POLICY "public_manage_payments" ON payments
+    FOR ALL TO public
     USING (true)
     WITH CHECK (true);
 

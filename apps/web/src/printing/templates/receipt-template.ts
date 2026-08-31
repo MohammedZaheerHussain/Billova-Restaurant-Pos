@@ -1,5 +1,5 @@
-// Receipt & KOT Template Generator — Optimized for 3-Inch (80mm) Thermal Printers
-// Supports: Customer Bill + Auto-Cut Separator + Kitchen KOT in a single unified print job
+// Receipt & KOT Combined Template Generator — 3-Inch (80mm) Thermal Printing Standard
+// Supports: High Contrast Pure Black Typography, Dynamic Online Platforms (Swiggy/Zomato), Order Notes, and 2-Sheet Output
 
 import { ESCPOSEncoder, TextAlign, FontSize, CutType } from '../escpos/escpos-encoder';
 
@@ -11,7 +11,6 @@ export interface ReceiptItem {
     variant?: string;
     addons?: string[];
     notes?: string;
-    isVeg?: boolean;
 }
 
 export interface ReceiptData {
@@ -31,6 +30,9 @@ export interface ReceiptData {
     tableName?: string;
     customerName?: string;
     customerPhone?: string;
+    notes?: string;
+    onlinePlatform?: string;
+    onlineOrderId?: string;
 
     // Items
     items: ReceiptItem[];
@@ -75,38 +77,43 @@ function formatCleanBillNo(billNo?: string, orderNo?: number | string): string {
     return `#${Date.now().toString().slice(-4)}`;
 }
 
-// Format Order Type
-function getOrderTypeLabel(type: string): string {
+function getOrderTypeLabel(type: string, platform?: string): string {
+    const p = platform ? ` (${platform.toUpperCase()})` : '';
     switch (type) {
-        case 'DINE_IN': return 'Dine In';
-        case 'TAKEAWAY': return 'Takeaway';
-        case 'DELIVERY': return 'Delivery';
-        case 'ONLINE': return 'Online Order';
-        default: return type || 'Dine In';
+        case 'DINE_IN': return 'DINE IN';
+        case 'TAKEAWAY': return 'TAKEAWAY';
+        case 'DELIVERY': return 'DELIVERY';
+        case 'ONLINE': return `ONLINE${p}`;
+        default: return (type || 'DINE IN').toUpperCase();
     }
 }
 
 /**
- * Generates ESC/POS thermal bytecode (Customer Bill + Auto-Cut + Kitchen KOT)
+ * Format currency with Rupee symbol
+ */
+function rupee(amount: string | number): string {
+    return `Rs. ${Number(amount).toFixed(2)}`;
+}
+
+/**
+ * Generates 3-Inch (80mm) ESC/POS binary data with auto-cut
  */
 export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): ESCPOSEncoder {
     const encoder = new ESCPOSEncoder({ width: printerWidth });
-    const rupee = encoder.rupee.bind(encoder);
     const displayBillNo = formatCleanBillNo(data.billNumber, data.orderNumber);
 
     encoder.initialize();
 
     // ==========================================
-    // ── SECTION 1: CUSTOMER TAX BILL / INVOICE ──
+    // ── SECTION 1: CUSTOMER TAX INVOICE ──
     // ==========================================
     encoder.align(TextAlign.CENTER);
 
-    // Business Name (Double size, bold)
-    encoder.setFontSize(FontSize.DOUBLE_BOTH).bold(true);
-    encoder.line((data.businessName || 'BILLOVA POS').toUpperCase());
+    // Business Header
+    encoder.bold(true).setFontSize(FontSize.DOUBLE_WIDTH);
+    encoder.line(data.businessName || 'BILLOVA POS');
     encoder.setFontSize(FontSize.NORMAL).bold(false);
 
-    // Branch & Contact Details
     if (data.branchName) encoder.line(data.branchName);
     if (data.address) encoder.line(data.address);
     if (data.phone) encoder.line(`Tel: ${data.phone}`);
@@ -125,19 +132,28 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
     const orderDate = new Date(data.orderDate || Date.now());
     encoder.printRow('Date:', orderDate.toLocaleDateString('en-IN'));
     encoder.printRow('Time:', orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
-    encoder.printRow('Type:', getOrderTypeLabel(data.orderType));
 
-    if (data.tableName && data.orderType === 'DINE_IN') {
-        encoder.bold(true).printRow('Table:', data.tableName).bold(false);
+    if (data.orderType === 'ONLINE' || data.onlinePlatform) {
+        const plat = (data.onlinePlatform || 'ONLINE').toUpperCase();
+        encoder.bold(true).printRow('Type:', `ONLINE (${plat})`).bold(false);
+        if (data.onlineOrderId) {
+            encoder.bold(true).printRow('Online ID:', `#${data.onlineOrderId}`).bold(false);
+        }
+    } else {
+        encoder.printRow('Type:', getOrderTypeLabel(data.orderType));
+        if (data.tableName && data.orderType === 'DINE_IN') {
+            encoder.bold(true).printRow('Table:', data.tableName).bold(false);
+        }
     }
+
     if (data.customerName) {
         encoder.printRow('Customer:', data.customerName);
     }
     if (data.customerPhone) {
         encoder.printRow('Phone:', data.customerPhone);
     }
-    if (data.cashierName) {
-        encoder.printRow('Served By:', data.cashierName);
+    if (data.notes) {
+        encoder.bold(true).printRow('Notes:', data.notes).bold(false);
     }
 
     encoder.divider('-');
@@ -223,9 +239,7 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
     encoder.line(data.footerText || 'Thank you for dining with us! Please visit again.');
     encoder.line('--- Powered by Billova POS ---');
 
-    // ==========================================
-    // ── AUTO-CUT AFTER CUSTOMER BILL ──
-    // ==========================================
+    // Auto-Cut after Customer Bill
     encoder.feed(3);
     encoder.cut(CutType.FULL);
 
@@ -237,21 +251,27 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
         encoder.feed(1);
         encoder.align(TextAlign.CENTER);
 
-        // KOT Title Banner (Large Inverted or Bold)
+        // KOT Title Banner
         encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
         encoder.line('*** KITCHEN ORDER ***');
         encoder.setFontSize(FontSize.NORMAL).bold(false);
 
-        // Table / Token Headline (Extra Large)
+        // Table / Token Headline
         encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
-        if (data.tableName && data.orderType === 'DINE_IN') {
+        if (data.orderType === 'ONLINE' || data.onlinePlatform) {
+            const plat = (data.onlinePlatform || 'ONLINE').toUpperCase();
+            encoder.line(`ONLINE: ${plat}`);
+            if (data.onlineOrderId) {
+                encoder.line(`ID: #${data.onlineOrderId}`);
+            }
+        } else if (data.tableName && data.orderType === 'DINE_IN') {
             encoder.line(`TABLE: ${data.tableName.toUpperCase()}`);
         } else {
             encoder.line(`TOKEN: ${displayBillNo}`);
         }
         encoder.setFontSize(FontSize.NORMAL).bold(false);
 
-        encoder.line(`TYPE: ${getOrderTypeLabel(data.orderType).toUpperCase()}`);
+        encoder.line(`TYPE: ${getOrderTypeLabel(data.orderType, data.onlinePlatform).toUpperCase()}`);
         encoder.divider('=');
         encoder.align(TextAlign.LEFT);
 
@@ -261,8 +281,10 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
         encoder.bold(false);
         encoder.printRow('Time:', orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
         encoder.printRow('Date:', orderDate.toLocaleDateString('en-IN'));
-        if (data.cashierName) {
-            encoder.printRow('Server:', data.cashierName);
+
+        if (data.notes) {
+            encoder.divider('-');
+            encoder.bold(true).line(`ORDER NOTE: ** ${data.notes.toUpperCase()} **`).bold(false);
         }
 
         encoder.divider('=');
@@ -315,7 +337,7 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
 
 /**
  * Generates 3-Inch (80mm) Thermal HTML for Browser Print & Driver
- * Features: High contrast black typography, clear layout, and page-break auto-cut separator
+ * Features: High contrast black typography, Swiggy/Zomato badges, Order Notes, and 2-Sheet Output
  */
 export function generateReceiptHTML(data: ReceiptData): string {
     const displayBillNo = formatCleanBillNo(data.billNumber, data.orderNumber);
@@ -356,27 +378,31 @@ export function generateReceiptHTML(data: ReceiptData): string {
     let totalItemsCount = 0;
     const kotItemsHTML = data.items.map(item => {
         totalItemsCount += item.quantity;
-        let name = item.name.toUpperCase();
-        if (item.variant) name += ` (${item.variant.toUpperCase()})`;
+        let itemName = item.name.toUpperCase();
+        if (item.variant) itemName += ` (${item.variant.toUpperCase()})`;
 
         const addonsHTML = item.addons && item.addons.length > 0
-            ? item.addons.map(a => `<div class="kot-addon">+ ${a.toUpperCase()}</div>`).join('')
+            ? item.addons.map(a => `<div class="kot-addon-line">+ ${a.toUpperCase()}</div>`).join('')
             : '';
-        const notesHTML = item.notes
-            ? `<div class="kot-special-note">** ${item.notes.toUpperCase()} **</div>`
+
+        const itemNoteHTML = item.notes
+            ? `<div class="kot-item-note">** ${item.notes.toUpperCase()} **</div>`
             : '';
 
         return `
-            <div class="kot-item-card">
-                <span class="kot-qty-badge">[ ${item.quantity}x ]</span>
-                <div class="kot-item-details">
-                    <span class="kot-item-name">${name}</span>
-                    ${addonsHTML}
-                    ${notesHTML}
+            <div class="kot-item-entry">
+                <div class="kot-item-main">
+                    <span class="kot-qty-badge">[ ${item.quantity}x ]</span>
+                    <span class="kot-item-name">${itemName}</span>
                 </div>
+                ${addonsHTML}
+                ${itemNoteHTML}
             </div>
         `;
     }).join('');
+
+    const isOnline = data.orderType === 'ONLINE' || Boolean(data.onlinePlatform);
+    const platformName = (data.onlinePlatform || 'ONLINE').toUpperCase();
 
     return `
         <div class="thermal-document">
@@ -400,11 +426,18 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="thermal-meta-row"><span class="meta-label">Bill No:</span><strong class="meta-val">${displayBillNo}</strong></div>
                     <div class="thermal-meta-row"><span class="meta-label">Date:</span><span class="meta-val">${formatDate(orderDate)}</span></div>
                     <div class="thermal-meta-row"><span class="meta-label">Time:</span><span class="meta-val">${formatTime(orderDate)}</span></div>
-                    <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val">${getOrderTypeLabel(data.orderType)}</strong></div>
-                    ${data.tableName && data.orderType === 'DINE_IN' ? `<div class="thermal-meta-row"><span class="meta-label">Table:</span><strong class="meta-val highlight">${data.tableName}</strong></div>` : ''}
+                    
+                    ${isOnline ? `
+                        <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val highlight">ONLINE (${platformName})</strong></div>
+                        ${data.onlineOrderId ? `<div class="thermal-meta-row"><span class="meta-label">Online ID:</span><strong class="meta-val highlight">#${data.onlineOrderId}</strong></div>` : ''}
+                    ` : `
+                        <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val">${getOrderTypeLabel(data.orderType)}</strong></div>
+                        ${data.tableName && data.orderType === 'DINE_IN' ? `<div class="thermal-meta-row"><span class="meta-label">Table:</span><strong class="meta-val highlight">${data.tableName}</strong></div>` : ''}
+                    `}
+
                     ${data.customerName ? `<div class="thermal-meta-row"><span class="meta-label">Customer:</span><span class="meta-val">${data.customerName}</span></div>` : ''}
                     ${data.customerPhone ? `<div class="thermal-meta-row"><span class="meta-label">Phone:</span><span class="meta-val">${data.customerPhone}</span></div>` : ''}
-                    ${data.cashierName ? `<div class="thermal-meta-row"><span class="meta-label">Served By:</span><span class="meta-val">${data.cashierName}</span></div>` : ''}
+                    ${data.notes ? `<div class="thermal-meta-row"><span class="meta-label">Notes:</span><span class="meta-val highlight">${data.notes}</span></div>` : ''}
                 </div>
 
                 <div class="thermal-divider solid"></div>
@@ -478,12 +511,16 @@ export function generateReceiptHTML(data: ReceiptData): string {
                 <div class="thermal-center">
                     <div class="kot-header-tag">*** KITCHEN ORDER ***</div>
                     <div class="kot-table-banner">
-                        ${data.tableName && data.orderType === 'DINE_IN'
-                            ? `<div class="kot-table-name">TABLE: ${data.tableName.toUpperCase()}</div>`
-                            : `<div class="kot-table-name">TOKEN: ${displayBillNo}</div>`
+                        ${isOnline
+                            ? `<div class="kot-table-name">ONLINE: ${platformName}</div>`
+                            : (data.tableName && data.orderType === 'DINE_IN'
+                                ? `<div class="kot-table-name">TABLE: ${data.tableName.toUpperCase()}</div>`
+                                : `<div class="kot-table-name">TOKEN: ${displayBillNo}</div>`
+                            )
                         }
                     </div>
-                    <div class="kot-type-pill">TYPE: ${getOrderTypeLabel(data.orderType).toUpperCase()}</div>
+                    ${isOnline && data.onlineOrderId ? `<div class="kot-online-order-id">ONLINE ORDER #${data.onlineOrderId}</div>` : ''}
+                    <div class="kot-type-pill">TYPE: ${getOrderTypeLabel(data.orderType, data.onlinePlatform).toUpperCase()}</div>
                 </div>
 
                 <div class="thermal-divider solid"></div>
@@ -492,8 +529,14 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="thermal-meta-row"><span class="meta-label">KOT No:</span><strong class="meta-val">${displayBillNo}</strong></div>
                     <div class="thermal-meta-row"><span class="meta-label">Time:</span><strong class="meta-val">${formatTime(orderDate)}</strong></div>
                     <div class="thermal-meta-row"><span class="meta-label">Date:</span><span class="meta-val">${formatDate(orderDate)}</span></div>
-                    ${data.cashierName ? `<div class="thermal-meta-row"><span class="meta-label">Server:</span><span class="meta-val">${data.cashierName}</span></div>` : ''}
                 </div>
+
+                ${data.notes ? `
+                    <div class="kot-notes-box">
+                        <div class="kot-notes-title">** ORDER NOTES **</div>
+                        <div class="kot-notes-content">${data.notes.toUpperCase()}</div>
+                    </div>
+                ` : ''}
 
                 <div class="thermal-divider double"></div>
 
@@ -605,102 +648,106 @@ export function generateReceiptHTML(data: ReceiptData): string {
             .thermal-sub-text {
                 font-size: 11px;
                 font-weight: 600;
+                line-height: 1.25;
             }
 
             .thermal-invoice-badge {
                 font-size: 12px;
-                font-weight: 800;
-                letter-spacing: 0.08em;
+                font-weight: 900;
                 margin-top: 4px;
+                letter-spacing: 0.05em;
             }
 
-            /* Meta rows */
+            /* Metadata List */
             .thermal-meta-list {
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: 3px;
+                margin: 4px 0;
             }
 
             .thermal-meta-row {
                 display: flex;
                 justify-content: space-between;
-                font-size: 12px;
+                font-size: 11.5px;
+                font-weight: 600;
             }
 
-            .meta-label {
-                font-weight: 700;
+            .thermal-meta-row strong {
+                font-weight: 900;
             }
 
-            .meta-val {
-                font-weight: 800;
-                text-align: right;
-            }
-
-            .meta-val.highlight {
+            .thermal-meta-row .highlight {
                 font-size: 13px;
-                text-decoration: underline;
+                font-weight: 900;
             }
 
-            /* Items Table */
+            /* Table Formatting */
             .thermal-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin: 4px 0;
+                margin: 6px 0;
+                font-size: 11px;
             }
 
             .thermal-table th {
-                font-size: 11px;
+                border-bottom: 1.5px solid #000000;
+                padding-bottom: 4px;
                 font-weight: 900;
                 text-align: left;
-                padding: 3px 0;
-                border-bottom: 1.5px solid #000000;
             }
 
             .thermal-table td {
-                padding: 3px 0;
-                font-size: 11.5px;
-                font-weight: 700;
+                padding: 4px 0;
                 vertical-align: top;
             }
 
-            .col-name { text-align: left; width: 45%; }
-            .col-qty { text-align: center; width: 14%; font-weight: 800; }
-            .col-price { text-align: right; width: 20%; }
-            .col-amt { text-align: right; width: 21%; font-weight: 800; }
+            .col-name { width: 44%; text-align: left; }
+            .col-qty { width: 14%; text-align: center; font-weight: 900; font-size: 12px; }
+            .col-price { width: 20%; text-align: right; }
+            .col-amt { width: 22%; text-align: right; font-weight: 800; }
 
             .item-title {
                 font-weight: 800;
-                line-height: 1.25;
+                line-height: 1.2;
             }
 
-            .thermal-addon, .thermal-note {
+            .thermal-addon {
                 font-size: 10px;
-                font-weight: 700;
-                padding-left: 6px;
+                font-weight: 600;
+                padding-left: 4px;
             }
 
-            /* Totals */
+            .thermal-note {
+                font-size: 10px;
+                font-style: italic;
+                font-weight: 700;
+                padding-left: 4px;
+            }
+
+            /* Totals Box */
             .thermal-totals-box {
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: 3px;
+                margin: 4px 0;
             }
 
             .thermal-total-row {
                 display: flex;
                 justify-content: space-between;
-                font-size: 12px;
-                font-weight: 700;
+                font-size: 11.5px;
+                font-weight: 600;
             }
 
-            /* Grand Total */
             .thermal-grand-total {
                 display: flex;
                 justify-content: space-between;
-                align-items: baseline;
-                font-size: 16px;
+                align-items: center;
+                font-size: 17px;
                 font-weight: 900;
                 padding: 4px 0;
+                letter-spacing: 0.02em;
             }
 
             .grand-price {
@@ -708,11 +755,8 @@ export function generateReceiptHTML(data: ReceiptData): string {
                 font-weight: 900;
             }
 
-            /* Payment & Footer */
             .thermal-payment-box {
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
+                margin: 4px 0;
                 padding: 2px 0;
             }
 
@@ -747,22 +791,48 @@ export function generateReceiptHTML(data: ReceiptData): string {
             }
 
             .kot-table-banner {
-                margin: 4px 0;
-                padding: 4px 8px;
                 border: 2px solid #000000;
+                padding: 4px 8px;
+                margin: 4px 0;
                 width: 100%;
                 text-align: center;
             }
 
             .kot-table-name {
-                font-size: 18px;
+                font-size: 19px;
                 font-weight: 900;
+                letter-spacing: 0.04em;
+            }
+
+            .kot-online-order-id {
+                font-size: 14px;
+                font-weight: 900;
+                margin-top: 2px;
             }
 
             .kot-type-pill {
                 font-size: 12px;
-                font-weight: 800;
-                letter-spacing: 0.05em;
+                font-weight: 900;
+                margin-top: 2px;
+            }
+
+            .kot-notes-box {
+                border: 1.5px dashed #000000;
+                padding: 5px 8px;
+                margin: 6px 0;
+                text-align: center;
+                background: #f9f9f9;
+            }
+
+            .kot-notes-title {
+                font-size: 11px;
+                font-weight: 900;
+                margin-bottom: 2px;
+            }
+
+            .kot-notes-content {
+                font-size: 13px;
+                font-weight: 900;
             }
 
             .kot-items-container {
@@ -772,40 +842,43 @@ export function generateReceiptHTML(data: ReceiptData): string {
                 margin: 6px 0;
             }
 
-            .kot-item-card {
+            .kot-item-entry {
                 display: flex;
-                gap: 8px;
+                flex-direction: column;
+                gap: 2px;
+                border-bottom: 1px dotted #000000;
+                padding-bottom: 5px;
+            }
+
+            .kot-item-main {
+                display: flex;
                 align-items: baseline;
+                gap: 6px;
             }
 
             .kot-qty-badge {
                 font-size: 16px;
                 font-weight: 900;
-                min-width: 44px;
-            }
-
-            .kot-item-details {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 1px;
+                min-width: 50px;
             }
 
             .kot-item-name {
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 900;
                 line-height: 1.25;
             }
 
-            .kot-addon {
+            .kot-addon-line {
                 font-size: 11px;
                 font-weight: 700;
+                padding-left: 54px;
             }
 
-            .kot-special-note {
-                font-size: 12px;
+            .kot-item-note {
+                font-size: 11.5px;
                 font-weight: 900;
                 text-decoration: underline;
+                padding-left: 54px;
                 margin-top: 2px;
             }
 
@@ -816,10 +889,15 @@ export function generateReceiptHTML(data: ReceiptData): string {
             }
 
             .kot-footer {
-                margin-top: 10px;
+                margin-top: 6px;
+                font-size: 11px;
+                font-weight: 800;
             }
         </style>
     `;
 }
 
-export default generateReceipt;
+export default {
+    generateReceipt,
+    generateReceiptHTML,
+};
