@@ -111,10 +111,9 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
 
     // Business Header
     encoder.bold(true).setFontSize(FontSize.DOUBLE_WIDTH);
-    encoder.line(data.businessName || 'BILLOVA POS');
+    encoder.line((data.businessName || 'BILLOVA POS').toUpperCase());
     encoder.setFontSize(FontSize.NORMAL).bold(false);
 
-    if (data.branchName) encoder.line(data.branchName);
     if (data.address) encoder.line(data.address);
     if (data.phone) encoder.line(`Tel: ${data.phone}`);
     if (data.gstNumber) encoder.line(`GSTIN: ${data.gstNumber}`);
@@ -412,7 +411,6 @@ export function generateReceiptHTML(data: ReceiptData): string {
             <div class="thermal-receipt customer-bill">
                 <div class="thermal-center">
                     <h1 class="thermal-brand-title">${(data.businessName || 'BILLOVA POS').toUpperCase()}</h1>
-                    ${data.branchName ? `<div class="thermal-sub-text">${data.branchName}</div>` : ''}
                     ${data.address ? `<div class="thermal-sub-text">${data.address}</div>` : ''}
                     ${data.phone ? `<div class="thermal-sub-text">Tel: ${data.phone}</div>` : ''}
                     ${data.gstNumber ? `<div class="thermal-sub-text">GSTIN: ${data.gstNumber}</div>` : ''}
