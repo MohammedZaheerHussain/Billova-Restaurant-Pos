@@ -18,26 +18,10 @@ export const ordersAPI = {
             const user = useAuthStore.getState().user;
             const branchId = user?.branch?.id || (user as any)?.branchId;
 
+            // 1. Fetch orders cleanly
             let query = supabase
                 .from('orders')
-                .select(`
-                    *,
-                    order_items (
-                        id,
-                        order_id,
-                        menu_item_id,
-                        variant_id,
-                        quantity,
-                        unit_price,
-                        total,
-                        notes,
-                        status,
-                        menu_items ( id, name, price ),
-                        menu_item_variants ( id, name, price )
-                    ),
-                    payments ( id, mode, amount, created_at ),
-                    tables ( id, name )
-                `)
+                .select('*')
                 .order('created_at', { ascending: false });
 
             if (branchId) {
@@ -45,42 +29,28 @@ export const ordersAPI = {
             }
 
             if (params?.date) {
-                const startOfDay = new Date(params.date);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(params.date);
-                endOfDay.setHours(23, 59, 59, 999);
-                query = query.gte('created_at', startOfDay.toISOString()).lte('created_at', endOfDay.toISOString());
+                const startOfDay = `${params.date}T00:00:00.000Z`;
+                const endOfDay = `${params.date}T23:59:59.999Z`;
+                query = query.gte('created_at', startOfDay).lte('created_at', endOfDay);
             }
 
-            const { data, error } = await query;
+            const { data: ordersData, error: ordersError } = await query;
 
-            if (error) {
-                logger.warn('Nested query failed, falling back to basic orders query:', error.message);
-                // Fallback query without complex joins in case of schema discrepancy
-                let simpleQuery = supabase
+            if (ordersError) {
+                logger.warn('Failed to fetch orders from supabase:', ordersError.message);
+                // Simple query fallback without filters in case of RLS
+                const { data: fallbackOrders } = await supabase
                     .from('orders')
                     .select('*')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .limit(100);
 
-                if (branchId) {
-                    simpleQuery = simpleQuery.eq('branch_id', branchId);
-                }
-                if (params?.date) {
-                    const startOfDay = new Date(params.date);
-                    startOfDay.setHours(0, 0, 0, 0);
-                    const endOfDay = new Date(params.date);
-                    endOfDay.setHours(23, 59, 59, 999);
-                    simpleQuery = simpleQuery.gte('created_at', startOfDay.toISOString()).lte('created_at', endOfDay.toISOString());
-                }
-
-                const { data: simpleOrders, error: simpleErr } = await simpleQuery;
-                if (simpleErr || !simpleOrders) return { data: [] };
-
+                if (!fallbackOrders || fallbackOrders.length === 0) return { data: [] };
                 return {
-                    data: simpleOrders.map((o: any) => ({
+                    data: (fallbackOrders || []).map((o: any) => ({
                         id: o.id,
-                        orderNumber: o.order_number || o.daily_order_no || 1,
-                        dailyOrderNo: o.daily_order_no || o.order_number || 1,
+                        orderNumber: Number(o.order_number || o.daily_order_no || 1),
+                        dailyOrderNo: Number(o.daily_order_no || o.order_number || 1),
                         orderType: o.order_type || 'DINE_IN',
                         status: o.status || 'PENDING',
                         total: Number(o.total || o.total_amount || 0),
@@ -99,47 +69,93 @@ export const ordersAPI = {
                 };
             }
 
-            const formatted = (data || []).map((o: any) => ({
-                id: o.id,
-                orderNumber: o.order_number || o.daily_order_no || 1,
-                dailyOrderNo: o.daily_order_no || o.order_number || 1,
-                orderType: o.order_type || 'DINE_IN',
-                status: o.status || 'PENDING',
-                total: Number(o.total || o.total_amount || 0),
-                totalAmount: Number(o.total || o.total_amount || 0),
-                subtotal: Number(o.subtotal || 0),
-                discountType: o.discount_type,
-                discountValue: Number(o.discount_value || 0),
-                discountAmount: Number(o.discount_amount || 0),
-                gstAmount: Number(o.gst_amount || 0),
-                customerName: o.customer_name,
-                customerPhone: o.customer_phone,
-                notes: o.notes,
-                createdAt: o.created_at || new Date().toISOString(),
-                completedAt: o.completed_at,
-                table: o.tables ? { id: o.tables.id, name: o.tables.name } : undefined,
-                items: (o.order_items || []).map((it: any) => ({
+            const rawOrders = ordersData || [];
+            if (rawOrders.length === 0) return { data: [] };
+
+            const orderIds = rawOrders.map((o: any) => o.id);
+
+            // 2. Fetch order items, payments, tables, and menu items in parallel for linked details
+            const [itemsRes, paymentsRes, tablesRes, menuRes] = await Promise.allSettled([
+                supabase.from('order_items').select('*').in('order_id', orderIds),
+                supabase.from('payments').select('*').in('order_id', orderIds),
+                supabase.from('tables').select('id, name'),
+                supabase.from('menu_items').select('id, name, price'),
+            ]);
+
+            const allItems = itemsRes.status === 'fulfilled' ? (itemsRes.value.data || []) : [];
+            const allPayments = paymentsRes.status === 'fulfilled' ? (paymentsRes.value.data || []) : [];
+            const allTables = tablesRes.status === 'fulfilled' ? (tablesRes.value.data || []) : [];
+            const allMenuItems = menuRes.status === 'fulfilled' ? (menuRes.value.data || []) : [];
+
+            // Build lookup maps
+            const menuMap = new Map<string, any>();
+            allMenuItems.forEach((m: any) => menuMap.set(m.id, m));
+
+            const tableMap = new Map<string, any>();
+            allTables.forEach((t: any) => tableMap.set(t.id, t));
+
+            const itemsByOrder = new Map<string, any[]>();
+            allItems.forEach((it: any) => {
+                const list = itemsByOrder.get(it.order_id) || [];
+                const menuItem = menuMap.get(it.menu_item_id);
+                list.push({
                     id: it.id,
-                    quantity: it.quantity || 1,
-                    unitPrice: Number(it.unit_price || 0),
+                    quantity: Number(it.quantity || 1),
+                    unitPrice: Number(it.unit_price || it.price || menuItem?.price || 0),
                     total: Number(it.total || 0),
                     notes: it.notes,
                     menuItem: {
                         id: it.menu_item_id || it.id,
-                        name: it.menu_items?.name || it.name || 'Item'
+                        name: it.name || menuItem?.name || 'Item',
                     },
-                    variant: it.menu_item_variants ? {
-                        id: it.variant_id,
-                        name: it.menu_item_variants.name
-                    } : undefined,
-                })),
-                payments: (o.payments || []).map((p: any) => ({
+                    variant: it.variant_id ? { id: it.variant_id, name: it.variant_name || '' } : undefined,
+                });
+                itemsByOrder.set(it.order_id, list);
+            });
+
+            const paymentsByOrder = new Map<string, any[]>();
+            allPayments.forEach((p: any) => {
+                const list = paymentsByOrder.get(p.order_id) || [];
+                list.push({
                     id: p.id,
-                    mode: p.mode,
+                    mode: p.mode || 'CASH',
                     amount: Number(p.amount || 0),
-                    createdAt: p.created_at,
-                })),
-            }));
+                    createdAt: p.created_at || new Date().toISOString(),
+                });
+                paymentsByOrder.set(p.order_id, list);
+            });
+
+            // 3. Format orders
+            const formatted = rawOrders.map((o: any) => {
+                const num = Number(o.order_number || o.daily_order_no || 1);
+                const orderItems = itemsByOrder.get(o.id) || (Array.isArray(o.items) ? o.items : []);
+                const orderPayments = paymentsByOrder.get(o.id) || (Array.isArray(o.payments) ? o.payments : []);
+                const tableInfo = o.table_id ? tableMap.get(o.table_id) : undefined;
+
+                return {
+                    id: o.id,
+                    orderNumber: num,
+                    dailyOrderNo: num,
+                    billNumber: `#${String(num).padStart(3, '0')}`,
+                    orderType: o.order_type || 'DINE_IN',
+                    status: o.status || 'PENDING',
+                    total: Number(o.total || o.total_amount || 0),
+                    totalAmount: Number(o.total || o.total_amount || 0),
+                    subtotal: Number(o.subtotal || o.total || 0),
+                    discountType: o.discount_type,
+                    discountValue: Number(o.discount_value || 0),
+                    discountAmount: Number(o.discount_amount || 0),
+                    gstAmount: Number(o.gst_amount || 0),
+                    customerName: o.customer_name,
+                    customerPhone: o.customer_phone,
+                    notes: o.notes,
+                    createdAt: o.created_at || new Date().toISOString(),
+                    completedAt: o.completed_at,
+                    table: tableInfo ? { id: tableInfo.id, name: tableInfo.name } : undefined,
+                    items: orderItems,
+                    payments: orderPayments,
+                };
+            });
 
             return { data: formatted };
         } catch (err) {
@@ -158,20 +174,30 @@ export const ordersAPI = {
         try {
             const { data, error } = await supabase
                 .from('orders')
-                .select(`
-                    *,
-                    order_items (
-                        *,
-                        menu_items ( id, name, price ),
-                        menu_item_variants ( id, name, price )
-                    ),
-                    payments (*)
-                `)
+                .select('*')
                 .eq('id', id)
                 .single();
 
             if (error) throw error;
-            return { data };
+
+            const [itemsRes, paymentsRes] = await Promise.allSettled([
+                supabase.from('order_items').select('*').eq('order_id', id),
+                supabase.from('payments').select('*').eq('order_id', id),
+            ]);
+
+            const items = itemsRes.status === 'fulfilled' ? (itemsRes.value.data || []) : [];
+            const payments = paymentsRes.status === 'fulfilled' ? (paymentsRes.value.data || []) : [];
+
+            return {
+                data: {
+                    ...data,
+                    orderNumber: Number(data.order_number || data.daily_order_no || 1),
+                    dailyOrderNo: Number(data.daily_order_no || data.order_number || 1),
+                    billNumber: `#${String(data.order_number || 1).padStart(3, '0')}`,
+                    items,
+                    payments,
+                }
+            };
         } catch {
             return { data: null };
         }
@@ -192,36 +218,49 @@ export const ordersAPI = {
         try {
             const user = useAuthStore.getState().user;
             const branchId = user?.branch?.id || (user as any)?.branchId;
-            const userId = user?.id;
 
             // ── 1. Calculate Sequential Order Number for Today ──
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
+            const todayStr = new Date().toISOString().split('T')[0];
+            let nextOrderNumber = 1;
 
-            let orderNumQuery = supabase
-                .from('orders')
-                .select('order_number')
-                .order('order_number', { ascending: false })
-                .limit(20);
+            try {
+                let orderNumQuery = supabase
+                    .from('orders')
+                    .select('order_number, daily_order_no, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
 
-            if (branchId) {
-                orderNumQuery = orderNumQuery.eq('branch_id', branchId);
-            }
-            if (options?.dailyReset !== false) {
-                orderNumQuery = orderNumQuery.gte('created_at', startOfDay.toISOString());
-            }
-
-            const { data: recentOrders } = await orderNumQuery;
-            let maxOrderNum = 0;
-            if (recentOrders && recentOrders.length > 0) {
-                for (const o of recentOrders) {
-                    const num = Number(o.order_number || 0);
-                    if (num > maxOrderNum) maxOrderNum = num;
+                if (branchId) {
+                    orderNumQuery = orderNumQuery.eq('branch_id', branchId);
                 }
+
+                const { data: recentOrders } = await orderNumQuery;
+                if (recentOrders && recentOrders.length > 0) {
+                    const todays = options?.dailyReset !== false
+                        ? recentOrders.filter((o: any) => (o.created_at || '').startsWith(todayStr))
+                        : recentOrders;
+
+                    let maxNum = 0;
+                    for (const o of todays) {
+                        const n = Number(o.order_number || o.daily_order_no || 0);
+                        if (n > maxNum) maxNum = n;
+                    }
+                    nextOrderNumber = maxNum + 1;
+                }
+            } catch (queryErr) {
+                logger.warn('Could not query max order number, using local seq:', queryErr);
+                const storedDate = localStorage.getItem('billova_order_seq_date');
+                let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
+                if (storedDate !== todayStr) {
+                    seq = 0;
+                }
+                nextOrderNumber = seq + 1;
             }
 
-            // Next sequential number (e.g. 1, 2, 3, 4, 5...)
-            const nextOrderNumber = maxOrderNum + 1;
+            // Keep localStorage in sync
+            localStorage.setItem('billova_order_seq_date', todayStr);
+            localStorage.setItem('billova_order_seq_num', String(nextOrderNumber));
+
             const billNumber = `#${String(nextOrderNumber).padStart(3, '0')}`;
 
             // Calculate item totals
@@ -240,23 +279,32 @@ export const ordersAPI = {
             // ── 2. Insert into orders table ──
             const insertPayload: any = {
                 order_number: nextOrderNumber,
+                daily_order_no: nextOrderNumber,
                 order_type: data.orderType || 'DINE_IN',
-                status: 'PENDING',
+                status: (data as any).status || 'PENDING',
                 customer_name: data.customerName || null,
                 customer_phone: data.customerPhone || null,
-                table_id: data.tableId || null,
                 subtotal: subtotal,
-                discount_type: data.discountType || null,
-                discount_value: data.discountValue || 0,
+                total: total,
+                total_amount: total,
                 discount_amount: discountAmount,
                 gst_amount: gstAmount,
-                total: total,
                 notes: data.notes || null,
                 created_at: new Date().toISOString(),
             };
 
-            if (branchId) insertPayload.branch_id = branchId;
-            if (userId) insertPayload.user_id = userId;
+            if (data.discountType === 'PERCENTAGE' || data.discountType === 'FIXED') {
+                insertPayload.discount_type = data.discountType;
+                insertPayload.discount_value = data.discountValue || 0;
+            }
+
+            if (branchId) {
+                insertPayload.branch_id = branchId;
+            }
+
+            if (data.tableId) {
+                insertPayload.table_id = data.tableId;
+            }
 
             const { data: order, error: orderErr } = await supabase
                 .from('orders')
@@ -270,19 +318,22 @@ export const ordersAPI = {
             }
 
             // ── 3. Insert order items ──
-            if (order && items.length > 0) {
-                const orderItemsPayload = items.map((it: any) => ({
-                    order_id: order.id,
-                    menu_item_id: it.menuItemId || it.id,
-                    variant_id: it.variantId || null,
-                    quantity: Number(it.quantity || 1),
-                    unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
-                    total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-                    notes: it.notes || null,
-                    status: 'PENDING',
-                }));
+            if (order && order.id && items.length > 0) {
+                try {
+                    const orderItemsPayload = items.map((it: any) => ({
+                        order_id: order.id,
+                        menu_item_id: it.menuItemId || it.id || null,
+                        quantity: Number(it.quantity || 1),
+                        unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
+                        total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                        notes: it.notes || null,
+                        status: 'PENDING',
+                    }));
 
-                await supabase.from('order_items').insert(orderItemsPayload);
+                    await supabase.from('order_items').insert(orderItemsPayload);
+                } catch (itemInsertErr) {
+                    logger.warn('Could not insert items into order_items table:', itemInsertErr);
+                }
             }
 
             return {
@@ -297,7 +348,6 @@ export const ordersAPI = {
             };
         } catch (error) {
             logger.error('Fallback order creation error:', error);
-            // In local offline fallback, maintain local daily sequence
             const todayStr = new Date().toISOString().split('T')[0];
             const storedDate = localStorage.getItem('billova_order_seq_date');
             let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
@@ -330,13 +380,17 @@ export const ordersAPI = {
         }
         try {
             if (!id.startsWith('temp-')) {
-                // 1. Insert payment record
-                await supabase.from('payments').insert([{
-                    order_id: id,
-                    mode: data.mode || 'CASH',
-                    amount: data.amount,
-                    created_at: new Date().toISOString(),
-                }]);
+                // 1. Insert payment record (non-blocking if payments table is restricted)
+                try {
+                    await supabase.from('payments').insert([{
+                        order_id: id,
+                        mode: data.mode || 'CASH',
+                        amount: data.amount,
+                        created_at: new Date().toISOString(),
+                    }]);
+                } catch (payErr) {
+                    logger.warn('Payment insert warning:', payErr);
+                }
 
                 // 2. Mark order as COMPLETED
                 await supabase.from('orders').update({
