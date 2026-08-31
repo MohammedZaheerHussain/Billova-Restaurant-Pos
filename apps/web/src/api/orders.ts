@@ -1,4 +1,4 @@
-// Orders API - Resilient Hybrid (Supabase + Local Cache) Layer
+// Orders API - Ultra-Resilient Cloud (Supabase) + Local Cache Dual-Sync Layer
 import api from './client';
 import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 
 const LOCAL_ORDERS_KEY = 'billova_local_orders_v2';
 
-function getStoredLocalOrders(): any[] {
+export function getStoredLocalOrders(): any[] {
     try {
         const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
         return raw ? JSON.parse(raw) : [];
@@ -17,7 +17,7 @@ function getStoredLocalOrders(): any[] {
     }
 }
 
-function saveLocalOrder(order: any) {
+export function saveLocalOrder(order: any) {
     try {
         const list = getStoredLocalOrders();
         const existingIdx = list.findIndex(o => o.id === order.id || o.orderNumber === order.orderNumber);
@@ -26,14 +26,14 @@ function saveLocalOrder(order: any) {
         } else {
             list.unshift(order);
         }
-        // Keep last 200 orders locally
-        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(list.slice(0, 200)));
+        // Keep last 300 orders locally
+        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(list.slice(0, 300)));
     } catch (e) {
         logger.warn('Failed to save order to localStorage:', e);
     }
 }
 
-function updateLocalOrderStatus(id: string, status: string) {
+export function updateLocalOrderStatus(id: string, status: string) {
     try {
         const list = getStoredLocalOrders();
         const updated = list.map(o => o.id === id ? { ...o, status, completedAt: status === 'COMPLETED' ? new Date().toISOString() : o.completedAt } : o);
@@ -43,11 +43,92 @@ function updateLocalOrderStatus(id: string, status: string) {
     }
 }
 
+/**
+ * Auto-syncs any offline/unsynced orders to Supabase backend in the background
+ */
+export async function syncLocalOrdersToSupabase() {
+    const list = getStoredLocalOrders();
+    const unsynced = list.filter(o => o.id && (o.id.startsWith('ord-') || o.id.startsWith('temp-')));
+    if (unsynced.length === 0) return;
+
+    const user = useAuthStore.getState().user;
+    const branchId = user?.branch?.id || (user as any)?.branchId;
+
+    for (const localOrd of unsynced) {
+        try {
+            const insertPayload: any = {
+                order_number: localOrd.orderNumber || 1,
+                daily_order_no: localOrd.dailyOrderNo || localOrd.orderNumber || 1,
+                order_type: localOrd.orderType || 'DINE_IN',
+                status: localOrd.status || 'PENDING',
+                customer_name: localOrd.customerName || null,
+                customer_phone: localOrd.customerPhone || null,
+                subtotal: Number(localOrd.subtotal || 0),
+                total: Number(localOrd.total || 0),
+                total_amount: Number(localOrd.total || 0),
+                discount_amount: Number(localOrd.discountAmount || 0),
+                gst_amount: Number(localOrd.gstAmount || 0),
+                notes: localOrd.notes || null,
+                online_platform: localOrd.onlinePlatform || null,
+                online_order_id: localOrd.onlineOrderId || null,
+                created_at: localOrd.createdAt || new Date().toISOString(),
+                completed_at: localOrd.completedAt || (localOrd.status === 'COMPLETED' ? localOrd.createdAt : null),
+            };
+
+            if (branchId) insertPayload.branch_id = branchId;
+            if (user?.id) insertPayload.user_id = user.id;
+
+            const { data: serverOrder, error: orderErr } = await supabase
+                .from('orders')
+                .insert([insertPayload])
+                .select()
+                .single();
+
+            if (!orderErr && serverOrder) {
+                // Update local storage with real Supabase UUID
+                localOrd.id = serverOrder.id;
+                saveLocalOrder(localOrd);
+
+                // Insert items
+                if (localOrd.items && localOrd.items.length > 0) {
+                    const itemsPayload = localOrd.items.map((it: any) => ({
+                        order_id: serverOrder.id,
+                        menu_item_id: it.menuItem?.id || it.menuItemId || null,
+                        quantity: Number(it.quantity || 1),
+                        unit_price: Number(it.unitPrice || 0),
+                        total: Number(it.total || 0),
+                        notes: it.notes || null,
+                        status: 'PENDING',
+                    }));
+                    await supabase.from('order_items').insert(itemsPayload);
+                }
+
+                // Insert payments
+                if (localOrd.payments && localOrd.payments.length > 0) {
+                    const paymentsPayload = localOrd.payments.map((p: any) => ({
+                        order_id: serverOrder.id,
+                        mode: p.mode || 'CASH',
+                        amount: Number(p.amount || localOrd.total || 0),
+                        created_at: p.createdAt || new Date().toISOString(),
+                    }));
+                    await supabase.from('payments').insert(paymentsPayload);
+                }
+                logger.info(`[Sync] Order #${localOrd.orderNumber} successfully synced to Supabase:`, serverOrder.id);
+            }
+        } catch (syncErr) {
+            logger.warn(`[Sync] Failed to sync order #${localOrd.orderNumber}:`, syncErr);
+        }
+    }
+}
+
 export const ordersAPI = {
     /**
      * Get all orders with items, payments, and table details
      */
     getAll: async (params?: OrderQueryDTO) => {
+        // Trigger background sync for any unsynced local orders
+        syncLocalOrdersToSupabase().catch(() => {});
+
         if (hasExpressBackend()) {
             try { return await api.get('/orders', { params }); } catch { /* fallback */ }
         }
@@ -62,12 +143,13 @@ export const ordersAPI = {
                 .order('created_at', { ascending: false });
 
             if (branchId) {
-                query = query.eq('branch_id', branchId);
+                query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
             }
 
             if (params?.date) {
-                const startOfDay = `${params.date}T00:00:00.000Z`;
-                const endOfDay = `${params.date}T23:59:59.999Z`;
+                const [y, m, d] = params.date.split('-').map(Number);
+                const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+                const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
                 query = query.gte('created_at', startOfDay).lte('created_at', endOfDay);
             }
 
@@ -171,7 +253,14 @@ export const ordersAPI = {
             const dateFilter = params?.date;
 
             const filteredLocal = dateFilter
-                ? localOrders.filter(o => (o.createdAt || '').startsWith(dateFilter))
+                ? localOrders.filter(o => {
+                    if (!o.createdAt) return false;
+                    const d = new Date(o.createdAt);
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}` === dateFilter;
+                })
                 : localOrders;
 
             // Combine and deduplicate
@@ -199,7 +288,6 @@ export const ordersAPI = {
             return { data: combined };
         } catch (err) {
             logger.error('Orders getAll error:', err);
-            // Return local cached orders on failure
             const localOrders = getStoredLocalOrders();
             return { data: localOrders };
         }
@@ -246,7 +334,7 @@ export const ordersAPI = {
     },
 
     /**
-     * Create a new order with sequential order numbering and dual persistence
+     * Create a new order with sequential order numbering and guaranteed Supabase persistence
      */
     create: async (data: CreateOrderDTO, options?: { dailyReset?: boolean }) => {
         if (hasExpressBackend()) {
@@ -259,32 +347,34 @@ export const ordersAPI = {
 
         const user = useAuthStore.getState().user;
         const branchId = user?.branch?.id || (user as any)?.branchId;
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayLocal = new Date();
+        const y = todayLocal.getFullYear();
+        const m = String(todayLocal.getMonth() + 1).padStart(2, '0');
+        const d = String(todayLocal.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
 
         // ── 1. Calculate Sequential Order Number for Today ──
         let nextOrderNumber = 1;
 
         try {
+            const startOfDay = new Date(y, todayLocal.getMonth(), todayLocal.getDate(), 0, 0, 0, 0).toISOString();
             const { data: recentOrders } = await supabase
                 .from('orders')
                 .select('order_number, daily_order_no, created_at')
+                .gte('created_at', startOfDay)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
             if (recentOrders && recentOrders.length > 0) {
-                const todays = options?.dailyReset !== false
-                    ? recentOrders.filter((o: any) => (o.created_at || '').startsWith(todayStr))
-                    : recentOrders;
-
                 let maxNum = 0;
-                for (const o of todays) {
+                for (const o of recentOrders) {
                     const n = Number(o.order_number || o.daily_order_no || 0);
                     if (n > maxNum) maxNum = n;
                 }
                 nextOrderNumber = maxNum + 1;
             }
         } catch (queryErr) {
-            logger.warn('Could not query max order number, using local seq:', queryErr);
+            logger.warn('Could not query max order number from Supabase, using local:', queryErr);
             const storedDate = localStorage.getItem('billova_order_seq_date');
             let seq = Number(localStorage.getItem('billova_order_seq_num') || '0');
             if (storedDate !== todayStr) {
@@ -293,8 +383,12 @@ export const ordersAPI = {
             nextOrderNumber = seq + 1;
         }
 
-        // Also check local storage max for today
-        const localList = getStoredLocalOrders().filter(o => (o.createdAt || '').startsWith(todayStr));
+        // Check local storage max for today
+        const localList = getStoredLocalOrders().filter(o => {
+            if (!o.createdAt) return false;
+            const od = new Date(o.createdAt);
+            return `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}` === todayStr;
+        });
         for (const lo of localList) {
             if (Number(lo.orderNumber || 0) >= nextOrderNumber) {
                 nextOrderNumber = Number(lo.orderNumber || 0) + 1;
@@ -320,7 +414,7 @@ export const ordersAPI = {
         const discountAmount = Number((data as any).discountAmount || 0);
         const total = Number((data as any).total || (data as any).totalAmount || (subtotal - discountAmount + gstAmount));
 
-        // Format Items for local cache & return
+        // Format Items for return & local cache
         const formattedItems = items.map((it: any, idx: number) => ({
             id: it.id || `item-${Date.now()}-${idx}`,
             quantity: Number(it.quantity || 1),
@@ -334,10 +428,10 @@ export const ordersAPI = {
             variant: it.variantId ? { id: it.variantId, name: (it as any).variant?.name || '' } : undefined,
         }));
 
-        const orderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        let assignedOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
         const baseOrder = {
-            id: orderId,
+            id: assignedOrderId,
             orderNumber: nextOrderNumber,
             dailyOrderNo: nextOrderNumber,
             billNumber: billNumber,
@@ -360,10 +454,7 @@ export const ordersAPI = {
             createdAt: new Date().toISOString(),
         };
 
-        // Save immediately to local cache
-        saveLocalOrder(baseOrder);
-
-        // ── 2. Insert into Supabase table (asynchronous / resilient) ──
+        // ── 2. Insert into Supabase table (PRIMARY PERSISTENCE) ──
         try {
             const insertPayload: any = {
                 order_number: nextOrderNumber,
@@ -392,6 +483,10 @@ export const ordersAPI = {
                 insertPayload.branch_id = branchId;
             }
 
+            if (user?.id) {
+                insertPayload.user_id = user.id;
+            }
+
             if (data.tableId) {
                 insertPayload.table_id = data.tableId;
             }
@@ -403,11 +498,8 @@ export const ordersAPI = {
                 .single();
 
             if (!orderErr && serverOrder) {
-                // Update local order with server ID
-                saveLocalOrder({
-                    ...baseOrder,
-                    id: serverOrder.id,
-                });
+                assignedOrderId = serverOrder.id;
+                baseOrder.id = serverOrder.id;
 
                 // Insert items into Supabase
                 if (items.length > 0) {
@@ -427,17 +519,16 @@ export const ordersAPI = {
                         logger.warn('Could not insert items into order_items table:', itemInsertErr);
                     }
                 }
-
-                return {
-                    data: {
-                        ...baseOrder,
-                        id: serverOrder.id,
-                    }
-                };
+                logger.info(`[POS] Order #${nextOrderNumber} saved to Supabase:`, serverOrder.id);
+            } else if (orderErr) {
+                logger.error('[POS] Supabase order insert error:', orderErr);
             }
         } catch (supErr) {
-            logger.warn('Supabase order insert error (using local order):', supErr);
+            logger.error('[POS] Supabase order insert exception:', supErr);
         }
+
+        // Save order with latest ID to local cache as backup
+        saveLocalOrder(baseOrder);
 
         return { data: baseOrder };
     },

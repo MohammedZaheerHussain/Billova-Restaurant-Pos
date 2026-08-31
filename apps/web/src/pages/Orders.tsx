@@ -14,6 +14,7 @@ import './Orders.css';
 import { OrdersSkeleton } from '../components/Skeleton';
 import { DatePicker } from '../components/ui';
 import { logger } from '../utils/logger';
+import { subscribeChannel, unsubscribeChannel } from '../lib/supabase';
 
 interface OrderItem {
     id: string;
@@ -103,8 +104,18 @@ export default function OrdersPage() {
     useEffect(() => {
         fetchOrders();
         fetchMenuItems();
-        const interval = setInterval(fetchOrders, 10000);
-        return () => clearInterval(interval);
+
+        // Realtime live sync from Supabase
+        const channel = subscribeChannel('orders-live-sync', 'orders', (payload) => {
+            logger.debug('[Orders] Realtime update:', payload.eventType);
+            fetchOrders();
+        });
+
+        const interval = setInterval(fetchOrders, 8000);
+        return () => {
+            clearInterval(interval);
+            if (channel) unsubscribeChannel('orders-live-sync');
+        };
     }, [selectedDate]);
 
     // Clear selection when filter/date changes
