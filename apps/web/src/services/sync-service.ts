@@ -454,7 +454,7 @@ async function syncPendingKOTs(): Promise<{ synced: number; failed: number }> {
     let synced = 0;
     let failed = 0;
 
-    if (!db.offlineKOTs) return { synced, failed };
+    if (!db.offlineKOTs || !hasExpressBackend()) return { synced, failed };
 
     const pendingKOTs = await db.offlineKOTs
         .where('syncStatus')
@@ -509,7 +509,7 @@ async function syncOrderStatusUpdates(): Promise<{ synced: number; failed: numbe
     let synced = 0;
     let failed = 0;
 
-    if (!db.orderStatusHistory) return { synced, failed };
+    if (!db.orderStatusHistory || !hasExpressBackend()) return { synced, failed };
 
     const pendingUpdates = await db.orderStatusHistory
         .where('syncStatus')
@@ -555,7 +555,7 @@ async function syncCancelledItems(): Promise<{ synced: number; failed: number }>
     let synced = 0;
     let failed = 0;
 
-    if (!db.cancelledItems) return { synced, failed };
+    if (!db.cancelledItems || !hasExpressBackend()) return { synced, failed };
 
     const pendingCancellations = await db.cancelledItems
         .where('syncStatus')
