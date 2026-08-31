@@ -472,15 +472,6 @@ export function generateReceiptHTML(data: ReceiptData): string {
             </div>
 
             <!-- ========================================== -->
-            <!-- ── AUTO-CUT SEPARATOR / PAGE BREAK ── -->
-            <!-- ========================================== -->
-            <div class="thermal-cut-separator">
-                <div class="cut-guide-line">========================================</div>
-                <div class="cut-guide-text">✂ - - - [ AUTO-CUT / TEAR HERE ] - - - ✂</div>
-                <div class="cut-guide-line">========================================</div>
-            </div>
-
-            <!-- ========================================== -->
             <!-- ── SECTION 2: KITCHEN ORDER TICKET (K.O.T.) ── -->
             <!-- ========================================== -->
             <div class="thermal-receipt kitchen-kot">
@@ -571,10 +562,6 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     padding: 2mm 1mm !important;
                 }
                 .customer-bill {
-                    page-break-after: always !important;
-                    break-after: page !important;
-                }
-                .thermal-cut-separator {
                     page-break-after: always !important;
                     break-after: page !important;
                 }
@@ -746,26 +733,6 @@ export function generateReceiptHTML(data: ReceiptData): string {
                 font-size: 10px;
                 font-weight: 700;
                 margin-top: 4px;
-            }
-
-            /* ── Auto-Cut Separator ── */
-            .thermal-cut-separator {
-                margin: 20px 0;
-                text-align: center;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-            }
-
-            .cut-guide-line {
-                font-size: 10px;
-                letter-spacing: 1px;
-            }
-
-            .cut-guide-text {
-                font-size: 11px;
-                font-weight: 900;
-                letter-spacing: 0.05em;
             }
 
             /* ── Kitchen KOT Styling ── */

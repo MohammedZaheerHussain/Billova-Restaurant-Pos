@@ -86,10 +86,6 @@ export class BrowserPrintDriver extends BasePrinterDriver {
                                 page-break-after: always !important;
                                 break-after: page !important;
                             }
-                            .thermal-cut-separator {
-                                page-break-after: always !important;
-                                break-after: page !important;
-                            }
                             .kitchen-kot {
                                 page-break-before: always !important;
                                 break-before: page !important;
