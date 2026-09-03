@@ -664,7 +664,7 @@ export default function POSPage() {
                                     >
                                         {/* Card Top Row: Category Icon Pill + Badges */}
                                         <div className="card-top-row">
-                                            <div className="category-pill">
+                                            <div className="category-pill" title={categoryName}>
                                                 <span className="cat-icon">{categoryIcon}</span>
                                                 {categoryName && <span className="cat-name">{categoryName}</span>}
                                             </div>
