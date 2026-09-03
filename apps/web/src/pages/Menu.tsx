@@ -1,7 +1,7 @@
 // Menu Management Page
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, X, Upload, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed, Search, Power } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Upload, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed, Search, Power, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuAPI, categoriesAPI } from '../api';
 import { useAuthStore, MenuItem, Category } from '../store';
@@ -208,20 +208,6 @@ export default function MenuPage() {
         }
     };
 
-    // Clean up duplicate categories and items
-    const handleCleanDuplicates = async () => {
-        try {
-            const res = await menuAPI.cleanDuplicates(user?.branch?.id);
-            if (res.success) {
-                toast.success(res.count > 0 ? `✨ Merged ${res.count} duplicates (${res.categoryCount} categories, ${res.itemCount} items)!` : 'All items and categories are already clean and duplicate-free!');
-                fetchData();
-            } else {
-                toast.error('Failed to merge duplicates');
-            }
-        } catch {
-            toast.error('Failed to merge duplicates');
-        }
-    };
 
     // Update Category
     const handleUpdateCategory = async (id: string, name: string, icon: string) => {
@@ -758,61 +744,86 @@ export default function MenuPage() {
                         onClick={() => setShowManageCategoriesModal(false)}
                     >
                         <motion.div
-                            className="modal category-modal"
-                            style={{ maxWidth: '540px' }}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="modal category-manager-modal"
+                            initial={{ opacity: 0, scale: 0.96, y: 15 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: 15 }}
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="modal-header">
-                                <h2><FolderCog size={20} /> Manage Categories</h2>
-                                <button className="modal-close" onClick={() => setShowManageCategoriesModal(false)}>
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            <div className="category-manager-body" style={{ padding: '20px', maxHeight: '65vh', overflowY: 'auto' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                                        {categories.length} Categories
-                                    </span>
-                                    <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '11px' }} onClick={handleCleanDuplicates}>
-                                        <Sparkles size={14} /> Merge Duplicates
+                                <div className="modal-header-left">
+                                    <div className="modal-title-with-icon">
+                                        <div className="cat-modal-header-badge">
+                                            <FolderCog size={18} />
+                                        </div>
+                                        <div>
+                                            <h2>Manage Categories</h2>
+                                            <p className="modal-subtitle">{categories.length} active menu categories</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-header-right">
+                                    <button
+                                        type="button"
+                                        className="btn-create-category"
+                                        onClick={() => {
+                                            setShowManageCategoriesModal(false);
+                                            setShowCategoryModal(true);
+                                        }}
+                                        title="Add a new category"
+                                    >
+                                        <Plus size={14} /> Add Category
+                                    </button>
+                                    <button className="modal-close" onClick={() => setShowManageCategoriesModal(false)}>
+                                        <X size={18} />
                                     </button>
                                 </div>
-                                <div className="category-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            </div>
+
+                            <div className="category-manager-body">
+                                <div className="category-manager-list">
                                     {categories.map((cat) => {
                                         const itemCount = items.filter(i => i.categoryId === cat.id || (cat as any).ids?.includes(i.categoryId)).length;
                                         const isEditing = editingCategory?.id === cat.id;
 
                                         return (
-                                            <div key={cat.id} className="category-manager-row" style={{ padding: '10px 14px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                            <div key={cat.id} className={`category-row-card ${isEditing ? 'is-editing' : ''}`}>
                                                 {isEditing ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                            <span style={{ fontSize: '20px', padding: '0 4px' }}>{editCatIcon || '🍽️'}</span>
+                                                    <div className="category-edit-form">
+                                                        <div className="category-edit-top">
+                                                            <div className="cat-emoji-preview">{editCatIcon || '🍽️'}</div>
                                                             <input
                                                                 type="text"
+                                                                className="category-edit-input"
                                                                 value={editCatName}
                                                                 onChange={(e) => setEditCatName(e.target.value)}
                                                                 placeholder="Category Name"
-                                                                style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                                                                autoFocus
                                                             />
-                                                            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}>
-                                                                Save
-                                                            </button>
-                                                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingCategory(null)}>
-                                                                Cancel
-                                                            </button>
+                                                            <div className="category-edit-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-cat-save"
+                                                                    onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}
+                                                                >
+                                                                    <Check size={14} /> Save
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-cat-cancel"
+                                                                    onClick={() => setEditingCategory(null)}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                        <div className="icon-picker" style={{ maxHeight: '110px' }}>
+                                                        <div className="icon-picker-strip">
                                                             {CATEGORY_ICONS.map((icon) => (
                                                                 <button
                                                                     key={icon}
                                                                     type="button"
                                                                     className={`icon-option ${editCatIcon === icon ? 'selected' : ''}`}
                                                                     onClick={() => setEditCatIcon(icon)}
-                                                                    style={{ height: '36px', fontSize: '18px' }}
                                                                 >
                                                                     {icon}
                                                                 </button>
@@ -821,16 +832,19 @@ export default function MenuPage() {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                            <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                                                            <div>
-                                                                <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{cat.name}</span>
-                                                                <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)' }}>{itemCount} items</span>
+                                                        <div className="category-row-info">
+                                                            <div className="category-emoji-box">
+                                                                <span>{cat.icon || '🍽️'}</span>
+                                                            </div>
+                                                            <div className="category-text-meta">
+                                                                <span className="category-title">{cat.name}</span>
+                                                                <span className="category-item-count">{itemCount} items</span>
                                                             </div>
                                                         </div>
-                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <div className="category-row-actions">
                                                             <button
-                                                                className="btn-icon-sm"
+                                                                type="button"
+                                                                className="cat-action-icon edit"
                                                                 onClick={() => {
                                                                     setEditingCategory(cat);
                                                                     setEditCatName(cat.name);
@@ -841,7 +855,8 @@ export default function MenuPage() {
                                                                 <Edit2 size={14} />
                                                             </button>
                                                             <button
-                                                                className="btn-icon-sm danger"
+                                                                type="button"
+                                                                className="cat-action-icon delete"
                                                                 onClick={() => handleDeleteCategory(cat.id)}
                                                                 title="Delete Category"
                                                             >
