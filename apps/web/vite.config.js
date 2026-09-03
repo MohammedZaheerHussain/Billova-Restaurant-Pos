@@ -5,8 +5,8 @@ export default defineConfig({
     plugins: [
         react(),
         VitePWA({
-            registerType: 'prompt',
-            includeAssets: ['logo.png', 'apple-touch-icon.png'],
+            registerType: 'autoUpdate',
+            includeAssets: ['logo.png', 'apple-touch-icon.png', 'favicon.png', 'favicon.ico'],
             manifest: {
                 name: 'Billova POS',
                 short_name: 'Billova',
@@ -31,15 +31,56 @@ export default defineConfig({
                 ],
             },
             workbox: {
+                clientsClaim: true,
+                skipWaiting: true,
+                navigateFallback: '/index.html',
+                navigateFallbackDenylist: [/^\/api\//],
+                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
                 // Cache strategies
                 runtimeCaching: [
                     {
-                        // Cache API requests with Network First strategy
+                        // Cache Google Fonts stylesheets
+                        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+                        handler: 'StaleWhileRevalidate',
+                        options: {
+                            cacheName: 'google-fonts-stylesheets',
+                        },
+                    },
+                    {
+                        // Cache Google Fonts webfonts
+                        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'google-fonts-webfonts',
+                            expiration: {
+                                maxEntries: 30,
+                                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+                            },
+                        },
+                    },
+                    {
+                        // Cache Supabase REST requests with Network First strategy (3s timeout fallback to cache)
+                        urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+                        handler: 'NetworkFirst',
+                        options: {
+                            cacheName: 'supabase-api-cache',
+                            networkTimeoutSeconds: 3,
+                            cacheableResponse: {
+                                statuses: [0, 200],
+                            },
+                            expiration: {
+                                maxEntries: 200,
+                                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+                            },
+                        },
+                    },
+                    {
+                        // Cache Express API requests with Network First strategy
                         urlPattern: /^https?:\/\/.*\/api\/.*/i,
                         handler: 'NetworkFirst',
                         options: {
                             cacheName: 'api-cache',
-                            networkTimeoutSeconds: 10,
+                            networkTimeoutSeconds: 5,
                             cacheableResponse: {
                                 statuses: [0, 200],
                             },
@@ -56,7 +97,7 @@ export default defineConfig({
                         options: {
                             cacheName: 'image-cache',
                             expiration: {
-                                maxEntries: 50,
+                                maxEntries: 100,
                                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
                             },
                         },
@@ -68,17 +109,15 @@ export default defineConfig({
                         options: {
                             cacheName: 'static-cache',
                             expiration: {
-                                maxEntries: 50,
+                                maxEntries: 100,
                                 maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
                             },
                         },
                     },
                 ],
-                // Precache app shell
-                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
             },
             devOptions: {
-                enabled: false, // Enable in dev for testing
+                enabled: false,
             },
         }),
     ],

@@ -6,58 +6,81 @@ import { CreateOrderDTO, UpdateOrderStatusDTO, AddPaymentDTO, OrderQueryDTO } fr
 import { useAuthStore } from '../store';
 import { logger } from '../utils/logger';
 
-const LOCAL_ORDERS_KEY = 'billova_local_orders_v2';
+export function getLocalOrdersKey(branchId?: string): string {
+    const bId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+    return `billova_local_orders_${bId}`;
+}
 
 const isValidUUID = (str?: string | null): boolean => Boolean(str && typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
-export function getStoredLocalOrders(): any[] {
+export function getStoredLocalOrders(branchId?: string): any[] {
     try {
-        const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+        const key = getLocalOrdersKey(branchId);
+        let raw = localStorage.getItem(key);
+        // Seamless backward-compatibility migration
+        if (!raw) {
+            const legacy = localStorage.getItem('billova_local_orders_v2');
+            if (legacy) {
+                try {
+                    const parsedLegacy = JSON.parse(legacy);
+                    if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+                        localStorage.setItem(key, legacy);
+                        return parsedLegacy;
+                    }
+                } catch {}
+            }
+        }
         return raw ? JSON.parse(raw) : [];
     } catch {
         return [];
     }
 }
 
-export function saveLocalOrder(order: any) {
+export function saveLocalOrder(order: any, branchId?: string) {
     try {
-        const list = getStoredLocalOrders();
-        const existingIdx = list.findIndex(o => o.id === order.id || o.orderNumber === order.orderNumber);
+        const bId = branchId || order.branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+        order.branchId = bId;
+        const key = getLocalOrdersKey(bId);
+        const list = getStoredLocalOrders(bId);
+        const existingIdx = list.findIndex(o => o.id === order.id || (o.orderNumber === order.orderNumber && o.createdAt === order.createdAt));
         if (existingIdx >= 0) {
             list[existingIdx] = { ...list[existingIdx], ...order };
         } else {
             list.unshift(order);
         }
-        // Keep last 300 orders locally
-        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(list.slice(0, 300)));
+        // Keep last 300 orders per tenant locally
+        localStorage.setItem(key, JSON.stringify(list.slice(0, 300)));
     } catch (e) {
         logger.warn('Failed to save order to localStorage:', e);
     }
 }
 
-export function updateLocalOrderStatus(id: string, status: string) {
+export function updateLocalOrderStatus(id: string, status: string, branchId?: string) {
     try {
-        const list = getStoredLocalOrders();
+        const bId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+        const key = getLocalOrdersKey(bId);
+        const list = getStoredLocalOrders(bId);
         const updated = list.map(o => o.id === id ? { ...o, status, completedAt: status === 'COMPLETED' ? new Date().toISOString() : o.completedAt } : o);
-        localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(updated));
+        localStorage.setItem(key, JSON.stringify(updated));
     } catch (e) {
         logger.warn('Failed to update local order status:', e);
     }
 }
 
 /**
- * Auto-syncs any offline/unsynced orders to Supabase backend in the background
+ * Auto-syncs any offline/unsynced orders to Supabase backend in the background (Tenant Scoped)
  */
-export async function syncLocalOrdersToSupabase() {
-    const list = getStoredLocalOrders();
-    const unsynced = list.filter(o => o.id && (o.id.startsWith('ord-') || o.id.startsWith('temp-')));
-    if (unsynced.length === 0) return;
-
+export async function syncLocalOrdersToSupabase(branchId?: string): Promise<number> {
     const user = useAuthStore.getState().user;
-    const branchId = user?.branch?.id || (user as any)?.branchId;
+    const activeBranchId = branchId || user?.branch?.id || (user as any)?.branchId;
+    const list = getStoredLocalOrders(activeBranchId);
+    const unsynced = list.filter(o => o.id && (o.id.startsWith('ord-') || o.id.startsWith('temp-')));
+    if (unsynced.length === 0) return 0;
 
+    let syncedCount = 0;
     for (const localOrd of unsynced) {
         try {
+            const targetBranchId = localOrd.branchId || activeBranchId;
             const syncOrderUuid = (localOrd.id && isValidUUID(localOrd.id))
                 ? localOrd.id
                 : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined);
@@ -82,7 +105,7 @@ export async function syncLocalOrdersToSupabase() {
                 completed_at: localOrd.completedAt || (localOrd.status === 'COMPLETED' ? localOrd.createdAt : null),
             };
 
-            if (isValidUUID(branchId)) insertPayload.branch_id = branchId;
+            if (isValidUUID(targetBranchId)) insertPayload.branch_id = targetBranchId;
 
             const { data: serverOrder, error: orderErr } = await supabase
                 .from('orders')
@@ -93,18 +116,18 @@ export async function syncLocalOrdersToSupabase() {
             if (!orderErr && serverOrder) {
                 // Update local storage with real Supabase UUID
                 localOrd.id = serverOrder.id;
-                saveLocalOrder(localOrd);
+                saveLocalOrder(localOrd, targetBranchId);
 
                 // Insert items
                 if (localOrd.items && localOrd.items.length > 0) {
                     const itemsPayload = localOrd.items.map((it: any) => {
                         const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
-                            const rawMenuId = it.menuItem?.id || it.menuItemId || it.id;
-                            return {
-                                ...(itemUuid ? { id: itemUuid } : {}),
-                                order_id: serverOrder.id,
-                                menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
-                                quantity: Number(it.quantity || 1),
+                        const rawMenuId = it.menuItem?.id || it.menuItemId || it.id;
+                        return {
+                            ...(itemUuid ? { id: itemUuid } : {}),
+                            order_id: serverOrder.id,
+                            menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
+                            quantity: Number(it.quantity || 1),
                             unit_price: Number(it.unitPrice || 0),
                             total: Number(it.total || 0),
                             notes: it.notes || null,
@@ -128,12 +151,14 @@ export async function syncLocalOrdersToSupabase() {
                     });
                     await supabase.from('payments').insert(paymentsPayload);
                 }
+                syncedCount++;
                 logger.info(`[Sync] Order #${localOrd.orderNumber} successfully synced to Supabase:`, serverOrder.id);
             }
         } catch (syncErr) {
             logger.warn(`[Sync] Failed to sync order #${localOrd.orderNumber}:`, syncErr);
         }
     }
+    return syncedCount;
 }
 
 export const ordersAPI = {

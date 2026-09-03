@@ -3,9 +3,22 @@ import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { logger } from '../utils/logger';
 import { CreateMenuItemDTO, CreateCategoryDTO } from '@billova/types';
+import { useAuthStore } from '../store';
+
+function getMenuCacheKey(branchId?: string): string {
+    const bId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+    return `billova_menu_cache_${bId}`;
+}
+
+function getCategoriesCacheKey(branchId?: string): string {
+    const bId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+    return `billova_categories_cache_${bId}`;
+}
 
 export const menuAPI = {
     getAll: async (branchId?: string, categoryId?: string) => {
+        const cacheKey = getMenuCacheKey(branchId);
+
         if (hasExpressBackend()) {
             try { return await api.get('/menu', { params: { branchId, categoryId } }); } catch { /* fallback */ }
         }
@@ -15,11 +28,11 @@ export const menuAPI = {
             if (categoryId) query = query.eq('category_id', categoryId);
             const { data, error } = await query;
             if (error) {
-                logger.error('[menuAPI.getAll] Relational query failed, retrying simple select:', error?.message || error);
+                logger.warn('[menuAPI.getAll] Relational query failed, retrying simple select:', error?.message || error);
                 let simpleQuery = supabase.from('menu_items').select('*');
                 if (branchId) simpleQuery = simpleQuery.eq('branch_id', branchId);
                 const { data: simpleData } = await simpleQuery;
-                if (simpleData) {
+                if (simpleData && simpleData.length > 0) {
                     const formatted = simpleData.map((m: any) => ({
                         id: m.id,
                         name: m.name,
@@ -30,25 +43,47 @@ export const menuAPI = {
                         image: m.image_url || m.image,
                         description: m.description,
                     }));
+                    try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
                     return { data: formatted };
                 }
-                return { data: [] };
+            } else if (data && data.length > 0) {
+                const formatted = data.map((m: any) => ({
+                    id: m.id,
+                    name: m.name,
+                    price: Number(m.price || 0),
+                    categoryId: m.category_id,
+                    category: m.category ? { name: m.category.name, icon: m.category.icon } : undefined,
+                    isVeg: m.is_veg ?? true,
+                    isAvailable: m.is_available ?? true,
+                    image: m.image_url || m.image,
+                    description: m.description,
+                }));
+                try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
+                return { data: formatted };
             }
-            const formatted = (data || []).map((m: any) => ({
-                id: m.id,
-                name: m.name,
-                price: Number(m.price || 0),
-                categoryId: m.category_id,
-                category: m.category ? { name: m.category.name, icon: m.category.icon } : undefined,
-                isVeg: m.is_veg ?? true,
-                isAvailable: m.is_available ?? true,
-                image: m.image_url || m.image,
-                description: m.description,
-            }));
-            return { data: formatted };
-        } catch {
-            return { data: [] };
+        } catch (netErr) {
+            logger.warn('[menuAPI.getAll] Network query failed, checking offline cache:', netErr);
         }
+
+        // Offline Fallback from tenant-scoped cache
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    let results = parsed;
+                    if (categoryId) {
+                        results = results.filter((it: any) => it.categoryId === categoryId);
+                    }
+                    logger.info(`[menuAPI.getAll] Serving ${results.length} cached menu items for tenant ${cacheKey}`);
+                    return { data: results };
+                }
+            }
+        } catch (cacheErr) {
+            logger.error('[menuAPI.getAll] Cache read error:', cacheErr);
+        }
+
+        return { data: [] };
     },
     getOne: async (id: string) => {
         if (hasExpressBackend()) {
@@ -458,6 +493,8 @@ Return ONLY valid JSON (no markdown, no other text):
 
 export const categoriesAPI = {
     getAll: async (branchId?: string) => {
+        const cacheKey = getCategoriesCacheKey(branchId);
+
         if (hasExpressBackend()) {
             try { return await api.get('/categories', { params: { branchId } }); } catch { /* fallback */ }
         }
@@ -465,29 +502,45 @@ export const categoriesAPI = {
             let query = supabase.from('categories').select('*').order('name');
             if (branchId) query = query.eq('branch_id', branchId);
             const { data, error } = await query;
-            if (error) return { data: [] };
+            if (!error && data && data.length > 0) {
+                const uniqueMap = new Map<string, any>();
+                for (const c of data) {
+                    const key = c.name.trim().toLowerCase();
+                    if (!uniqueMap.has(key)) {
+                        uniqueMap.set(key, {
+                            id: c.id,
+                            name: c.name.trim(),
+                            icon: c.icon || '🍽️',
+                            color: c.color,
+                            ids: [c.id],
+                        });
+                    } else {
+                        uniqueMap.get(key).ids.push(c.id);
+                    }
+                }
 
-            const uniqueMap = new Map<string, any>();
-            for (const c of (data || [])) {
-                const key = c.name.trim().toLowerCase();
-                if (!uniqueMap.has(key)) {
-                    uniqueMap.set(key, {
-                        id: c.id,
-                        name: c.name.trim(),
-                        icon: c.icon || '🍽️',
-                        color: c.color,
-                        ids: [c.id],
-                    });
-                } else {
-                    uniqueMap.get(key).ids.push(c.id);
+                const formatted = Array.from(uniqueMap.values());
+                try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
+                return { data: formatted };
+            }
+        } catch (netErr) {
+            logger.warn('[categoriesAPI.getAll] Network query failed, checking offline cache:', netErr);
+        }
+
+        // Offline Fallback from tenant-scoped cache
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return { data: parsed };
                 }
             }
-
-            const formatted = Array.from(uniqueMap.values());
-            return { data: formatted };
-        } catch {
-            return { data: [] };
+        } catch (cacheErr) {
+            logger.error('[categoriesAPI.getAll] Cache read error:', cacheErr);
         }
+
+        return { data: [] };
     },
     create: async (data: CreateCategoryDTO) => {
         if (hasExpressBackend()) {

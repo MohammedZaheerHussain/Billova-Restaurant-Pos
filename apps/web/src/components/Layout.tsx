@@ -275,6 +275,9 @@ export default function Layout() {
                         <span>Search commands or pages...</span>
                         <kbd>⌘K</kbd>
                     </button>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                        <OfflineIndicator variant="badge" />
+                    </div>
                 </header>
 
                 <Outlet />

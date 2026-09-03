@@ -5,6 +5,7 @@ import { useAuthStore } from './store';
 import Layout from './components/Layout';
 import SplashScreen from './components/SplashScreen';
 import { PWAUpdatePrompt } from './components/pwa';
+import { initNetworkSync } from './services/network-sync';
 
 // Lazy-loaded pages (code splitting)
 const LoginPage = lazy(() => import('./pages/Login'));
@@ -90,6 +91,11 @@ function App() {
     const redirectPath = useRedirectPath();
     const [showSplash, setShowSplash] = useState(false);
     const [splashComplete, setSplashComplete] = useState(false);
+
+    // Initialize auto network sync for offline queue
+    useEffect(() => {
+        initNetworkSync();
+    }, []);
 
     // Show splash screen when user becomes authenticated
     useEffect(() => {
