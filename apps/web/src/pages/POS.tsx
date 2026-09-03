@@ -125,6 +125,9 @@ export default function POSPage() {
                 }
             } else if (e.key === 'F2') {
                 e.preventDefault();
+                if (orderType !== 'DINE_IN' && !editingOrderId) {
+                    return; // Pending bill only applies to Dine In
+                }
                 if (cartItems.length > 0) {
                     handleSavePendingOrder();
                 } else {
@@ -376,6 +379,11 @@ export default function POSPage() {
 
     // Handle saving as PENDING order (Send to Kitchen & Print KOT only)
     const handleSavePendingOrder = async () => {
+        if (orderType !== 'DINE_IN' && !editingOrderId) {
+            toast.error('Pending bills are only for Dine In orders');
+            return;
+        }
+
         if (cartItems.length === 0) {
             toast.error('Add items to cart first');
             return;
@@ -986,32 +994,46 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    {/* Action CTA Buttons: Pending Bill / KOT + Complete Bill */}
-                    <div className="cart-action-buttons">
-                        <button
-                            type="button"
-                            className="pending-bill-btn"
-                            onClick={handleSavePendingOrder}
-                            disabled={cartItems.length === 0 || submitting}
-                            title="Save as Pending & Send to Kitchen (F2)"
-                        >
-                            <UtensilsCrossed size={16} />
-                            <span>{editingOrderId ? 'UPDATE & SEND KOT' : 'PENDING BILL'}</span>
-                            <span className="shortcut-hint">F2</span>
-                        </button>
+                    {/* Action CTA Buttons: Pending Bill only for DINE_IN (or editing), otherwise single Complete Bill */}
+                    {(orderType === 'DINE_IN' || editingOrderId) ? (
+                        <div className="cart-action-buttons dine-in-actions">
+                            <button
+                                type="button"
+                                className="pending-bill-btn"
+                                onClick={handleSavePendingOrder}
+                                disabled={cartItems.length === 0 || submitting}
+                                title="Save as Pending & Send to Kitchen (F2)"
+                            >
+                                <UtensilsCrossed size={15} />
+                                <span>{editingOrderId ? 'UPDATE KOT' : 'PENDING BILL'}</span>
+                                <span className="btn-badge">F2</span>
+                            </button>
 
+                            <button
+                                type="button"
+                                className="complete-bill-btn split"
+                                onClick={openPaymentModal}
+                                disabled={cartItems.length === 0 || submitting}
+                                title="Complete and collect payment (F4)"
+                            >
+                                <Sparkles size={15} />
+                                <span>COMPLETE BILL</span>
+                                <span className="btn-badge">F4</span>
+                            </button>
+                        </div>
+                    ) : (
                         <button
                             type="button"
-                            className="complete-bill-btn"
+                            className="complete-bill-btn full-width"
                             onClick={openPaymentModal}
                             disabled={cartItems.length === 0 || submitting}
                             title="Complete and collect payment (F4)"
                         >
-                            <Sparkles size={16} />
+                            <Sparkles size={18} />
                             <span>COMPLETE BILL • ₹{getTotal().toFixed(2)}</span>
                             <span className="shortcut-hint">F4</span>
                         </button>
-                    </div>
+                    )}
                 </div>
             </div>
 

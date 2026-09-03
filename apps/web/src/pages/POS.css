@@ -1088,20 +1088,20 @@
 }
 
 /* Action CTA Buttons Container */
-.cart-action-buttons {
-    display: flex;
-    gap: 10px;
+.cart-action-buttons.dine-in-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
     width: 100%;
 }
 
 .pending-bill-btn {
-    flex: 1;
     height: 48px;
-    border-radius: 14px;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1.5px solid rgba(245, 158, 11, 0.5);
-    color: #fbbf24;
-    font-size: 13px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #ffffff;
+    font-size: 12px;
     font-weight: 800;
     display: flex;
     align-items: center;
@@ -1109,16 +1109,16 @@
     gap: 6px;
     cursor: pointer;
     transition: all var(--transition-fast);
-    position: relative;
-    padding: 0 12px;
+    padding: 0 8px;
+    box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3);
+    white-space: nowrap;
 }
 
 .pending-bill-btn:hover:not(:disabled) {
-    background: rgba(245, 158, 11, 0.22);
-    border-color: #f59e0b;
-    color: #fef08a;
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    color: #ffffff;
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
 }
 
 .pending-bill-btn:active:not(:disabled) {
@@ -1128,10 +1128,55 @@
 .pending-bill-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
-.cart-action-buttons .complete-bill-btn {
-    flex: 1.4;
+.complete-bill-btn.split {
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    border: none;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 0 8px;
+    box-shadow: 0 3px 12px rgba(249, 115, 22, 0.35);
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.complete-bill-btn.split:hover:not(:disabled) {
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 16px rgba(249, 115, 22, 0.45);
+}
+
+.complete-bill-btn.split:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.complete-bill-btn.split:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-badge {
+    background: rgba(0, 0, 0, 0.28);
+    color: rgba(255, 255, 255, 0.95);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    margin-left: 2px;
+    flex-shrink: 0;
 }
 
 /* =========================================================

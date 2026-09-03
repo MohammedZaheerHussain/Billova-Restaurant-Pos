@@ -105,16 +105,20 @@ export default function OrdersPage() {
     const user = useAuthStore((state) => state.user);
 
     useEffect(() => {
-        fetchOrders();
+        fetchOrders(false);
         fetchMenuItems();
 
-        // Realtime live sync from Supabase
+        // Realtime live sync from Supabase (silent in background)
         const channel = subscribeChannel('orders-live-sync', 'orders', (payload) => {
             logger.debug('[Orders] Realtime update:', payload.eventType);
-            fetchOrders();
+            fetchOrders(true);
         });
 
-        const interval = setInterval(fetchOrders, 8000);
+        // Periodic background sync (silent - does not flash skeleton loader)
+        const interval = setInterval(() => {
+            fetchOrders(true);
+        }, 8000);
+
         return () => {
             clearInterval(interval);
             if (channel) unsubscribeChannel('orders-live-sync');
@@ -126,15 +130,21 @@ export default function OrdersPage() {
         setSelectedOrderIds(new Set());
     }, [filter, selectedDate, orderSearch]);
 
-    const fetchOrders = async () => {
+    const fetchOrders = async (isBackground = false) => {
         try {
-            setLoading(true);
+            if (!isBackground) {
+                setLoading(true);
+            }
             const response = await ordersAPI.getAll({ date: selectedDate });
             setOrders(response.data || []);
         } catch (error) {
-            toast.error('Failed to load orders');
+            if (!isBackground) {
+                toast.error('Failed to load orders');
+            }
         } finally {
-            setLoading(false);
+            if (!isBackground) {
+                setLoading(false);
+            }
         }
     };
 
@@ -183,7 +193,7 @@ export default function OrdersPage() {
         try {
             await ordersAPI.updateStatus(orderId, newStatus);
             toast.success(`Order marked as ${newStatus}`);
-            fetchOrders();
+            fetchOrders(true);
             setSelectedOrder(null);
         } catch (error) {
             toast.error('Failed to update order status');
@@ -253,7 +263,7 @@ export default function OrdersPage() {
             setNewItems([]);
             setEditingOrder(null);
             setMenuSearch('');
-            fetchOrders();
+            fetchOrders(true);
         } catch (error: any) {
             const msg = error.response?.data?.error || 'Failed to add items';
             toast.error(msg);
@@ -312,7 +322,7 @@ export default function OrdersPage() {
             await Promise.all(promises);
             toast.success(`${selectedOrderIds.size} orders closed successfully!`);
             setSelectedOrderIds(new Set());
-            fetchOrders();
+            fetchOrders(true);
         } catch (error) {
             toast.error('Failed to close some orders');
         } finally {
@@ -514,7 +524,7 @@ export default function OrdersPage() {
                 </div>
             </div>
 
-            {loading ? (
+            {loading && orders.length === 0 ? (
                 <OrdersSkeleton />
             ) : filteredOrders.length === 0 ? (
                 <div className="empty-state">
