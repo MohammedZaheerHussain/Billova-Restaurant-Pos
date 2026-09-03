@@ -208,18 +208,18 @@ export default function MenuPage() {
         }
     };
 
-    // Clean up duplicate categories
+    // Clean up duplicate categories and items
     const handleCleanDuplicates = async () => {
         try {
-            const res = await categoriesAPI.cleanDuplicates(user?.branch?.id);
+            const res = await menuAPI.cleanDuplicates(user?.branch?.id);
             if (res.success) {
-                toast.success(res.count > 0 ? `✨ Merged ${res.count} duplicate categories!` : 'All categories are already clean!');
+                toast.success(res.count > 0 ? `✨ Merged ${res.count} duplicates (${res.categoryCount} categories, ${res.itemCount} items)!` : 'All items and categories are already clean and duplicate-free!');
                 fetchData();
             } else {
-                toast.error('Failed to merge categories');
+                toast.error('Failed to merge duplicates');
             }
         } catch {
-            toast.error('Failed to merge categories');
+            toast.error('Failed to merge duplicates');
         }
     };
 
@@ -332,6 +332,7 @@ export default function MenuPage() {
             }
             if (successCount > 0) toast.success(`🎉 Successfully saved ${successCount} items to your menu!`);
             if (failCount > 0) toast.error(`⚠️ ${failCount} items failed to save.`);
+            try { await menuAPI.cleanDuplicates(currentBranchId); } catch {}
             setShowMenuCardModal(false);
             setMenuCardImage('');
             setExtractedItems([]);

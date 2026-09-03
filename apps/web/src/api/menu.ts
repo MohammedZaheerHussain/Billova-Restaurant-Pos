@@ -42,8 +42,20 @@ export const menuAPI = {
                         isAvailable: m.is_available ?? true,
                         description: m.description,
                     }));
-                    try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
-                    return { data: formatted };
+                    // Deduplicate by name
+                    const uniqueMap = new Map<string, any>();
+                    for (const item of formatted) {
+                        const key = item.name.trim().toLowerCase();
+                        if (!uniqueMap.has(key)) {
+                            uniqueMap.set(key, item);
+                        } else {
+                            const existing = uniqueMap.get(key);
+                            if (!existing.categoryId && item.categoryId) uniqueMap.set(key, item);
+                        }
+                    }
+                    const deduplicated = Array.from(uniqueMap.values());
+                    try { localStorage.setItem(cacheKey, JSON.stringify(deduplicated)); } catch {}
+                    return { data: deduplicated };
                 }
             } else if (data && data.length > 0) {
                 const formatted = data.map((m: any) => ({
@@ -56,8 +68,20 @@ export const menuAPI = {
                     isAvailable: m.is_available ?? true,
                     description: m.description,
                 }));
-                try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
-                return { data: formatted };
+                // Deduplicate by name
+                const uniqueMap = new Map<string, any>();
+                for (const item of formatted) {
+                    const key = item.name.trim().toLowerCase();
+                    if (!uniqueMap.has(key)) {
+                        uniqueMap.set(key, item);
+                    } else {
+                        const existing = uniqueMap.get(key);
+                        if (!existing.categoryId && item.categoryId) uniqueMap.set(key, item);
+                    }
+                }
+                const deduplicated = Array.from(uniqueMap.values());
+                try { localStorage.setItem(cacheKey, JSON.stringify(deduplicated)); } catch {}
+                return { data: deduplicated };
             }
         } catch (netErr) {
             logger.warn('[menuAPI.getAll] Network query failed, checking offline cache:', netErr);
@@ -129,6 +153,19 @@ export const menuAPI = {
                 }
             }
 
+            // Prevent duplicate creation: check if an item with the same name already exists
+            let dupCheck = supabase.from('menu_items').select('id, category_id').ilike('name', data.name.trim());
+            if (branchId) dupCheck = dupCheck.eq('branch_id', branchId);
+            const { data: existingDups } = await dupCheck;
+            if (existingDups && existingDups.length > 0) {
+                const targetId = existingDups[0].id;
+                logger.info('[menuAPI.create] Existing item found for', data.name, '-> updating', targetId);
+                return await menuAPI.update(targetId, {
+                    ...data,
+                    categoryId: categoryId || existingDups[0].category_id || undefined,
+                });
+            }
+
             const insertPayload: any = {
                 name: data.name,
                 price: Number(data.price || 0),
@@ -153,7 +190,10 @@ export const menuAPI = {
                     const fallbackPayload = { ...insertPayload };
                     delete fallbackPayload.category_id;
                     const { data: fbCreated, error: fbError } = await supabase.from('menu_items').insert([fallbackPayload]).select().single();
-                    if (!fbError && fbCreated) return { data: fbCreated };
+                    if (!fbError && fbCreated) {
+                        try { localStorage.removeItem(getMenuCacheKey(branchId || undefined)); } catch {}
+                        return { data: fbCreated };
+                    }
                 }
 
                 // Fallback Stage 2: Minimal insert payload (guaranteed minimal fields)
@@ -165,10 +205,14 @@ export const menuAPI = {
                 };
                 if (branchId) minimalPayload.branch_id = branchId;
                 const { data: minCreated, error: minError } = await supabase.from('menu_items').insert([minimalPayload]).select().single();
-                if (!minError && minCreated) return { data: minCreated };
+                if (!minError && minCreated) {
+                    try { localStorage.removeItem(getMenuCacheKey(branchId || undefined)); } catch {}
+                    return { data: minCreated };
+                }
 
                 throw error;
             }
+            try { localStorage.removeItem(getMenuCacheKey(branchId || undefined)); } catch {}
             return { data: created };
         } catch (err: any) {
             logger.error('[menuAPI.create] Final failure:', err?.message || err);
@@ -206,6 +250,23 @@ export const menuAPI = {
                 throw error;
             }
 
+            // Automatically resolve and merge any duplicate items with the same name
+            if (data.name) {
+                try {
+                    let nameDupQuery = supabase.from('menu_items').select('id').ilike('name', data.name.trim()).neq('id', id);
+                    const { data: nameDups } = await nameDupQuery;
+                    if (nameDups && nameDups.length > 0) {
+                        const dupIds = nameDups.map((d: any) => d.id);
+                        logger.info('[menuAPI.update] Merging duplicate items for', data.name, dupIds, 'into', id);
+                        await supabase.from('order_items').update({ menu_item_id: id }).in('menu_item_id', dupIds);
+                        await supabase.from('menu_items').delete().in('id', dupIds);
+                    }
+                } catch (dupErr) {
+                    logger.warn('[menuAPI.update] Non-blocking duplicate cleanup warning:', dupErr);
+                }
+            }
+
+            try { localStorage.removeItem(getMenuCacheKey()); } catch {}
             return { data: updated };
         } catch (err) {
             logger.error('[menuAPI.update] Failed:', err);
@@ -220,6 +281,7 @@ export const menuAPI = {
             const { data: item } = await supabase.from('menu_items').select('is_available').eq('id', id).single();
             const newStatus = !item?.is_available;
             const { data: updated } = await supabase.from('menu_items').update({ is_available: newStatus }).eq('id', id).select().single();
+            try { localStorage.removeItem(getMenuCacheKey()); } catch {}
             return { data: updated };
         } catch {
             return { data: null };
@@ -230,12 +292,75 @@ export const menuAPI = {
             try { return await api.delete(`/menu/${id}`); } catch { /* fallback */ }
         }
         try {
+            // Delete variants and order items references first to avoid foreign key violations
+            try { await supabase.from('menu_item_variants').delete().eq('menu_item_id', id); } catch {}
+            try { await supabase.from('order_items').delete().eq('menu_item_id', id); } catch {}
             const { error } = await supabase.from('menu_items').delete().eq('id', id);
-            if (error) throw error;
+            if (error) {
+                logger.warn('[menuAPI.delete] Hard delete failed, soft-deactivating item:', error);
+                await supabase.from('menu_items').update({ is_available: false }).eq('id', id);
+            }
+            try { localStorage.removeItem(getMenuCacheKey()); } catch {}
             return { data: { success: true } };
         } catch (err) {
             logger.error('[menuAPI.delete] Failed:', err);
             throw err;
+        }
+    },
+    cleanDuplicates: async (branchId?: string) => {
+        try {
+            let catCount = 0;
+            let itemCount = 0;
+
+            // 1. Clean duplicate categories
+            const catRes = await categoriesAPI.cleanDuplicates(branchId);
+            catCount = catRes.count || 0;
+
+            // 2. Clean duplicate menu items
+            let query = supabase.from('menu_items').select('*');
+            if (branchId) query = query.eq('branch_id', branchId);
+            const { data: allItems } = await query;
+
+            if (allItems && allItems.length > 0) {
+                const nameMap = new Map<string, any[]>();
+                for (const item of allItems) {
+                    const key = (item.name || '').trim().toLowerCase();
+                    if (!nameMap.has(key)) nameMap.set(key, []);
+                    nameMap.get(key)!.push(item);
+                }
+
+                for (const list of nameMap.values()) {
+                    if (list.length > 1) {
+                        // Sort: prefer assigned category, then newest
+                        list.sort((a, b) => {
+                            if (a.category_id && !b.category_id) return -1;
+                            if (!a.category_id && b.category_id) return 1;
+                            return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                        });
+
+                        const primary = list[0];
+                        const duplicates = list.slice(1);
+                        const dupIds = duplicates.map(d => d.id);
+
+                        await supabase.from('order_items').update({ menu_item_id: primary.id }).in('menu_item_id', dupIds);
+                        const { error: delErr } = await supabase.from('menu_items').delete().in('id', dupIds);
+                        if (!delErr) {
+                            itemCount += duplicates.length;
+                        }
+                    }
+                }
+            }
+
+            // Invalidate local storage caches
+            try {
+                localStorage.removeItem(getMenuCacheKey(branchId));
+                localStorage.removeItem(getCategoriesCacheKey(branchId));
+            } catch {}
+
+            return { success: true, count: catCount + itemCount, categoryCount: catCount, itemCount };
+        } catch (err) {
+            logger.error('[menuAPI.cleanDuplicates] Error:', err);
+            return { success: false, count: 0, categoryCount: 0, itemCount: 0 };
         }
     },
     extractMenuCard: async (imageData: string, branchId?: string | null) => {
