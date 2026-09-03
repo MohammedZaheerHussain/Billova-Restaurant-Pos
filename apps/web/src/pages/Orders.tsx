@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Clock, X, User, Phone, CreditCard,
     Banknote, Smartphone, Receipt, CheckCircle, XCircle, Edit,
-    Plus, FileText, Search, Minus, CheckSquare, Square, Printer
+    Plus, FileText, Search, Minus, CheckSquare, Square, Printer,
+    ShoppingCart, UtensilsCrossed
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersAPI, menuAPI } from '../api';
-import { useAuthStore, MenuItem } from '../store';
+import { useAuthStore, useCartStore, MenuItem } from '../store';
 import { useBranchSettingsStore } from '../store/branch-settings-store';
-import { reprintReceipt, ReceiptData } from '../printing';
+import { reprintReceipt, reprintKOT, ReceiptData, KOTData } from '../printing';
 import './Orders.css';
 import { OrdersSkeleton } from '../components/Skeleton';
 import { DatePicker } from '../components/ui';
@@ -61,6 +63,7 @@ interface NewItem {
 }
 
 export default function OrdersPage() {
+    const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('PENDING');
@@ -370,6 +373,40 @@ export default function OrdersPage() {
         }
     };
 
+    const handleResumeInPOS = (order: Order) => {
+        useCartStore.getState().loadOrderForEditing(order);
+        toast.success(`Order #${order.orderNumber} loaded into POS`);
+        navigate('/pos');
+    };
+
+    const handlePrintKOT = async (order: Order) => {
+        const kotData: KOTData = {
+            orderNumber: order.orderNumber,
+            kotNumber: `KOT-${order.orderNumber}`,
+            orderType: order.orderType,
+            tableName: order.table?.name || (order.orderType === 'DINE_IN' ? 'Counter' : undefined),
+            createdAt: new Date(order.createdAt),
+            orderNotes: order.notes,
+            items: order.items.map(item => ({
+                name: item.menuItem?.name || (item as any).name || 'Item',
+                variant: item.variant?.name,
+                quantity: item.quantity,
+                notes: item.notes,
+            })),
+        };
+
+        try {
+            const success = await reprintKOT(kotData);
+            if (success) {
+                toast.success('Kitchen KOT printed successfully!');
+            } else {
+                toast.error('KOT print failed - check printer');
+            }
+        } catch (error) {
+            logger.error('KOT print error:', error);
+            toast.error('Failed to print KOT');
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -590,6 +627,20 @@ export default function OrdersPage() {
                                             {isEditable && (
                                                 <>
                                                     <button
+                                                        className="action-icon open-pos"
+                                                        onClick={() => handleResumeInPOS(order)}
+                                                        title="Open in POS to add items or complete bill"
+                                                    >
+                                                        <ShoppingCart size={17} />
+                                                    </button>
+                                                    <button
+                                                        className="action-icon kot"
+                                                        onClick={() => handlePrintKOT(order)}
+                                                        title="Print Kitchen KOT"
+                                                    >
+                                                        <UtensilsCrossed size={17} />
+                                                    </button>
+                                                    <button
                                                         className="action-icon complete"
                                                         onClick={() => updateOrderStatus(order.id, 'COMPLETED')}
                                                         title="Mark Complete"
@@ -606,7 +657,7 @@ export default function OrdersPage() {
                                                     <button
                                                         className="action-icon edit"
                                                         onClick={() => setEditingOrder(order)}
-                                                        title="Edit Order"
+                                                        title="Quick Edit Order"
                                                     >
                                                         <Edit size={18} />
                                                     </button>
@@ -749,16 +800,38 @@ export default function OrdersPage() {
                                 </span>
 
                                 {canEditOrder(selectedOrder.status) && (
-                                    <div className="action-buttons">
+                                    <div className="action-buttons" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%', marginTop: 12 }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={() => {
+                                                const ord = selectedOrder;
+                                                setSelectedOrder(null);
+                                                handleResumeInPOS(ord);
+                                            }}
+                                            style={{ flex: 1 }}
+                                            title="Load order into POS to add items or complete"
+                                        >
+                                            <ShoppingCart size={18} /> Open in POS
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={() => handlePrintKOT(selectedOrder)}
+                                            style={{ flex: 1 }}
+                                            title="Print standalone kitchen KOT"
+                                        >
+                                            <UtensilsCrossed size={18} /> Print KOT
+                                        </button>
                                         <button
                                             className="btn btn-success"
                                             onClick={() => updateOrderStatus(selectedOrder.id, 'COMPLETED')}
+                                            style={{ flex: 1 }}
                                         >
                                             <CheckCircle size={18} /> Complete
                                         </button>
                                         <button
                                             className="btn btn-danger"
                                             onClick={() => updateOrderStatus(selectedOrder.id, 'CANCELLED')}
+                                            style={{ flex: 1 }}
                                         >
                                             <XCircle size={18} /> Cancel
                                         </button>
@@ -769,9 +842,9 @@ export default function OrdersPage() {
                                 <button
                                     className="btn btn-secondary"
                                     onClick={() => handlePrintBill(selectedOrder)}
-                                    style={{ marginTop: 12 }}
+                                    style={{ marginTop: 12, width: '100%' }}
                                 >
-                                    <Printer size={18} /> Print Bill
+                                    <Printer size={18} /> Print Customer Bill
                                 </button>
                             </div>
                         </motion.div>

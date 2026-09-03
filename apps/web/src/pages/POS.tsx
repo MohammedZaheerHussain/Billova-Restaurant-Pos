@@ -12,7 +12,7 @@ import { useCartStore, useUIStore, useAuthStore, MenuItem, Category } from '../s
 import { menuAPI, categoriesAPI, ordersAPI } from '../api';
 import { logger } from '../utils/logger';
 import { OrderCompleteModal, OrderCompleteData } from '../components/order';
-import { ReceiptData } from '../printing';
+import { ReceiptData, reprintKOT, KOTData } from '../printing';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import { useBranchSettingsStore } from '../store/branch-settings-store';
 import './POS.css';
@@ -80,10 +80,31 @@ export default function POSPage() {
         discountType,
         discountValue,
         setDiscount,
+        editingOrderId,
+        editingOrderNumber,
+        editingOrderTableName,
+        cancelEditingOrder,
     } = useCartStore();
 
     // Printer settings for daily order reset
     const { settings: printerSettings } = usePrinterConfigStore();
+
+    // Sync form when an existing order is loaded for editing
+    useEffect(() => {
+        if (editingOrderId) {
+            const storeState = useCartStore.getState();
+            setCustomerName(storeState.customerName || '');
+            setCustomerPhone(storeState.customerPhone || '');
+            setOrderNotes(storeState.notes || '');
+            if (storeState.discountType && storeState.discountValue) {
+                setDiscountMode(storeState.discountType);
+                setDiscountInput(String(storeState.discountValue));
+            }
+            if (storeState.customerName || storeState.customerPhone || storeState.notes) {
+                setShowCustomerInputs(true);
+            }
+        }
+    }, [editingOrderId]);
 
     // Fetch data
     useEffect(() => {
@@ -92,7 +113,7 @@ export default function POSPage() {
         }
     }, [isAuthenticated]);
 
-    // Keyboard Shortcuts (F4 to trigger payment)
+    // Keyboard Shortcuts (F4 = Complete Bill, F2 = Pending Bill / Send KOT)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'F4') {
@@ -102,11 +123,18 @@ export default function POSPage() {
                 } else {
                     toast.error('Add items to cart first');
                 }
+            } else if (e.key === 'F2') {
+                e.preventDefault();
+                if (cartItems.length > 0) {
+                    handleSavePendingOrder();
+                } else {
+                    toast.error('Add items to cart first');
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [cartItems]);
+    }, [cartItems, editingOrderId, customerName, customerPhone, orderNotes, discountType, discountValue, orderType]);
 
     const fetchData = async () => {
         try {
@@ -193,7 +221,7 @@ export default function POSPage() {
         }
     };
 
-    // Handle order submission
+    // Handle order submission (Complete Bill with Payment)
     const handleSubmitOrder = async (paymentMode: string) => {
         if (cartItems.length === 0) {
             toast.error('Cart is empty');
@@ -204,47 +232,79 @@ export default function POSPage() {
 
         try {
             setSubmitting(true);
-
-            const orderData = {
-                orderType,
-                customerName: customerName.trim() || undefined,
-                customerPhone: customerPhone.trim() || undefined,
-                notes: orderNotes.trim() || undefined,
-                onlinePlatform: orderType === 'ONLINE' ? onlinePlatform : undefined,
-                onlineOrderId: orderType === 'ONLINE' ? onlineOrderId.trim() : undefined,
-                subtotal: getSubtotal(),
-                discountAmount: getDiscountAmount(),
-                total: getTotal(),
-                totalAmount: getTotal(),
-                items: cartItems.map((item) => ({
-                    menuItemId: item.menuItem.id,
-                    variantId: item.variant?.id || null,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    total: item.total,
-                    notes: item.notes || null,
-                })),
-                discountType: discountType || undefined,
-                discountValue: discountValue || undefined,
-            };
-
-            logger.debug('Creating order:', orderData);
-            const response = await ordersAPI.create(orderData, {
-                dailyReset: printerSettings.dailyOrderReset
-            });
-            logger.debug('Order created:', response.data);
-
-            // Add payment
-            await ordersAPI.addPayment(response.data.id, {
-                mode: paymentMode,
-                amount: getTotal(),
-            });
-
-            // Prepare receipt data for printing
             const branchSettings = useBranchSettingsStore.getState().settings;
-            const cleanOrderNumber = response.data.orderNumber || response.data.dailyOrderNo || response.data.daily_order_no || 1;
-            const cleanBillNumber = response.data.billNumber || response.data.bill_number || `#${String(cleanOrderNumber).padStart(3, '0')}`;
 
+            let targetOrderId = editingOrderId;
+            let cleanOrderNumber = editingOrderNumber || 1;
+            let cleanBillNumber = `#${String(cleanOrderNumber).padStart(3, '0')}`;
+
+            if (editingOrderId) {
+                // Update existing order in Supabase & local DB
+                await ordersAPI.updateOrder(editingOrderId, {
+                    orderType,
+                    customerName: customerName.trim() || undefined,
+                    customerPhone: customerPhone.trim() || undefined,
+                    notes: orderNotes.trim() || undefined,
+                    subtotal: getSubtotal(),
+                    discountAmount: getDiscountAmount(),
+                    total: getTotal(),
+                    totalAmount: getTotal(),
+                    items: cartItems.map((item) => ({
+                        menuItemId: item.menuItem.id,
+                        variantId: item.variant?.id || null,
+                        name: item.menuItem.name,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        total: item.total,
+                        notes: item.notes || null,
+                    })),
+                    discountType: discountType || undefined,
+                    discountValue: discountValue || undefined,
+                });
+            } else {
+                const orderData = {
+                    orderType,
+                    customerName: customerName.trim() || undefined,
+                    customerPhone: customerPhone.trim() || undefined,
+                    notes: orderNotes.trim() || undefined,
+                    onlinePlatform: orderType === 'ONLINE' ? onlinePlatform : undefined,
+                    onlineOrderId: orderType === 'ONLINE' ? onlineOrderId.trim() : undefined,
+                    subtotal: getSubtotal(),
+                    discountAmount: getDiscountAmount(),
+                    total: getTotal(),
+                    totalAmount: getTotal(),
+                    items: cartItems.map((item) => ({
+                        menuItemId: item.menuItem.id,
+                        variantId: item.variant?.id || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        total: item.total,
+                        notes: item.notes || null,
+                    })),
+                    discountType: discountType || undefined,
+                    discountValue: discountValue || undefined,
+                };
+
+                logger.debug('Creating order:', orderData);
+                const response = await ordersAPI.create(orderData, {
+                    dailyReset: printerSettings.dailyOrderReset
+                });
+                logger.debug('Order created:', response.data);
+
+                targetOrderId = response.data.id;
+                cleanOrderNumber = response.data.orderNumber || response.data.dailyOrderNo || response.data.daily_order_no || 1;
+                cleanBillNumber = response.data.billNumber || response.data.bill_number || `#${String(cleanOrderNumber).padStart(3, '0')}`;
+            }
+
+            // Add payment and mark as COMPLETED
+            if (targetOrderId) {
+                await ordersAPI.addPayment(targetOrderId, {
+                    mode: paymentMode,
+                    amount: getTotal(),
+                });
+            }
+
+            // Prepare receipt data for printing (Customer Bill + KOT)
             const receiptData: ReceiptData = {
                 businessName: branchSettings.name || user?.branch?.name || 'Billova POS',
                 branchName: branchSettings.name || user?.branch?.name || '',
@@ -254,7 +314,9 @@ export default function POSPage() {
                 orderNumber: cleanOrderNumber,
                 billNumber: cleanBillNumber,
                 orderType: orderType,
-                tableName: (orderType === 'DINE_IN' && orderNotes.trim()) ? orderNotes.trim() : (orderType === 'DINE_IN' ? 'Counter' : undefined),
+                tableName: (orderType === 'DINE_IN' && (editingOrderTableName || orderNotes.trim())) 
+                    ? (editingOrderTableName || orderNotes.trim()) 
+                    : (orderType === 'DINE_IN' ? 'Counter' : undefined),
                 orderDate: new Date(),
                 customerName: customerName.trim() || undefined,
                 customerPhone: customerPhone.trim() || undefined,
@@ -281,7 +343,7 @@ export default function POSPage() {
 
             // Save order details for modal
             setCompletedOrderData({
-                orderId: response.data.id,
+                orderId: targetOrderId || '',
                 orderNumber: cleanOrderNumber,
                 billNumber: cleanBillNumber,
                 total: getTotal(),
@@ -294,8 +356,9 @@ export default function POSPage() {
             setShowPayment(false);
             setShowSuccess(true);
 
-            // Clear form data
+            // Clear cart & cancel editing
             clearCart();
+            cancelEditingOrder();
             setCustomerName('');
             setCustomerPhone('');
             setDiscountInput('');
@@ -306,6 +369,148 @@ export default function POSPage() {
             logger.error('Order failed:', error);
             const errorMessage = error.response?.data?.error || 'Failed to create order';
             toast.error(errorMessage);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // Handle saving as PENDING order (Send to Kitchen & Print KOT only)
+    const handleSavePendingOrder = async () => {
+        if (cartItems.length === 0) {
+            toast.error('Add items to cart first');
+            return;
+        }
+
+        if (submitting) return;
+
+        try {
+            setSubmitting(true);
+
+            if (editingOrderId) {
+                // Updating existing pending order
+                await ordersAPI.updateOrder(editingOrderId, {
+                    orderType,
+                    customerName: customerName.trim() || undefined,
+                    customerPhone: customerPhone.trim() || undefined,
+                    notes: orderNotes.trim() || undefined,
+                    subtotal: getSubtotal(),
+                    discountAmount: getDiscountAmount(),
+                    total: getTotal(),
+                    totalAmount: getTotal(),
+                    items: cartItems.map((item) => ({
+                        menuItemId: item.menuItem.id,
+                        variantId: item.variant?.id || null,
+                        name: item.menuItem.name,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        total: item.total,
+                        notes: item.notes || null,
+                    })),
+                    discountType: discountType || undefined,
+                    discountValue: discountValue || undefined,
+                });
+
+                // Print updated KOT only
+                const kotData: KOTData = {
+                    orderNumber: editingOrderNumber || 1,
+                    kotNumber: `KOT-${editingOrderNumber || 1}`,
+                    orderType: orderType,
+                    tableName: (orderType === 'DINE_IN' && (editingOrderTableName || orderNotes.trim()))
+                        ? (editingOrderTableName || orderNotes.trim())
+                        : (orderType === 'DINE_IN' ? 'Counter' : undefined),
+                    createdAt: new Date(),
+                    orderNotes: orderNotes.trim() || undefined,
+                    items: cartItems.map((item) => ({
+                        name: item.menuItem.name,
+                        variant: item.variant?.name,
+                        quantity: item.quantity,
+                        notes: item.notes || undefined,
+                    })),
+                };
+
+                try {
+                    await reprintKOT(kotData);
+                } catch (kotErr) {
+                    logger.warn('KOT print error:', kotErr);
+                }
+
+                toast.success(`Order #${editingOrderNumber} updated & KOT sent to kitchen!`);
+                cancelEditingOrder();
+                setCustomerName('');
+                setCustomerPhone('');
+                setDiscountInput('');
+                setOrderNotes('');
+                setOnlinePlatform(null);
+                setOnlineOrderId('');
+                return;
+            }
+
+            // Creating new PENDING order
+            const orderData = {
+                orderType,
+                customerName: customerName.trim() || undefined,
+                customerPhone: customerPhone.trim() || undefined,
+                notes: orderNotes.trim() || undefined,
+                onlinePlatform: orderType === 'ONLINE' ? onlinePlatform : undefined,
+                onlineOrderId: orderType === 'ONLINE' ? onlineOrderId.trim() : undefined,
+                subtotal: getSubtotal(),
+                discountAmount: getDiscountAmount(),
+                total: getTotal(),
+                totalAmount: getTotal(),
+                status: 'PENDING',
+                items: cartItems.map((item) => ({
+                    menuItemId: item.menuItem.id,
+                    variantId: item.variant?.id || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    total: item.total,
+                    notes: item.notes || null,
+                })),
+                discountType: discountType || undefined,
+                discountValue: discountValue || undefined,
+            };
+
+            const response = await ordersAPI.create(orderData, {
+                dailyReset: printerSettings.dailyOrderReset
+            });
+
+            const cleanOrderNumber = response.data.orderNumber || response.data.dailyOrderNo || response.data.daily_order_no || 1;
+
+            // Automatically print Kitchen KOT only!
+            const kotData: KOTData = {
+                orderNumber: cleanOrderNumber,
+                kotNumber: `KOT-${cleanOrderNumber}`,
+                orderType: orderType,
+                tableName: (orderType === 'DINE_IN' && orderNotes.trim()) ? orderNotes.trim() : (orderType === 'DINE_IN' ? 'Counter' : undefined),
+                createdAt: new Date(),
+                orderNotes: orderNotes.trim() || undefined,
+                items: cartItems.map((item) => ({
+                    name: item.menuItem.name,
+                    variant: item.variant?.name,
+                    quantity: item.quantity,
+                    notes: item.notes || undefined,
+                })),
+            };
+
+            try {
+                await reprintKOT(kotData);
+            } catch (kotErr) {
+                logger.warn('KOT print error:', kotErr);
+            }
+
+            toast.success(`Order #${cleanOrderNumber} saved as Pending & KOT printed!`);
+
+            clearCart();
+            cancelEditingOrder();
+            setCustomerName('');
+            setCustomerPhone('');
+            setDiscountInput('');
+            setOrderNotes('');
+            setOnlinePlatform(null);
+            setOnlineOrderId('');
+        } catch (error: any) {
+            logger.error('Pending order failed:', error);
+            toast.error(error.response?.data?.error || 'Failed to save pending order');
         } finally {
             setSubmitting(false);
         }
@@ -542,6 +747,27 @@ export default function POSPage() {
                     </div>
                 </div>
 
+                {/* Editing Existing Order Banner */}
+                {editingOrderId && (
+                    <div className="editing-order-banner">
+                        <div className="editing-banner-info">
+                            <span className="editing-badge">EDITING</span>
+                            <span className="editing-title">
+                                Order #{editingOrderNumber} {editingOrderTableName ? `· ${editingOrderTableName}` : ''}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="cancel-edit-btn"
+                            onClick={cancelEditingOrder}
+                            title="Cancel editing and clear cart"
+                        >
+                            <X size={14} />
+                            <span>Cancel</span>
+                        </button>
+                    </div>
+                )}
+
                 {/* Cart Items List */}
                 <div className="cart-items custom-scrollbar">
                     {cartItems.length === 0 ? (
@@ -760,16 +986,32 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    {/* Complete Bill CTA Button */}
-                    <button
-                        className="complete-bill-btn"
-                        onClick={openPaymentModal}
-                        disabled={cartItems.length === 0}
-                    >
-                        <Sparkles size={18} />
-                        <span>COMPLETE BILL • ₹{getTotal().toFixed(2)}</span>
-                        <span className="shortcut-hint">F4</span>
-                    </button>
+                    {/* Action CTA Buttons: Pending Bill / KOT + Complete Bill */}
+                    <div className="cart-action-buttons">
+                        <button
+                            type="button"
+                            className="pending-bill-btn"
+                            onClick={handleSavePendingOrder}
+                            disabled={cartItems.length === 0 || submitting}
+                            title="Save as Pending & Send to Kitchen (F2)"
+                        >
+                            <UtensilsCrossed size={16} />
+                            <span>{editingOrderId ? 'UPDATE & SEND KOT' : 'PENDING BILL'}</span>
+                            <span className="shortcut-hint">F2</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="complete-bill-btn"
+                            onClick={openPaymentModal}
+                            disabled={cartItems.length === 0 || submitting}
+                            title="Complete and collect payment (F4)"
+                        >
+                            <Sparkles size={16} />
+                            <span>COMPLETE BILL • ₹{getTotal().toFixed(2)}</span>
+                            <span className="shortcut-hint">F4</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

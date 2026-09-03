@@ -644,6 +644,62 @@ export const ordersAPI = {
     },
 
     /**
+     * Update an existing order (e.g. adding items to a pending order)
+     */
+    updateOrder: async (id: string, data: any) => {
+        const localList = getStoredLocalOrders();
+        const existing = localList.find(o => o.id === id);
+        if (existing) {
+            Object.assign(existing, data, { updatedAt: new Date().toISOString() });
+            saveLocalOrder(existing);
+        }
+
+        if (isValidUUID(id)) {
+            try {
+                const updatePayload: any = {
+                    subtotal: Number(data.subtotal || 0),
+                    total: Number(data.total || 0),
+                    total_amount: Number(data.total || 0),
+                    discount_amount: Number(data.discountAmount || 0),
+                    gst_amount: Number(data.gstAmount || 0),
+                    notes: data.notes || null,
+                    updated_at: new Date().toISOString(),
+                };
+                if (data.customerName) updatePayload.customer_name = data.customerName;
+                if (data.customerPhone) updatePayload.customer_phone = data.customerPhone;
+                if (data.discountType) updatePayload.discount_type = data.discountType;
+                if (data.discountValue) updatePayload.discount_value = Number(data.discountValue);
+
+                await supabase.from('orders').update(updatePayload).eq('id', id);
+
+                // Update items in order_items table
+                if (data.items && data.items.length > 0) {
+                    await supabase.from('order_items').delete().eq('order_id', id);
+                    const orderItemsPayload = data.items.map((it: any) => {
+                        const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                        const rawMenuId = it.menuItemId || it.id || it.menuItem?.id;
+                        return {
+                            ...(itemUuid ? { id: itemUuid } : {}),
+                            order_id: id,
+                            menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
+                            quantity: Number(it.quantity || 1),
+                            unit_price: Number(it.unitPrice || it.price || 0),
+                            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                            notes: it.notes || null,
+                            status: 'PENDING',
+                        };
+                    });
+                    await supabase.from('order_items').insert(orderItemsPayload);
+                }
+            } catch (err) {
+                logger.error('Update order error:', err);
+            }
+        }
+
+        return { data: { id, ...data } };
+    },
+
+    /**
      * Cancel an order
      */
     cancel: async (id: string) => {

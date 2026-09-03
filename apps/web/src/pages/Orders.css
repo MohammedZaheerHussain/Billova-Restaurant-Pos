@@ -422,6 +422,18 @@
     flex-shrink: 0;
 }
 
+.action-icon.open-pos:hover {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #fbbf24;
+}
+
+.action-icon.kot:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    color: #c084fc;
+}
+
 .action-icon.complete:hover {
     background: var(--success-bg);
     border-color: rgba(16, 185, 129, 0.3);

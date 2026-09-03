@@ -73,6 +73,13 @@ interface CartStore {
     discountValue: number;
     notes: string;
 
+    // Editing existing order state
+    editingOrderId: string | null;
+    editingOrderNumber: number | null;
+    editingOrderTableName?: string;
+    loadOrderForEditing: (order: any) => void;
+    cancelEditingOrder: () => void;
+
     // Actions
     addItem: (menuItem: MenuItem, variant?: MenuItemVariant, notes?: string) => void;
     removeItem: (itemId: string) => void;
@@ -96,6 +103,9 @@ export const useCartStore = create<CartStore>()(
     persist(
         (set, get) => ({
             items: [],
+            editingOrderId: null,
+            editingOrderNumber: null,
+            editingOrderTableName: undefined,
             orderType: 'DINE_IN',
             tableId: null,
             customerName: '',
@@ -103,6 +113,57 @@ export const useCartStore = create<CartStore>()(
             discountType: null,
             discountValue: 0,
             notes: '',
+
+            loadOrderForEditing: (order: any) => {
+                const cartItems: CartItem[] = (order.items || []).map((it: any) => ({
+                    id: it.id || ((it.menuItemId || it.menuItem?.id || it.id) + (it.variantId ? `-${it.variantId}` : '')),
+                    menuItem: {
+                        id: it.menuItemId || it.menuItem?.id || it.id,
+                        name: it.name || it.menuItem?.name || 'Item',
+                        price: Number(it.unitPrice || it.price || 0),
+                        isVeg: it.menuItem?.isVeg ?? true,
+                        isAvailable: true,
+                    },
+                    variant: it.variant ? {
+                        id: it.variant.id,
+                        name: it.variant.name,
+                        price: Number(it.unitPrice || it.variant.price || 0),
+                    } : undefined,
+                    quantity: Number(it.quantity || 1),
+                    unitPrice: Number(it.unitPrice || it.price || 0),
+                    total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                    notes: it.notes || undefined,
+                }));
+
+                set({
+                    editingOrderId: order.id,
+                    editingOrderNumber: order.orderNumber || order.dailyOrderNo || order.daily_order_no || null,
+                    editingOrderTableName: order.tableName || order.table?.name || undefined,
+                    items: cartItems,
+                    orderType: order.orderType || 'DINE_IN',
+                    tableId: order.tableId || null,
+                    customerName: order.customerName || '',
+                    customerPhone: order.customerPhone || '',
+                    discountType: order.discountType || null,
+                    discountValue: Number(order.discountValue || 0),
+                    notes: order.notes || '',
+                });
+            },
+
+            cancelEditingOrder: () => {
+                set({
+                    editingOrderId: null,
+                    editingOrderNumber: null,
+                    editingOrderTableName: undefined,
+                    items: [],
+                    tableId: null,
+                    customerName: '',
+                    customerPhone: '',
+                    discountType: null,
+                    discountValue: 0,
+                    notes: '',
+                });
+            },
 
             addItem: (menuItem, variant, notes) => {
                 // Convert price to number in case it's a Decimal/string from API
@@ -173,6 +234,9 @@ export const useCartStore = create<CartStore>()(
             clearCart: () => {
                 set({
                     items: [],
+                    editingOrderId: null,
+                    editingOrderNumber: null,
+                    editingOrderTableName: undefined,
                     tableId: null,
                     customerName: '',
                     customerPhone: '',
