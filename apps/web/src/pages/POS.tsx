@@ -278,7 +278,9 @@ export default function POSPage() {
                     totalAmount: getTotal(),
                     items: cartItems.map((item) => ({
                         menuItemId: item.menuItem.id,
+                        name: item.menuItem.name,
                         variantId: item.variant?.id || null,
+                        variantName: item.variant?.name || null,
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
                         total: item.total,
@@ -468,7 +470,9 @@ export default function POSPage() {
                 status: 'PENDING',
                 items: cartItems.map((item) => ({
                     menuItemId: item.menuItem.id,
+                    name: item.menuItem.name,
                     variantId: item.variant?.id || null,
+                    variantName: item.variant?.name || null,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     total: item.total,

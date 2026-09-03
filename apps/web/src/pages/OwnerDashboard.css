@@ -636,6 +636,22 @@
     font-family: var(--font-mono);
 }
 
+.od-payment-pill-row.total-row {
+    background: rgba(249, 115, 22, 0.08);
+    border: 1px solid rgba(249, 115, 22, 0.22);
+    margin-top: 6px;
+}
+
+.od-payment-pill-row.total-row .payment-label {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.od-payment-pill-row.total-row .payment-amount.highlight {
+    color: var(--primary);
+    font-size: 14.5px;
+}
+
 /* Margin Summary Box */
 .od-margin-summary-box {
     display: grid;

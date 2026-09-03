@@ -25,12 +25,47 @@ export function getStoredLocalOrders(branchId?: string): any[] {
                     const parsedLegacy = JSON.parse(legacy);
                     if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
                         localStorage.setItem(key, legacy);
-                        return parsedLegacy;
+                        raw = legacy;
                     }
                 } catch {}
             }
         }
-        return raw ? JSON.parse(raw) : [];
+        const orders = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(orders) && orders.length > 0) {
+            const bId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId || 'default';
+            const menuCacheRaw = localStorage.getItem(`billova_menu_cache_${bId}`);
+            if (menuCacheRaw) {
+                try {
+                    const menuItems = JSON.parse(menuCacheRaw);
+                    if (Array.isArray(menuItems)) {
+                        const menuMap = new Map<string, string>();
+                        const priceMap = new Map<number, string>();
+                        menuItems.forEach((m: any) => {
+                            if (m.id && m.name) menuMap.set(m.id, m.name);
+                            if (m.price && !priceMap.has(Number(m.price))) priceMap.set(Number(m.price), m.name);
+                        });
+
+                        orders.forEach((o: any) => {
+                            (o.items || []).forEach((it: any) => {
+                                const currentName = (it.name || it.menuItem?.name || it.itemName || '').trim();
+                                if (!currentName || currentName.toLowerCase() === 'item') {
+                                    const mId = it.menuItemId || it.menu_item_id || it.menuItem?.id;
+                                    const resolved = (mId && menuMap.has(mId))
+                                        ? menuMap.get(mId)
+                                        : (it.unitPrice && priceMap.has(Number(it.unitPrice)) ? priceMap.get(Number(it.unitPrice)) : null);
+                                    if (resolved) {
+                                        it.name = resolved;
+                                        if (it.menuItem) it.menuItem.name = resolved;
+                                        else it.menuItem = { id: mId, name: resolved };
+                                    }
+                                }
+                            });
+                        });
+                    }
+                } catch {}
+            }
+        }
+        return orders;
     } catch {
         return [];
     }
@@ -227,15 +262,18 @@ export const ordersAPI = {
             allItems.forEach((it: any) => {
                 const list = itemsByOrder.get(it.order_id) || [];
                 const menuItem = menuMap.get(it.menu_item_id);
+                const dishName = it.name || menuItem?.name || 'Item';
                 list.push({
                     id: it.id,
+                    name: dishName,
                     quantity: Number(it.quantity || 1),
                     unitPrice: Number(it.unit_price || it.price || menuItem?.price || 0),
                     total: Number(it.total || 0),
                     notes: it.notes,
+                    menuItemId: it.menu_item_id,
                     menuItem: {
                         id: it.menu_item_id || it.id,
-                        name: it.name || menuItem?.name || 'Item',
+                        name: dishName,
                     },
                     variant: it.variant_id ? { id: it.variant_id, name: it.variant_name || '' } : undefined,
                 });
@@ -455,18 +493,24 @@ export const ordersAPI = {
         const total = Number((data as any).total || (data as any).totalAmount || (subtotal - discountAmount + gstAmount));
 
         // Format Items for return & local cache
-        const formattedItems = items.map((it: any, idx: number) => ({
-            id: it.id || `item-${Date.now()}-${idx}`,
-            quantity: Number(it.quantity || 1),
-            unitPrice: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
-            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-            notes: it.notes || undefined,
-            menuItem: {
-                id: it.menuItemId || it.id,
-                name: (it as any).name || (it as any).menuItem?.name || 'Item',
-            },
-            variant: it.variantId ? { id: it.variantId, name: (it as any).variant?.name || '' } : undefined,
-        }));
+        const formattedItems = items.map((it: any, idx: number) => {
+            const rawMenuId = it.menuItemId || it.id || (it as any).menuItem?.id;
+            const dishName = (it as any).name || (it as any).menuItem?.name || (it as any).itemName || 'Item';
+            return {
+                id: it.id || `item-${Date.now()}-${idx}`,
+                name: dishName,
+                quantity: Number(it.quantity || 1),
+                unitPrice: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
+                total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                notes: it.notes || undefined,
+                menuItemId: rawMenuId,
+                menuItem: {
+                    id: rawMenuId,
+                    name: dishName,
+                },
+                variant: it.variantId ? { id: it.variantId, name: (it as any).variant?.name || it.variantName || '' } : undefined,
+            };
+        });
 
         let assignedOrderId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 

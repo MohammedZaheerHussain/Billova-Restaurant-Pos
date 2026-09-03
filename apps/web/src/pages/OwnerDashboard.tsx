@@ -343,25 +343,11 @@ export default function OwnerDashboard() {
                                         <span className="payment-amount">{fmt(pm.amount)}</span>
                                     </div>
                                 ))}
-                            </div>
-
-                            {/* Margin Summary Box */}
-                            <div className="od-margin-summary-box">
-                                <div className="margin-summary-item">
-                                    <span className="margin-label">Revenue</span>
-                                    <span className="margin-val">{fmt(profitEstimate.revenue)}</span>
-                                </div>
-                                <div className="margin-summary-item">
-                                    <span className="margin-label">Est. Cost</span>
-                                    <span className="margin-val">{fmt(profitEstimate.estimatedCost)}</span>
-                                </div>
-                                <div className="margin-summary-item">
-                                    <span className="margin-label">Net Profit</span>
-                                    <span className="margin-val profit">{fmt(profitEstimate.estimatedProfit)}</span>
-                                </div>
-                                <div className="margin-summary-item">
-                                    <span className="margin-label">Margin</span>
-                                    <span className="margin-val highlight">{profitEstimate.margin}%</span>
+                                <div className="od-payment-pill-row total-row">
+                                    <span className="payment-label">Total Credited</span>
+                                    <span className="payment-amount highlight">
+                                        {fmt(paymentMethodsList.reduce((sum, p) => sum + p.amount, 0))}
+                                    </span>
                                 </div>
                             </div>
                         </div>

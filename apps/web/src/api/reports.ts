@@ -1,6 +1,7 @@
 import api from './client';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { ordersAPI, getStoredLocalOrders } from './orders';
+import { menuAPI } from './menu';
 import { useAuthStore } from '../store';
 
 const getLocalDate = (d: Date = new Date()) => {
@@ -17,6 +18,45 @@ const getOrderDateStr = (o: any) => {
     if (isNaN(d.getTime())) return '';
     return getLocalDate(d);
 };
+
+async function getMenuLookup(): Promise<{ idMap: Map<string, string>; priceMap: Map<number, string> }> {
+    const idMap = new Map<string, string>();
+    const priceMap = new Map<number, string>();
+    try {
+        const branchId = useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
+        const res = await menuAPI.getAll(branchId);
+        if (res?.data && Array.isArray(res.data)) {
+            res.data.forEach((m: any) => {
+                if (m.id && m.name) idMap.set(m.id, m.name);
+                const p = Number(m.price || 0);
+                if (p > 0 && !priceMap.has(p)) priceMap.set(p, m.name);
+            });
+        }
+    } catch {}
+    return { idMap, priceMap };
+}
+
+function resolveItemName(it: any, idMap: Map<string, string>, priceMap: Map<number, string>): string {
+    const rawName = (it.name || it.itemName || it.item_name || it.menuItem?.name || '').trim();
+    if (rawName && rawName.toLowerCase() !== 'item' && rawName.toLowerCase() !== 'product') {
+        return rawName;
+    }
+
+    const menuId = it.menuItemId || it.menu_item_id || it.menuItem?.id;
+    if (menuId && idMap.has(menuId)) {
+        return idMap.get(menuId)!;
+    }
+
+    if (it.variant?.name && it.variant.name.trim()) return it.variant.name;
+    if (it.variantName && it.variantName.trim()) return it.variantName;
+
+    const unitPrice = Number(it.price || it.unitPrice || it.unit_price || 0);
+    if (unitPrice > 0 && priceMap.has(unitPrice)) {
+        return priceMap.get(unitPrice)!;
+    }
+
+    return rawName || 'Special Item';
+}
 
 async function getResilientOrders(): Promise<any[]> {
     try {
@@ -71,14 +111,17 @@ export const reportsAPI = {
         if (hasExpressBackend()) {
             try { return await api.get('/reports/item-sales', { params: { startDate, endDate } }); } catch { /* fallback */ }
         }
-        const orders = await getResilientOrders();
+        const [orders, { idMap, priceMap }] = await Promise.all([
+            getResilientOrders(),
+            getMenuLookup(),
+        ]);
         const itemMap: Record<string, { name: string; quantity: number; total: number }> = {};
         orders.forEach((o: any) => {
             const items = o.items || [];
             items.forEach((it: any) => {
-                const name = it.name || it.itemName || it.item_name || it.menuItem?.name || 'Item';
+                const name = resolveItemName(it, idMap, priceMap);
                 const qty = Number(it.quantity || 1);
-                const price = Number(it.price || it.unitPrice || it.unit_price || 0);
+                const price = Number(it.price || it.unitPrice || it.unit_price || (it.total ? it.total / qty : 0));
                 if (!itemMap[name]) itemMap[name] = { name, quantity: 0, total: 0 };
                 itemMap[name].quantity += qty;
                 itemMap[name].total += (qty * price);
@@ -237,7 +280,10 @@ export const dashboardAPI = {
         if (hasExpressBackend()) {
             try { return await api.get('/dashboard/owner-summary'); } catch { /* fallback */ }
         }
-        const orders = await getResilientOrders();
+        const [orders, { idMap, priceMap }] = await Promise.all([
+            getResilientOrders(),
+            getMenuLookup(),
+        ]);
         const todayStr = getLocalDate();
         const yesterdayDate = new Date();
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -258,9 +304,9 @@ export const dashboardAPI = {
         const itemMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
         activeOrders.forEach((o: any) => {
             (o.items || []).forEach((it: any) => {
-                const name = it.name || it.itemName || it.item_name || it.menuItem?.name || 'Item';
+                const name = resolveItemName(it, idMap, priceMap);
                 const qty = Number(it.quantity || 1);
-                const price = Number(it.price || it.unitPrice || it.unit_price || 0);
+                const price = Number(it.price || it.unitPrice || it.unit_price || (it.total ? it.total / qty : 0));
                 if (!itemMap[name]) itemMap[name] = { name, quantity: 0, revenue: 0 };
                 itemMap[name].quantity += qty;
                 itemMap[name].revenue += (qty * price);
