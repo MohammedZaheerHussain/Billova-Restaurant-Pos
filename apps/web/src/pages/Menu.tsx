@@ -13,7 +13,6 @@ interface MenuItemForm {
     price: string;
     categoryId: string;
     isVeg: boolean;
-    image: string;
     hasGST: boolean;
     gstPercent: string;
 }
@@ -24,7 +23,6 @@ const emptyForm: MenuItemForm = {
     price: '',
     categoryId: '',
     isVeg: false,
-    image: '',
     hasGST: true,
     gstPercent: '5',
 };
@@ -59,7 +57,6 @@ export default function MenuPage() {
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const menuCardInputRef = useRef<HTMLInputElement>(null);
 
     // Category Modal
@@ -125,7 +122,6 @@ export default function MenuPage() {
             price: String(item.price),
             categoryId: item.categoryId,
             isVeg: item.isVeg,
-            image: item.image || '',
             hasGST: (item as any).hasGST !== false,
             gstPercent: String((item as any).gstPercent || 5),
         });
@@ -136,39 +132,6 @@ export default function MenuPage() {
         setShowModal(false);
         setEditingItem(null);
         setForm(emptyForm);
-    };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error('Image must be less than 2MB');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            setForm({ ...form, image: reader.result as string });
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files?.[0];
-        if (!file || !file.type.startsWith('image/')) return;
-
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error('Image must be less than 2MB');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            setForm({ ...form, image: reader.result as string });
-        };
-        reader.readAsDataURL(file);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -188,7 +151,6 @@ export default function MenuPage() {
                 categoryId: form.categoryId,
                 branchId: user?.branch?.id,
                 isVeg: form.isVeg,
-                image: form.image || undefined,
                 hasGST: form.hasGST,
                 gstPercent: parseFloat(form.gstPercent) || 5,
             };
@@ -492,13 +454,9 @@ export default function MenuPage() {
                                         <td className="product-col">
                                             <div className="product-item-cell">
                                                 <div className="item-image-wrapper">
-                                                    {item.image ? (
-                                                        <img src={item.image} alt={item.name} className="product-thumb" />
-                                                    ) : (
-                                                        <div className="product-thumb-fallback">
-                                                            <span>{cat?.icon || '🍽️'}</span>
-                                                        </div>
-                                                    )}
+                                                    <div className="product-thumb-fallback">
+                                                        <span>{cat?.icon || '🍽️'}</span>
+                                                    </div>
                                                 </div>
                                                 <div className="product-meta">
                                                     <span className="product-name">{item.name}</span>
@@ -650,46 +608,6 @@ export default function MenuPage() {
                                         onChange={(e) => setForm({ ...form, description: e.target.value })}
                                         placeholder="Brief description of the item..."
                                         rows={2}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Item Image</label>
-                                    <div
-                                        className="upload-placeholder"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        onDrop={handleDrop}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        style={form.image ? { padding: 0, border: 'none', height: 'auto' } : undefined}
-                                    >
-                                        {form.image ? (
-                                            <div className="image-preview">
-                                                <img src={form.image} alt="Preview" />
-                                                <button
-                                                    type="button"
-                                                    className="remove-image"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setForm({ ...form, image: '' });
-                                                    }}
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <Upload size={24} />
-                                                <p>Click or drag image here</p>
-                                                <span>Max 2MB · JPG / PNG</span>
-                                            </>
-                                        )}
-                                    </div>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        style={{ display: 'none' }}
                                     />
                                 </div>
 

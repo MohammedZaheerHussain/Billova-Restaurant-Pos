@@ -644,8 +644,10 @@ export default function POSPage() {
                         <AnimatePresence mode="popLayout">
                             {displayItems.map((item) => {
                                 const inCartQty = getQuantityInCart(item.id);
-                                const itemImage = (item as any).image_url || (item as any).image;
                                 const itemPrice = Number(item.variants?.[0]?.price ?? item.price);
+                                const cat = item.category || categories.find((c) => c.id === item.categoryId);
+                                const categoryIcon = cat?.icon || (item.isVeg ? '🥗' : '🍗');
+                                const categoryName = cat?.name || '';
 
                                 return (
                                     <motion.div
@@ -660,67 +662,55 @@ export default function POSPage() {
                                         className={`menu-item-card ${inCartQty > 0 ? 'in-cart' : ''}`}
                                         onClick={() => handleAddItem(item)}
                                     >
-                                        {/* Top Card Badges */}
-                                        <div className="card-badge-row">
-                                            {/* In-Cart Counter Badge */}
-                                            {inCartQty > 0 ? (
-                                                <span className="in-cart-badge">
-                                                    {inCartQty} in cart
-                                                </span>
-                                            ) : (
-                                                <span className="badge-placeholder" />
-                                            )}
+                                        {/* Card Top Row: Category Icon Pill + Badges */}
+                                        <div className="card-top-row">
+                                            <div className="category-pill">
+                                                <span className="cat-icon">{categoryIcon}</span>
+                                                {categoryName && <span className="cat-name">{categoryName}</span>}
+                                            </div>
 
-                                            <div className="card-top-right">
+                                            <div className="card-top-badges">
+                                                {inCartQty > 0 && (
+                                                    <span className="in-cart-badge">
+                                                        {inCartQty} in cart
+                                                    </span>
+                                                )}
                                                 {item.variants && item.variants.length > 1 && (
                                                     <span className="variant-badge">{item.variants.length} sizes</span>
                                                 )}
-                                                <div className={`veg-indicator ${item.isVeg ? 'veg' : 'non-veg'}`} />
+                                                <div
+                                                    className={`veg-indicator ${item.isVeg ? 'veg' : 'non-veg'}`}
+                                                    title={item.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+                                                />
                                             </div>
                                         </div>
 
-                                        {/* Product Hero Image / Illustration */}
-                                        <div className="item-hero-container">
-                                            {itemImage ? (
-                                                <img
-                                                    src={itemImage}
-                                                    alt={item.name}
-                                                    className="item-hero-img"
-                                                    loading="lazy"
-                                                />
-                                            ) : (
-                                                <div className="item-hero-fallback">
-                                                    <span className="fallback-emoji">
-                                                        {item.isVeg ? '🥗' : '🍗'}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Card Details */}
-                                        <div className="item-details">
+                                        {/* Card Middle: Food Item Name */}
+                                        <div className="card-title-wrap">
                                             <h3 className="item-name" title={item.name}>
                                                 {item.name}
                                             </h3>
+                                        </div>
 
-                                            <div className="item-footer">
-                                                <div className="item-price">
-                                                    <span className="currency">₹</span>
-                                                    <span className="price-num">{itemPrice}</span>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    className={`card-add-btn ${inCartQty > 0 ? 'added' : ''}`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleAddItem(item);
-                                                    }}
-                                                    title="Add to cart"
-                                                >
-                                                    <Plus size={16} />
-                                                </button>
+                                        {/* Card Footer: Price & Add Button */}
+                                        <div className="item-footer">
+                                            <div className="item-price">
+                                                <span className="currency">₹</span>
+                                                <span className="price-num">{itemPrice}</span>
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                className={`card-add-btn ${inCartQty > 0 ? 'added' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAddItem(item);
+                                                }}
+                                                title="Add to cart"
+                                                aria-label={`Add ${item.name} to cart`}
+                                            >
+                                                <Plus size={16} />
+                                            </button>
                                         </div>
                                     </motion.div>
                                 );

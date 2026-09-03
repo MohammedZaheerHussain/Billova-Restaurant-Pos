@@ -40,7 +40,6 @@ export const menuAPI = {
                         categoryId: m.category_id,
                         isVeg: m.is_veg ?? true,
                         isAvailable: m.is_available ?? true,
-                        image: m.image_url || m.image,
                         description: m.description,
                     }));
                     try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
@@ -55,7 +54,6 @@ export const menuAPI = {
                     category: m.category ? { name: m.category.name, icon: m.category.icon } : undefined,
                     isVeg: m.is_veg ?? true,
                     isAvailable: m.is_available ?? true,
-                    image: m.image_url || m.image,
                     description: m.description,
                 }));
                 try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
