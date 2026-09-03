@@ -49,8 +49,13 @@ export default function OwnerDashboard() {
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 5 * 60 * 1000);
-        return () => clearInterval(interval);
+        const interval = setInterval(fetchData, 15000);
+        const handleFocus = () => fetchData();
+        window.addEventListener('focus', handleFocus);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, []);
 
     const fmt = (v: number) => {

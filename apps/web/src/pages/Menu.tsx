@@ -446,10 +446,9 @@ export default function MenuPage() {
                             {filteredItems.map((item) => {
                                 const cat = item.category || categories.find((c) => c.id === item.categoryId);
                                 return (
-                                    <motion.tr
+                                    <tr
                                         key={item.id}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
+                                        className="menu-table-row"
                                     >
                                         <td className="product-col">
                                             <div className="product-item-cell">
@@ -508,7 +507,7 @@ export default function MenuPage() {
                                                 </button>
                                             </div>
                                         </td>
-                                    </motion.tr>
+                                    </tr>
                                 );
                             })}
                         </tbody>
