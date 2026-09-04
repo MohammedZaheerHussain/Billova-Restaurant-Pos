@@ -1,4 +1,8 @@
 {
+  "version": 2,
+  "buildCommand": "if [ -d \"../../packages/types\" ]; then (cd ../.. && npx tsc -p packages/types/tsconfig.json); fi && npx vite build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
