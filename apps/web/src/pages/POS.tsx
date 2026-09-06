@@ -160,8 +160,8 @@ export default function POSPage() {
                 }
             } else if (e.key === 'F2') {
                 e.preventDefault();
-                if (orderType !== 'DINE_IN' && !editingOrderId) {
-                    return; // Pending bill only applies to Dine In
+                if (orderType !== 'DINE_IN' && orderType !== 'TAKEAWAY' && !editingOrderId) {
+                    return; // Pending bill applies to Dine In and Takeaway
                 }
                 if (cartItems.length > 0) {
                     handleSavePendingOrder();
@@ -416,8 +416,8 @@ export default function POSPage() {
 
     // Handle saving as PENDING order (Send to Kitchen & Print KOT only)
     const handleSavePendingOrder = async () => {
-        if (orderType !== 'DINE_IN' && !editingOrderId) {
-            toast.error('Pending bills are only for Dine In orders');
+        if (orderType !== 'DINE_IN' && orderType !== 'TAKEAWAY' && !editingOrderId) {
+            toast.error('Pending bills are only for Dine In and Takeaway orders');
             return;
         }
 
@@ -462,7 +462,7 @@ export default function POSPage() {
                     orderType: orderType,
                     tableName: (orderType === 'DINE_IN' && (editingOrderTableName || orderNotes.trim()))
                         ? (editingOrderTableName || orderNotes.trim())
-                        : (orderType === 'DINE_IN' ? 'Counter' : undefined),
+                        : (orderType === 'DINE_IN' ? 'Counter' : (orderType === 'TAKEAWAY' ? 'Takeaway' : undefined)),
                     createdAt: new Date(),
                     orderNotes: orderNotes.trim() || undefined,
                     items: cartItems.map((item) => ({
@@ -528,7 +528,7 @@ export default function POSPage() {
                 orderNumber: cleanOrderNumber,
                 kotNumber: `KOT-${cleanOrderNumber}`,
                 orderType: orderType,
-                tableName: (orderType === 'DINE_IN' && orderNotes.trim()) ? orderNotes.trim() : (orderType === 'DINE_IN' ? 'Counter' : undefined),
+                tableName: (orderType === 'DINE_IN' && orderNotes.trim()) ? orderNotes.trim() : (orderType === 'DINE_IN' ? 'Counter' : (orderType === 'TAKEAWAY' ? 'Takeaway' : undefined)),
                 createdAt: new Date(),
                 orderNotes: orderNotes.trim() || undefined,
                 items: cartItems.map((item) => ({
@@ -1161,8 +1161,8 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    {/* Action CTA Buttons: Pending Bill only for DINE_IN (or editing), otherwise single Complete Bill */}
-                    {(orderType === 'DINE_IN' || editingOrderId) ? (
+                    {/* Action CTA Buttons: Pending Bill for DINE_IN & TAKEAWAY (or editing), otherwise single Complete Bill (ONLINE) */}
+                    {(orderType === 'DINE_IN' || orderType === 'TAKEAWAY' || editingOrderId) ? (
                         <div className="cart-action-buttons dine-in-actions">
                             <button
                                 type="button"
