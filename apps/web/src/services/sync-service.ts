@@ -6,6 +6,7 @@ import { useSyncStore } from '../store/sync-store';
 import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { logger } from '../utils/logger';
+import { syncLocalOrdersToSupabase } from '../api/orders';
 import toast from 'react-hot-toast';
 
 // ==================== CONSTANTS ====================
@@ -236,6 +237,14 @@ export async function syncAll(): Promise<{ success: boolean; synced: number; fai
         totalSynced += orderResult.synced;
         totalFailed += orderResult.failed;
 
+        // Also sync any local storage orders directly to Supabase
+        try {
+            const localSynced = await syncLocalOrdersToSupabase();
+            totalSynced += localSynced;
+        } catch (localErr) {
+            logger.error('Failed syncing local storage orders:', localErr);
+        }
+
         const paymentResult = await syncPendingPayments();
         totalSynced += paymentResult.synced;
         totalFailed += paymentResult.failed;
@@ -306,17 +315,29 @@ async function syncPendingOrders(): Promise<{ synced: number; failed: number }> 
             await recordSyncEvent(order.branchId, 'ORDER', order.localId, 'pending');
 
             if (!hasExpressBackend()) {
-                const { data: serverOrder } = await supabase.from('orders').insert([{
-                    order_type: order.orderType,
-                    customer_name: order.customerName,
-                    customer_phone: order.customerPhone,
-                    total_amount: order.total,
-                    subtotal: order.subtotal,
-                    discount_amount: order.discountAmount,
-                    gst_amount: order.gstAmount,
-                    notes: order.notes,
-                    created_at: order.createdAt.toISOString(),
-                }]).select().single();
+                const insertPayload: any = {
+                    order_type: order.orderType || 'DINE_IN',
+                    status: order.status === 'PAID' ? 'COMPLETED' : (order.status || 'COMPLETED'),
+                    customer_name: order.customerName || null,
+                    customer_phone: order.customerPhone || null,
+                    items: JSON.stringify(order.items || []),
+                    total: Number(order.total || 0),
+                    total_amount: Number(order.total || 0),
+                    subtotal: Number(order.subtotal || 0),
+                    discount_amount: Number(order.discountAmount || 0),
+                    gst_amount: Number(order.gstAmount || 0),
+                    notes: order.notes || null,
+                    created_at: order.createdAt ? new Date(order.createdAt).toISOString() : new Date().toISOString(),
+                };
+                if (order.branchId) insertPayload.branch_id = order.branchId;
+
+                const { data: serverOrder, error: insErr } = await supabase
+                    .from('orders')
+                    .insert([insertPayload])
+                    .select()
+                    .single();
+
+                if (insErr) throw insErr;
 
                 await db.offlineOrders.update(order.localId, {
                     status: 'SYNCED',
