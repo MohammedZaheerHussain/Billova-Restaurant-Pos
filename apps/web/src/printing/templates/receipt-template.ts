@@ -101,151 +101,148 @@ function rupee(amount: string | number): string {
 export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): ESCPOSEncoder {
     const encoder = new ESCPOSEncoder({ width: printerWidth });
     const displayBillNo = formatCleanBillNo(data.billNumber, data.orderNumber);
+    const orderDate = new Date(data.orderDate || Date.now());
+    const isOnline = data.orderType === 'ONLINE' || Boolean(data.onlinePlatform);
 
     encoder.initialize();
 
     // ==========================================
     // ── SECTION 1: CUSTOMER TAX INVOICE ──
+    // (Only for in-store DINE_IN, TAKEAWAY, DELIVERY)
+    // (Skipped for ONLINE Swiggy/Zomato orders)
     // ==========================================
-    encoder.align(TextAlign.CENTER);
+    if (!isOnline) {
+        encoder.align(TextAlign.CENTER);
 
-    // Business Header
-    encoder.bold(true).setFontSize(FontSize.DOUBLE_WIDTH);
-    encoder.line((data.businessName || 'BILLOVA POS').toUpperCase());
-    encoder.setFontSize(FontSize.NORMAL).bold(false);
+        // Business Header
+        encoder.bold(true).setFontSize(FontSize.DOUBLE_WIDTH);
+        encoder.line((data.businessName || 'BILLOVA POS').toUpperCase());
+        encoder.setFontSize(FontSize.NORMAL).bold(false);
 
-    if (data.address) encoder.line(data.address);
-    if (data.phone) encoder.line(`Tel: ${data.phone}`);
-    if (data.gstNumber) encoder.line(`GSTIN: ${data.gstNumber}`);
-    if (data.fssaiNumber) encoder.line(`FSSAI: ${data.fssaiNumber}`);
+        if (data.address) encoder.line(data.address);
+        if (data.phone) encoder.line(`Tel: ${data.phone}`);
+        if (data.gstNumber) encoder.line(`GSTIN: ${data.gstNumber}`);
+        if (data.fssaiNumber) encoder.line(`FSSAI: ${data.fssaiNumber}`);
 
-    encoder.bold(true).line('*** TAX INVOICE ***').bold(false);
-    encoder.divider('=');
-    encoder.align(TextAlign.LEFT);
+        encoder.bold(true).line('*** TAX INVOICE ***').bold(false);
+        encoder.divider('=');
+        encoder.align(TextAlign.LEFT);
 
-    // Order Info
-    encoder.bold(true);
-    encoder.printRow('Bill No:', displayBillNo);
-    encoder.bold(false);
+        // Order Info
+        encoder.bold(true);
+        encoder.printRow('Bill No:', displayBillNo);
+        encoder.bold(false);
 
-    const orderDate = new Date(data.orderDate || Date.now());
-    encoder.printRow('Date:', orderDate.toLocaleDateString('en-IN'));
-    encoder.printRow('Time:', orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
+        encoder.printRow('Date:', orderDate.toLocaleDateString('en-IN'));
+        encoder.printRow('Time:', orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
 
-    if (data.orderType === 'ONLINE' || data.onlinePlatform) {
-        const plat = (data.onlinePlatform || 'ONLINE').toUpperCase();
-        encoder.bold(true).printRow('Type:', `ONLINE (${plat})`).bold(false);
-        if (data.onlineOrderId) {
-            encoder.bold(true).printRow('Online ID:', `#${data.onlineOrderId}`).bold(false);
-        }
-    } else {
         encoder.printRow('Type:', getOrderTypeLabel(data.orderType));
         if (data.tableName && data.orderType === 'DINE_IN') {
             encoder.bold(true).printRow('Table:', data.tableName).bold(false);
         }
-    }
 
-    if (data.customerName) {
-        encoder.printRow('Customer:', data.customerName);
-    }
-    if (data.customerPhone) {
-        encoder.printRow('Phone:', data.customerPhone);
-    }
-    if (data.notes) {
-        encoder.bold(true).printRow('Notes:', data.notes).bold(false);
-    }
-
-    encoder.divider('-');
-
-    // Items Header
-    encoder.bold(true);
-    if (printerWidth >= 48) {
-        encoder.line('ITEM                   QTY    PRICE    AMOUNT');
-    } else {
-        encoder.line('ITEM             QTY   AMT');
-    }
-    encoder.bold(false);
-    encoder.divider('-');
-
-    // Items List
-    for (const item of data.items) {
-        let itemName = item.name;
-        if (item.variant) itemName += ` (${item.variant})`;
-
-        const maxNameLen = printerWidth >= 48 ? 20 : 14;
-        if (itemName.length > maxNameLen) {
-            itemName = itemName.substring(0, maxNameLen - 1) + '…';
+        if (data.customerName) {
+            encoder.printRow('Customer:', data.customerName);
+        }
+        if (data.customerPhone) {
+            encoder.printRow('Phone:', data.customerPhone);
+        }
+        if (data.notes) {
+            encoder.bold(true).printRow('Notes:', data.notes).bold(false);
         }
 
-        const qtyStr = item.quantity.toString().padStart(2);
-        const priceStr = (item.unitPrice || (item.total / item.quantity)).toFixed(2);
-        const amtStr = rupee(item.total.toFixed(2));
+        encoder.divider('-');
 
+        // Items Header
+        encoder.bold(true);
         if (printerWidth >= 48) {
-            encoder.line(itemName.padEnd(20) + qtyStr.padStart(4) + priceStr.padStart(9) + amtStr.padStart(11));
+            encoder.line('ITEM                   QTY    PRICE    AMOUNT');
         } else {
-            encoder.line(itemName.padEnd(14) + qtyStr.padStart(3) + amtStr.padStart(8));
+            encoder.line('ITEM             QTY   AMT');
         }
+        encoder.bold(false);
+        encoder.divider('-');
 
-        if (item.addons && item.addons.length > 0) {
-            for (const addon of item.addons) {
-                encoder.line(`  + ${addon}`);
+        // Items List
+        for (const item of data.items) {
+            let itemName = item.name;
+            if (item.variant) itemName += ` (${item.variant})`;
+
+            const maxNameLen = printerWidth >= 48 ? 20 : 14;
+            if (itemName.length > maxNameLen) {
+                itemName = itemName.substring(0, maxNameLen - 1) + '…';
+            }
+
+            const qtyStr = item.quantity.toString().padStart(2);
+            const priceStr = (item.unitPrice || (item.total / item.quantity)).toFixed(2);
+            const amtStr = rupee(item.total.toFixed(2));
+
+            if (printerWidth >= 48) {
+                encoder.line(itemName.padEnd(20) + qtyStr.padStart(4) + priceStr.padStart(9) + amtStr.padStart(11));
+            } else {
+                encoder.line(itemName.padEnd(14) + qtyStr.padStart(3) + amtStr.padStart(8));
+            }
+
+            if (item.addons && item.addons.length > 0) {
+                for (const addon of item.addons) {
+                    encoder.line(`  + ${addon}`);
+                }
+            }
+            if (item.notes) {
+                encoder.line(`  * ${item.notes}`);
             }
         }
-        if (item.notes) {
-            encoder.line(`  * ${item.notes}`);
-        }
-    }
 
-    encoder.divider('-');
-
-    // Totals
-    encoder.printRow('Subtotal:', rupee(data.subtotal.toFixed(2)));
-
-    if (data.discountAmount > 0) {
-        let discLabel = 'Discount:';
-        if (data.discountType === 'PERCENTAGE' && data.discountValue) {
-            discLabel = `Discount (${data.discountValue}%):`;
-        }
-        encoder.printRow(discLabel, `-${rupee(data.discountAmount.toFixed(2))}`);
-    }
-
-    if (data.sgst && data.cgst) {
-        encoder.printRow('SGST:', rupee(data.sgst.toFixed(2)));
-        encoder.printRow('CGST:', rupee(data.cgst.toFixed(2)));
-    } else if (data.gstAmount > 0) {
-        encoder.printRow('GST:', rupee(data.gstAmount.toFixed(2)));
-    }
-
-    encoder.divider('=');
-
-    // Grand Total (Large Bold)
-    encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
-    encoder.printRow('TOTAL:', rupee(data.total.toFixed(2)));
-    encoder.setFontSize(FontSize.NORMAL).bold(false);
-
-    // Payment Info
-    if (data.paymentMode) {
         encoder.divider('-');
-        encoder.bold(true);
-        encoder.printRow('Payment Mode:', `PAID VIA ${data.paymentMode.toUpperCase()}`);
-        encoder.bold(false);
+
+        // Totals
+        encoder.printRow('Subtotal:', rupee(data.subtotal.toFixed(2)));
+
+        if (data.discountAmount > 0) {
+            let discLabel = 'Discount:';
+            if (data.discountType === 'PERCENTAGE' && data.discountValue) {
+                discLabel = `Discount (${data.discountValue}%):`;
+            }
+            encoder.printRow(discLabel, `-${rupee(data.discountAmount.toFixed(2))}`);
+        }
+
+        if (data.sgst && data.cgst) {
+            encoder.printRow('SGST:', rupee(data.sgst.toFixed(2)));
+            encoder.printRow('CGST:', rupee(data.cgst.toFixed(2)));
+        } else if (data.gstAmount > 0) {
+            encoder.printRow('GST:', rupee(data.gstAmount.toFixed(2)));
+        }
+
+        encoder.divider('=');
+
+        // Grand Total (Large Bold)
+        encoder.bold(true).setFontSize(FontSize.DOUBLE_BOTH);
+        encoder.printRow('TOTAL:', rupee(data.total.toFixed(2)));
+        encoder.setFontSize(FontSize.NORMAL).bold(false);
+
+        // Payment Info
+        if (data.paymentMode) {
+            encoder.divider('-');
+            encoder.bold(true);
+            encoder.printRow('Payment Mode:', `PAID VIA ${data.paymentMode.toUpperCase()}`);
+            encoder.bold(false);
+        }
+
+        // Customer Footer
+        encoder.align(TextAlign.CENTER);
+        encoder.feed(1);
+        encoder.line(data.footerText || 'Thank you for dining with us! Please visit again.');
+        encoder.line('--- Powered by Billova POS ---');
+
+        // Auto-Cut after Customer Bill
+        encoder.feed(3);
+        encoder.cut(CutType.FULL);
     }
-
-    // Customer Footer
-    encoder.align(TextAlign.CENTER);
-    encoder.feed(1);
-    encoder.line(data.footerText || 'Thank you for dining with us! Please visit again.');
-    encoder.line('--- Powered by Billova POS ---');
-
-    // Auto-Cut after Customer Bill
-    encoder.feed(3);
-    encoder.cut(CutType.FULL);
 
     // ==========================================
     // ── SECTION 2: KITCHEN ORDER TICKET (K.O.T.) ──
     // ==========================================
-    const shouldIncludeKOT = data.includeKOT !== false;
+    const shouldIncludeKOT = data.includeKOT !== false || isOnline;
     if (shouldIncludeKOT) {
         encoder.feed(1);
         encoder.align(TextAlign.CENTER);
@@ -403,8 +400,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     const isOnline = data.orderType === 'ONLINE' || Boolean(data.onlinePlatform);
     const platformName = (data.onlinePlatform || 'ONLINE').toUpperCase();
 
-    return `
-        <div class="thermal-document">
+    const customerBillSection = isOnline ? '' : `
             <!-- ========================================== -->
             <!-- ── SECTION 1: CUSTOMER TAX BILL / INVOICE ── -->
             <!-- ========================================== -->
@@ -425,13 +421,8 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="thermal-meta-row"><span class="meta-label">Date:</span><span class="meta-val">${formatDate(orderDate)}</span></div>
                     <div class="thermal-meta-row"><span class="meta-label">Time:</span><span class="meta-val">${formatTime(orderDate)}</span></div>
                     
-                    ${isOnline ? `
-                        <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val highlight">ONLINE (${platformName})</strong></div>
-                        ${data.onlineOrderId ? `<div class="thermal-meta-row"><span class="meta-label">Online ID:</span><strong class="meta-val highlight">#${data.onlineOrderId}</strong></div>` : ''}
-                    ` : `
-                        <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val">${getOrderTypeLabel(data.orderType)}</strong></div>
-                        ${data.tableName && data.orderType === 'DINE_IN' ? `<div class="thermal-meta-row"><span class="meta-label">Table:</span><strong class="meta-val highlight">${data.tableName}</strong></div>` : ''}
-                    `}
+                    <div class="thermal-meta-row"><span class="meta-label">Type:</span><strong class="meta-val">${getOrderTypeLabel(data.orderType)}</strong></div>
+                    ${data.tableName && data.orderType === 'DINE_IN' ? `<div class="thermal-meta-row"><span class="meta-label">Table:</span><strong class="meta-val highlight">${data.tableName}</strong></div>` : ''}
 
                     ${data.customerName ? `<div class="thermal-meta-row"><span class="meta-label">Customer:</span><span class="meta-val">${data.customerName}</span></div>` : ''}
                     ${data.customerPhone ? `<div class="thermal-meta-row"><span class="meta-label">Phone:</span><span class="meta-val">${data.customerPhone}</span></div>` : ''}
@@ -501,6 +492,11 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="powered-msg">--- Powered by Billova POS ---</div>
                 </div>
             </div>
+    `;
+
+    return `
+        <div class="thermal-document">
+            ${customerBillSection}
 
             <!-- ========================================== -->
             <!-- ── SECTION 2: KITCHEN ORDER TICKET (K.O.T.) ── -->
