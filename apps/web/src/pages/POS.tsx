@@ -1,11 +1,12 @@
 // POS Billing Screen - Main Point of Sale Interface
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, ShoppingCart, Minus, Plus, Trash2, X,
     CreditCard, Banknote, Smartphone, Coffee,
     UtensilsCrossed, Globe, User, Phone, FileText,
-    Sparkles, Flame, Check, Tag, ChevronDown, ChevronUp
+    Sparkles, Flame, Check, Tag, ChevronDown, ChevronUp,
+    ChevronLeft, ChevronRight, Layers
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCartStore, useUIStore, useAuthStore, MenuItem, Category } from '../store';
@@ -64,6 +65,40 @@ export default function POSPage() {
     const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery } = useUIStore();
     const user = useAuthStore((state) => state.user);
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+    // Category Dropdown & Mouse Navigation State
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+    const [categorySearchFilter, setCategorySearchFilter] = useState('');
+    const categoryDropdownRef = useRef<HTMLDivElement>(null);
+    const categoryScrollRef = useRef<HTMLDivElement>(null);
+    const categoryBtnRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+    // Close category dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+                setIsCategoryDropdownOpen(false);
+            }
+        };
+        if (isCategoryDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isCategoryDropdownOpen]);
+
+    const scrollCategoryIntoView = (id: string | null, isQuickPicks?: boolean) => {
+        const key = isQuickPicks ? 'quick-picks' : (id || 'all');
+        const el = categoryBtnRefs.current[key];
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    };
+
+    const getCategoryItemCount = (catId: string) => {
+        const catObj = categories.find(c => c.id === catId);
+        const catIds = catObj && (catObj as any).ids ? (catObj as any).ids : [catId];
+        return menuItems.filter(item => item.categoryId === catId || catIds.includes(item.categoryId)).length;
+    };
     const {
         items: cartItems,
         orderType,
@@ -596,42 +631,180 @@ export default function POSPage() {
                     </div>
                 </div>
 
-                {/* Category Pill Rail with ⭐ Quick Picks */}
-                <div className="category-scroll custom-scrollbar">
-                    <button
-                        className={`category-btn ${!selectedCategory && !isQuickPicksActive ? 'active' : ''}`}
-                        onClick={() => {
-                            setIsQuickPicksActive(false);
-                            setSelectedCategory(null);
-                        }}
-                    >
-                        <span className="category-name">All</span>
-                    </button>
-
-                    <button
-                        className={`category-btn quick-picks-btn ${isQuickPicksActive ? 'active' : ''}`}
-                        onClick={() => {
-                            setIsQuickPicksActive(true);
-                            setSelectedCategory(null);
-                        }}
-                    >
-                        <Flame size={14} className="quick-picks-icon" />
-                        <span className="category-name">Quick Picks ⭐</span>
-                    </button>
-
-                    {categories.map((cat) => (
+                {/* Enhanced Category Bar with Dropdown & Mouse Navigation */}
+                <div className="pos-category-bar-wrapper">
+                    {/* Category Dropdown Selector for Desktop & Fast Mouse Navigation */}
+                    <div className="category-dropdown-container" ref={categoryDropdownRef}>
                         <button
-                            key={cat.id}
-                            className={`category-btn ${selectedCategory === cat.id && !isQuickPicksActive ? 'active' : ''}`}
+                            type="button"
+                            className={`category-dropdown-trigger ${isCategoryDropdownOpen ? 'open' : ''} ${selectedCategory || isQuickPicksActive ? 'has-selection' : ''}`}
+                            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                            title="Select category from dropdown"
+                        >
+                            <Layers size={14} className="dropdown-layers-icon" />
+                            <span className="dropdown-label">
+                                {isQuickPicksActive
+                                    ? '⭐ Quick Picks'
+                                    : selectedCategory
+                                        ? (categories.find(c => c.id === selectedCategory)?.name || 'Category')
+                                        : 'Categories'}
+                            </span>
+                            <ChevronDown size={13} className={`dropdown-chevron ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isCategoryDropdownOpen && (
+                            <div className="category-dropdown-menu custom-scrollbar">
+                                {categories.length > 5 && (
+                                    <div className="category-dropdown-search">
+                                        <Search size={12} className="search-icon" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search category..."
+                                            value={categorySearchFilter}
+                                            onChange={(e) => setCategorySearchFilter(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            autoFocus
+                                        />
+                                        {categorySearchFilter && (
+                                            <button
+                                                type="button"
+                                                className="clear-filter-btn"
+                                                onClick={() => setCategorySearchFilter('')}
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="category-dropdown-list">
+                                    <button
+                                        type="button"
+                                        className={`category-dropdown-item ${!selectedCategory && !isQuickPicksActive ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setIsQuickPicksActive(false);
+                                            setSelectedCategory(null);
+                                            setIsCategoryDropdownOpen(false);
+                                            scrollCategoryIntoView(null);
+                                        }}
+                                    >
+                                        <span className="item-icon">🍽️</span>
+                                        <span className="item-name">All Items</span>
+                                        <span className="item-badge">{menuItems.length}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className={`category-dropdown-item quick-picks ${isQuickPicksActive ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setIsQuickPicksActive(true);
+                                            setSelectedCategory(null);
+                                            setIsCategoryDropdownOpen(false);
+                                            scrollCategoryIntoView(null, true);
+                                        }}
+                                    >
+                                        <span className="item-icon">⭐</span>
+                                        <span className="item-name">Quick Picks</span>
+                                        <span className="item-badge">Top 12</span>
+                                    </button>
+
+                                    <div className="category-dropdown-divider" />
+
+                                    {categories
+                                        .filter(c => !categorySearchFilter || c.name.toLowerCase().includes(categorySearchFilter.toLowerCase()))
+                                        .map((cat) => {
+                                            const count = getCategoryItemCount(cat.id);
+                                            return (
+                                                <button
+                                                    key={cat.id}
+                                                    type="button"
+                                                    className={`category-dropdown-item ${selectedCategory === cat.id && !isQuickPicksActive ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        setIsQuickPicksActive(false);
+                                                        setSelectedCategory(cat.id);
+                                                        setIsCategoryDropdownOpen(false);
+                                                        scrollCategoryIntoView(cat.id);
+                                                    }}
+                                                >
+                                                    <span className="item-icon">{cat.icon || '🍽️'}</span>
+                                                    <span className="item-name">{cat.name}</span>
+                                                    <span className="item-badge">{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Scroll Left Chevron */}
+                    <button
+                        type="button"
+                        className="category-scroll-nav-btn prev"
+                        onClick={() => categoryScrollRef.current?.scrollBy({ left: -220, behavior: 'smooth' })}
+                        title="Scroll categories left"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+
+                    {/* Category Pill Rail with Mouse Wheel Translation */}
+                    <div
+                        ref={categoryScrollRef}
+                        className="category-scroll custom-scrollbar"
+                        onWheel={(e) => {
+                            if (e.deltaY !== 0) {
+                                e.currentTarget.scrollLeft += e.deltaY;
+                            }
+                        }}
+                    >
+                        <button
+                            ref={el => { categoryBtnRefs.current['all'] = el; }}
+                            className={`category-btn ${!selectedCategory && !isQuickPicksActive ? 'active' : ''}`}
                             onClick={() => {
                                 setIsQuickPicksActive(false);
-                                setSelectedCategory(cat.id);
+                                setSelectedCategory(null);
                             }}
                         >
-                            <span className="category-icon">{cat.icon || '🍽️'}</span>
-                            <span className="category-name">{cat.name}</span>
+                            <span className="category-name">All</span>
                         </button>
-                    ))}
+
+                        <button
+                            ref={el => { categoryBtnRefs.current['quick-picks'] = el; }}
+                            className={`category-btn quick-picks-btn ${isQuickPicksActive ? 'active' : ''}`}
+                            onClick={() => {
+                                setIsQuickPicksActive(true);
+                                setSelectedCategory(null);
+                            }}
+                        >
+                            <Flame size={14} className="quick-picks-icon" />
+                            <span className="category-name">Quick Picks ⭐</span>
+                        </button>
+
+                        {categories.map((cat) => (
+                            <button
+                                key={cat.id}
+                                ref={el => { categoryBtnRefs.current[cat.id] = el; }}
+                                className={`category-btn ${selectedCategory === cat.id && !isQuickPicksActive ? 'active' : ''}`}
+                                onClick={() => {
+                                    setIsQuickPicksActive(false);
+                                    setSelectedCategory(cat.id);
+                                }}
+                            >
+                                <span className="category-icon">{cat.icon || '🍽️'}</span>
+                                <span className="category-name">{cat.name}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Scroll Right Chevron */}
+                    <button
+                        type="button"
+                        className="category-scroll-nav-btn next"
+                        onClick={() => categoryScrollRef.current?.scrollBy({ left: 220, behavior: 'smooth' })}
+                        title="Scroll categories right"
+                    >
+                        <ChevronRight size={16} />
+                    </button>
                 </div>
 
                 {/* Product Cards Grid */}

@@ -54,18 +54,8 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
         );
     }
 
-    // Banner variant - full-width warning when offline
-    if (variant === 'banner' && !isOnline) {
-        return (
-            <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white px-4 py-2 flex items-center justify-center gap-2 shadow-lg">
-                <WifiOff className="w-5 h-5" />
-                <span className="font-medium">You're offline - Orders will sync when connected</span>
-            </div>
-        );
-    }
-
-    // Don't show banner when online
-    if (variant === 'banner' && isOnline) {
+    // Banner variant is disabled to prevent blocking POS screens
+    if (variant === 'banner') {
         return null;
     }
 
@@ -73,15 +63,19 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
     return (
         <div
             className={`
-                flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
+                flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all select-none
                 ${isOnline
-                    ? 'bg-green-500/10 text-green-500'
-                    : 'bg-red-500/10 text-red-500'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                 }
             `}
+            title={isOnline ? 'Online: Connected to cloud' : 'Offline mode: Orders will automatically sync when connected'}
         >
-            <SignalIcon className="w-4 h-4" />
-            <span>{getSignalLabel()}</span>
+            <SignalIcon className={`w-3.5 h-3.5 ${isOnline ? 'text-emerald-400' : 'text-rose-400'}`} />
+            <span className="font-semibold text-[11px] tracking-wide">{getSignalLabel()}</span>
+            {!isOnline && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+            )}
         </div>
     );
 };

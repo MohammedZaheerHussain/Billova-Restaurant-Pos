@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscription, { FeatureKey } from '../hooks/useSubscription';
-import { useSync, useSyncInit } from '../hooks/useSync';
+import { useSyncInit } from '../hooks/useSync';
 import { OfflineIndicator } from './sync';
 import { CommandPalette } from './ui/CommandPalette';
 import { supabase } from '../lib/supabase';
@@ -48,7 +48,6 @@ export default function Layout() {
 
     // Initialize offline sync
     useSyncInit();
-    const { isOnline } = useSync();
 
     // Check token expiry on mount and periodically
     useEffect(() => {
@@ -250,10 +249,6 @@ export default function Layout() {
                 />
             )}
 
-            {/* Offline Banner - shown when offline at top */}
-            {!isOnline && (
-                <OfflineIndicator variant="banner" />
-            )}
 
             {/* Main Content */}
             <main className="main-content" id="main-content" role="main" aria-label="Page content">
