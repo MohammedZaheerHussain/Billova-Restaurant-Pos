@@ -9,8 +9,8 @@ import { logger } from '../utils/logger';
 // ==================== AUTO-PRINT FUNCTIONS ====================
 
 /**
- * Auto-print KOT when an order is created
- * Called from order creation flow
+ * Auto-print KOT when an order is created or sent to kitchen
+ * Called from order creation / payment flow
  */
 export async function autoPrintKOT(kotData: KOTData): Promise<boolean> {
     const store = usePrinterConfigStore.getState();
@@ -22,28 +22,34 @@ export async function autoPrintKOT(kotData: KOTData): Promise<boolean> {
 
     const printers = store.getPrintersForJob('kot');
 
+    // If no dedicated hardware printers registered, fallback to default printer driver (browser/thermal)
     if (printers.length === 0) {
-        logger.warn('[AutoPrint] No printers configured for KOT');
-        return false;
+        logger.debug('[AutoPrint] No dedicated KOT hardware printer configured, falling back to default driver');
+        return await reprintKOT(kotData);
     }
 
     let success = true;
 
     for (const printer of printers) {
         try {
-            const encoder = generateKOT(kotData, printer.paperWidth === 80 ? 48 : 32);
+            if (printer.type === 'browser') {
+                const printed = await reprintKOT(kotData, { copies: printer.copies || 1 });
+                if (!printed) success = false;
+            } else {
+                const encoder = generateKOT(kotData, printer.paperWidth === 80 ? 48 : 32);
 
-            // Print multiple copies if configured
-            for (let i = 0; i < (printer.copies || 1); i++) {
-                const result = await printService.print(
-                    encoder,
-                    printer.type,
-                    printer.address
-                );
+                // Print multiple copies if configured
+                for (let i = 0; i < (printer.copies || 1); i++) {
+                    const result = await printService.print(
+                        encoder,
+                        printer.type,
+                        printer.address
+                    );
 
-                if (!result.success) {
-                    logger.error(`[AutoPrint] KOT print failed for ${printer.name}:`, result.error);
-                    success = false;
+                    if (!result.success) {
+                        logger.error(`[AutoPrint] KOT print failed for ${printer.name}:`, result.error);
+                        success = false;
+                    }
                 }
             }
 
@@ -76,13 +82,17 @@ export async function autoPrintBill(receiptData: ReceiptData): Promise<boolean> 
 
     const printer = store.getPrinterForJob('bill');
 
+    // If no dedicated hardware printer registered, fallback to default printer driver
     if (!printer) {
-        logger.warn('[AutoPrint] No printer configured for bills');
-        return false;
+        logger.debug('[AutoPrint] No dedicated Bill hardware printer configured, falling back to default driver');
+        return await reprintReceipt(receiptData);
     }
 
     try {
-        // Logo handling can be added here if needed
+        if (printer.type === 'browser') {
+            return await reprintReceipt(receiptData, { copies: printer.copies || 1 });
+        }
+
         const encoder = generateReceipt(receiptData, printer.paperWidth === 80 ? 48 : 32);
 
         // Print

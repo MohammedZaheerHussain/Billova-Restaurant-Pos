@@ -8,6 +8,7 @@ import { useAuthStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import api from '../api';
+import { loadBranchSettings } from '../api/branches';
 import './Login.css';
 
 export default function LoginPage() {
@@ -100,15 +101,34 @@ export default function LoginPage() {
 
             if (profile) {
                 let branchData = undefined;
+                let activeBranchId = profile.branch_id;
 
-                // Only fetch branch if branch_id exists
-                if (profile.branch_id) {
-                    logger.debug('[Login] Fetching branch:', profile.branch_id);
+                // If profile has no branch_id, auto-link to first branch in system
+                if (!activeBranchId) {
+                    logger.debug('[Login] No branch_id on profile, discovering available branch...');
+                    const { data: firstBranch } = await supabase
+                        .from('branches')
+                        .select('id, name, subscription_plan, subscription_expiry')
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (firstBranch) {
+                        activeBranchId = firstBranch.id;
+                        await supabase
+                            .from('profiles')
+                            .update({ branch_id: firstBranch.id })
+                            .eq('id', profile.id);
+                    }
+                }
+
+                // Fetch branch details
+                if (activeBranchId) {
+                    logger.debug('[Login] Fetching branch:', activeBranchId);
                     const { data: branch } = await supabase
                         .from('branches')
                         .select('*')
-                        .eq('id', profile.branch_id)
-                        .single();
+                        .eq('id', activeBranchId)
+                        .maybeSingle();
 
                     if (branch) {
                         branchData = {
@@ -132,6 +152,12 @@ export default function LoginPage() {
 
                 // Store user in Zustand (token not needed for Supabase auth)
                 login('supabase-session', user);
+
+                // Load cloud-persisted branch profile into store immediately
+                if (activeBranchId) {
+                    loadBranchSettings(activeBranchId).catch(() => {});
+                }
+
                 toast.success('Welcome back!');
 
                 logger.debug('[Login] Navigating based on role:', user.role);

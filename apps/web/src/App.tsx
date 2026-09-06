@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store';
+import { loadBranchSettings } from './api/branches';
 import Layout from './components/Layout';
 import SplashScreen from './components/SplashScreen';
 import { PWAUpdatePrompt } from './components/pwa';
@@ -96,6 +97,13 @@ function App() {
     useEffect(() => {
         initNetworkSync();
     }, []);
+
+    // Load cloud branch settings whenever user is authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadBranchSettings().catch(() => {});
+        }
+    }, [isAuthenticated]);
 
     // Show splash screen when user becomes authenticated
     useEffect(() => {

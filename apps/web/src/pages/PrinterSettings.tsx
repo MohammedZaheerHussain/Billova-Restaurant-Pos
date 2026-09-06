@@ -19,6 +19,8 @@ import {
     RefreshCw,
     ChevronDown,
     ChevronUp,
+    Zap,
+    CheckCircle,
 } from 'lucide-react';
 import { usePrinterConfigStore, PrinterConfig, PrintJobType } from '../printing/printer-config-store';
 import { printService } from '../printing';
@@ -112,6 +114,26 @@ export default function PrinterSettings() {
         setTestingPrinter(printer.id);
 
         try {
+            if (printer.type === 'browser') {
+                const html = `
+                    <div style="text-align: center; padding: 8px; font-family: monospace; font-size: 13px; color: #000;">
+                        <div style="font-weight: bold; font-size: 16px;">*** TEST PRINT ***</div>
+                        <div style="font-weight: bold; margin-top: 4px;">Billova POS</div>
+                        <div style="margin-top: 4px;">Printer: ${printer.name}</div>
+                        <div>Type: Browser Thermal Print (80mm)</div>
+                        <div>Date: ${new Date().toLocaleString('en-IN')}</div>
+                        <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+                        <div style="font-size: 12px;">If you can read this, your printer is connected and working!</div>
+                        <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+                    </div>
+                `;
+                const result = await printService.printHTML(html);
+                if (!result.success) {
+                    alert(`Print failed: ${result.error}`);
+                }
+                return;
+            }
+
             const encoder = new ESCPOSEncoder({ width: printer.paperWidth === 80 ? 48 : 32 });
 
             encoder.initialize();
@@ -360,6 +382,47 @@ export default function PrinterSettings() {
                                     />
                                     <span className="toggle-slider"></span>
                                 </label>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Silent / Direct Printing Guide */}
+            <div className="settings-section" style={{ border: '1px solid rgba(16, 185, 129, 0.25)', background: 'rgba(16, 185, 129, 0.03)' }}>
+                <SectionHeader id="silent-print" title="Direct / Silent Printing (Zero Dialogs)" icon={Zap} />
+                <AnimatePresence>
+                    {expandedSection === 'silent-print' && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="section-content"
+                        >
+                            <div style={{ padding: '8px 0', fontSize: '13px', lineHeight: '1.6', color: '#cbd5e1' }}>
+                                <p style={{ marginBottom: 12 }}>
+                                    To print receipts and KOTs instantly without the browser print dialog box appearing, use either of these two POS setups:
+                                </p>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                                    <div style={{ background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <div style={{ fontWeight: 600, color: '#34d399', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Zap size={16} /> Option 1: WebUSB Direct Hardware
+                                        </div>
+                                        <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+                                            Connect your thermal printer via USB cable, click <strong>"Add Printer"</strong> above, select <strong>"USB Printer"</strong>, and choose your device. Billova sends raw binary ESC/POS commands directly to the printer hardware with 0 dialog boxes.
+                                        </p>
+                                    </div>
+
+                                    <div style={{ background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <div style={{ fontWeight: 600, color: '#38bdf8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <CheckCircle size={16} /> Option 2: Chrome Kiosk Printing
+                                        </div>
+                                        <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+                                            For Windows/Mac browser driver printing, start Chrome with the <code>--kiosk-printing</code> flag (e.g. In shortcut target: <code>chrome.exe --kiosk-printing https://billova-restaurant-pos-web.vercel.app</code>). All print jobs will print directly to your default thermal printer silently.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     )}

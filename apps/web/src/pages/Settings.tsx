@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Store, Printer, Database, Globe, Share2, Copy, ExternalLink,
     Settings as SettingsIcon, Save, RefreshCw, Building2, MapPin,
-    Phone, ShieldCheck
+    Phone, ShieldCheck, Zap
 } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { usePrinterConfigStore } from '../printing/printer-config-store';
 import { useBranchSettingsStore } from '../store/branch-settings-store';
 import { useSyncStore, getSyncStatusDisplay, getTotalPending } from '../store/sync-store';
 import { syncAll } from '../services/sync-service';
+import { loadBranchSettings, saveBranchSettingsToCloud } from '../api/branches';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Switch } from '../components/ui/Switch';
@@ -139,6 +140,7 @@ function getTimeAgo(date: Date): string {
 export default function SettingsPage() {
     const user = useAuthStore((state) => state.user);
     const [saving, setSaving] = useState(false);
+    const [loadingSettings, setLoadingSettings] = useState(false);
     const [activeTab, setActiveTab] = useState<SettingsTab>('all');
 
     // Printer settings from store
@@ -147,13 +149,34 @@ export default function SettingsPage() {
     // Branch settings from store
     const { settings: branchSettings, updateSettings: updateBranchSettings } = useBranchSettingsStore();
 
+    // Automatically load the latest branch details from Supabase cloud on mount
+    useEffect(() => {
+        let isMounted = true;
+        const fetchSettings = async () => {
+            setLoadingSettings(true);
+            try {
+                await loadBranchSettings();
+            } catch (e) {
+                // Ignore background errors
+            } finally {
+                if (isMounted) setLoadingSettings(false);
+            }
+        };
+        fetchSettings();
+        return () => { isMounted = false; };
+    }, []);
+
     const handleSaveChanges = async () => {
         try {
             setSaving(true);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            toast.success('All settings saved successfully!');
-        } catch (error) {
-            toast.error('Failed to save settings');
+            const result = await saveBranchSettingsToCloud(branchSettings, printerSettings);
+            if (result.success) {
+                toast.success('All settings saved and synced across all devices!');
+            } else {
+                toast.error(result.error || 'Failed to save settings to cloud');
+            }
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to save settings');
         } finally {
             setSaving(false);
         }
@@ -170,11 +193,17 @@ export default function SettingsPage() {
                     <span className="settings-header-sub">Manage store profile, cloud sync, orders, printers & taxes</span>
                 </div>
 
-                <div className="header-actions">
+                <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {loadingSettings && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#94a3b8' }}>
+                            <RefreshCw size={14} className="spin" />
+                            <span>Syncing cloud data…</span>
+                        </div>
+                    )}
                     <button
                         className="btn btn-primary save-all-btn"
                         onClick={handleSaveChanges}
-                        disabled={saving}
+                        disabled={saving || loadingSettings}
                     >
                         {saving ? (
                             <div className="spinner" />
@@ -503,11 +532,29 @@ export default function SettingsPage() {
                             <div className="settings-info-pill-row">
                                 <span>Configured Hardware:</span>
                                 <span className={`ice-badge-pill ${printers.length > 0 ? 'green' : 'amber'}`}>
-                                    {printers.length > 0 ? `${printers.length} Printer${printers.length > 1 ? 's' : ''} Connected` : 'No Printers Added'}
+                                    {printers.length > 0 ? `${printers.length} Printer${printers.length > 1 ? 's' : ''} Connected` : 'Browser Driver (Default)'}
                                 </span>
                             </div>
 
-                            <Link to="/printer-settings" className="btn btn-secondary advanced-printer-link">
+                            <div style={{
+                                marginTop: 8,
+                                padding: '10px 12px',
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                borderRadius: 8,
+                                fontSize: '12px',
+                                color: '#a7f3d0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}>
+                                <Zap size={15} style={{ color: '#34d399', flexShrink: 0 }} />
+                                <span>
+                                    <strong>Direct / Silent Printing:</strong> Connect via WebUSB or launch Chrome with <code>--kiosk-printing</code> flag to bypass printer dialogs completely.
+                                </span>
+                            </div>
+
+                            <Link to="/printer-settings" className="btn btn-secondary advanced-printer-link" style={{ marginTop: 12 }}>
                                 <SettingsIcon size={15} />
                                 <span>Advanced Printer Configuration</span>
                             </Link>

@@ -9,3 +9,4 @@ export * from './inventory';
 export * from './reports';
 export * from './users';
 export * from './super-admin';
+export * from './branches';

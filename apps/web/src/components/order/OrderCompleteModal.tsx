@@ -1,9 +1,8 @@
-// Order Complete Modal - Shows after payment with print, WhatsApp, and new order options
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Printer, MessageCircle, Plus, Loader2, X } from 'lucide-react';
 import { usePrinterConfigStore } from '../../printing/printer-config-store';
-import { reprintReceipt, ReceiptData } from '../../printing';
+import { reprintReceipt, reprintKOT, ReceiptData, KOTData } from '../../printing';
 import './OrderCompleteModal.css';
 import { logger } from '../../utils/logger';
 
@@ -47,19 +46,53 @@ export function OrderCompleteModal({
             setPrintSuccess(false);
             setIsPrinting(false);
 
-            // If auto-print is enabled, print immediately
-            if (settings.autoPrintBill && orderData) {
-                handlePrint();
+            // If auto-print bill or auto-print KOT is enabled, trigger print immediately
+            if ((settings.autoPrintBill || settings.autoPrintKOT) && orderData) {
+                handlePrint(false);
             }
         }
     }, [isOpen, orderData]);
 
-    const handlePrint = async () => {
+    const handlePrint = async (manual = false) => {
         if (!orderData) return;
 
         setIsPrinting(true);
         try {
-            const success = await reprintReceipt(orderData.receiptData);
+            let success = false;
+
+            if (manual || (settings.autoPrintBill && settings.autoPrintKOT)) {
+                // Manual or both enabled: print full receipt + KOT
+                success = await reprintReceipt({
+                    ...orderData.receiptData,
+                    includeKOT: true,
+                });
+            } else if (settings.autoPrintBill && !settings.autoPrintKOT) {
+                // Bill only
+                success = await reprintReceipt({
+                    ...orderData.receiptData,
+                    includeKOT: false,
+                });
+            } else if (settings.autoPrintKOT && !settings.autoPrintBill) {
+                // KOT only
+                const kotData: KOTData = {
+                    kotNumber: `KOT-${orderData.orderNumber || 1}`,
+                    orderNumber: orderData.orderNumber || 1,
+                    tableName: orderData.receiptData.tableName,
+                    orderType: orderData.receiptData.orderType,
+                    createdAt: orderData.receiptData.orderDate || new Date(),
+                    items: orderData.receiptData.items.map(it => ({
+                        name: it.name,
+                        variant: it.variant,
+                        quantity: it.quantity,
+                        notes: it.notes,
+                    })),
+                    orderNotes: orderData.receiptData.notes,
+                };
+                success = await reprintKOT(kotData);
+            } else {
+                success = await reprintReceipt(orderData.receiptData);
+            }
+
             setPrintSuccess(success);
 
             if (success) {
@@ -182,11 +215,11 @@ export function OrderCompleteModal({
                             transition={{ delay: 0.5 }}
                         >
                             {/* Step 1: Complete - Show Print Bill and New Order */}
-                            {(currentStep === 'complete' && !settings.autoPrintBill) && (
+                            {(currentStep === 'complete' && !settings.autoPrintBill && !settings.autoPrintKOT) && (
                                 <div className="complete-buttons">
                                     <button
                                         className="btn-print"
-                                        onClick={handlePrint}
+                                        onClick={() => handlePrint(true)}
                                         disabled={isPrinting}
                                     >
                                         {isPrinting ? (
@@ -213,10 +246,10 @@ export function OrderCompleteModal({
                             )}
 
                             {/* Auto-printing indicator */}
-                            {(currentStep === 'complete' && settings.autoPrintBill && isPrinting) && (
+                            {(currentStep === 'complete' && (settings.autoPrintBill || settings.autoPrintKOT) && isPrinting) && (
                                 <div className="auto-print-status">
                                     <Loader2 size={24} className="spin" />
-                                    <span>Printing bill...</span>
+                                    <span>Printing {settings.autoPrintBill ? 'bill' : ''} {settings.autoPrintBill && settings.autoPrintKOT ? '& ' : ''}{settings.autoPrintKOT ? 'KOT' : ''}...</span>
                                 </div>
                             )}
 
@@ -245,7 +278,7 @@ export function OrderCompleteModal({
                             {currentStep !== 'complete' && !isPrinting && (
                                 <button
                                     className="btn-reprint"
-                                    onClick={handlePrint}
+                                    onClick={() => handlePrint(true)}
                                     disabled={isPrinting}
                                 >
                                     <Printer size={16} />
