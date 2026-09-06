@@ -109,7 +109,31 @@ export async function syncLocalOrdersToSupabase(branchId?: string): Promise<numb
     const user = useAuthStore.getState().user;
     const activeBranchId = branchId || user?.branch?.id || (user as any)?.branchId;
     const list = getStoredLocalOrders(activeBranchId);
-    const unsynced = list.filter(o => o.id && (o.id.startsWith('ord-') || o.id.startsWith('temp-')));
+    if (!Array.isArray(list) || list.length === 0) return 0;
+
+    let unsynced: any[] = [];
+    try {
+        // Query Supabase for existing order IDs & numbers to accurately detect ANY un-synced orders (even if local ID is UUID)
+        let query = supabase.from('orders').select('id, order_number, created_at');
+        if (isValidUUID(activeBranchId)) {
+            query = query.or(`branch_id.eq.${activeBranchId},branch_id.is.null`);
+        }
+        const { data: existingRemote } = await query.limit(1000);
+        const remoteIdSet = new Set((existingRemote || []).map((r: any) => r.id));
+        const remoteNumDateSet = new Set((existingRemote || []).map((r: any) => `${r.order_number}_${(r.created_at || '').substring(0, 10)}`));
+
+        unsynced = list.filter(o => {
+            if (!o.id) return false;
+            if (o.syncedToCloud === true && remoteIdSet.has(o.id)) return false;
+            if (remoteIdSet.has(o.id)) return false;
+            const dateStr = (o.createdAt || o.created_at || '').substring(0, 10);
+            if (remoteNumDateSet.has(`${o.orderNumber || o.dailyOrderNo}_${dateStr}`)) return false;
+            return true;
+        });
+    } catch {
+        unsynced = list.filter(o => o.id && (o.id.startsWith('ord-') || o.id.startsWith('temp-') || !o.syncedToCloud));
+    }
+
     if (unsynced.length === 0) return 0;
 
     let syncedCount = 0;
@@ -120,24 +144,26 @@ export async function syncLocalOrdersToSupabase(branchId?: string): Promise<numb
                 ? localOrd.id
                 : ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined);
 
+            const itemsArray = localOrd.items || [];
             const insertPayload: any = {
                 ...(syncOrderUuid ? { id: syncOrderUuid } : {}),
-                order_number: localOrd.orderNumber || 1,
-                daily_order_no: localOrd.dailyOrderNo || localOrd.orderNumber || 1,
+                order_number: Number(localOrd.orderNumber || localOrd.dailyOrderNo || 1),
+                daily_order_no: Number(localOrd.dailyOrderNo || localOrd.orderNumber || 1),
                 order_type: localOrd.orderType || 'DINE_IN',
-                status: localOrd.status || 'PENDING',
+                status: localOrd.status || 'COMPLETED',
                 customer_name: localOrd.customerName || null,
                 customer_phone: localOrd.customerPhone || null,
+                items: JSON.stringify(itemsArray),
                 subtotal: Number(localOrd.subtotal || 0),
-                total: Number(localOrd.total || 0),
-                total_amount: Number(localOrd.total || 0),
+                total: Number(localOrd.total || localOrd.totalAmount || 0),
+                total_amount: Number(localOrd.total || localOrd.totalAmount || 0),
                 discount_amount: Number(localOrd.discountAmount || 0),
                 gst_amount: Number(localOrd.gstAmount || 0),
                 notes: localOrd.notes || null,
                 online_platform: localOrd.onlinePlatform || null,
                 online_order_id: localOrd.onlineOrderId || null,
                 created_at: localOrd.createdAt || new Date().toISOString(),
-                completed_at: localOrd.completedAt || (localOrd.status === 'COMPLETED' ? localOrd.createdAt : null),
+                completed_at: localOrd.completedAt || (localOrd.status === 'COMPLETED' ? (localOrd.createdAt || new Date().toISOString()) : null),
             };
 
             if (isValidUUID(targetBranchId)) insertPayload.branch_id = targetBranchId;
@@ -149,45 +175,51 @@ export async function syncLocalOrdersToSupabase(branchId?: string): Promise<numb
                 .single();
 
             if (!orderErr && serverOrder) {
-                // Update local storage with real Supabase UUID
+                // Update local storage with real Supabase UUID and mark as synced
                 localOrd.id = serverOrder.id;
+                localOrd.syncedToCloud = true;
                 saveLocalOrder(localOrd, targetBranchId);
 
                 // Insert items
-                if (localOrd.items && localOrd.items.length > 0) {
-                    const itemsPayload = localOrd.items.map((it: any) => {
+                if (itemsArray.length > 0) {
+                    const itemsPayload = itemsArray.map((it: any) => {
                         const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
                         const rawMenuId = it.menuItem?.id || it.menuItemId || it.id;
+                        const dishName = it.name || it.menuItem?.name || it.itemName || 'Item';
                         return {
                             ...(itemUuid ? { id: itemUuid } : {}),
                             order_id: serverOrder.id,
+                            name: dishName,
                             menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
                             quantity: Number(it.quantity || 1),
-                            unit_price: Number(it.unitPrice || 0),
+                            unit_price: Number(it.unitPrice || it.price || 0),
                             total: Number(it.total || 0),
                             notes: it.notes || null,
-                            status: 'PENDING',
+                            status: localOrd.status || 'COMPLETED',
                         };
                     });
                     await supabase.from('order_items').insert(itemsPayload);
                 }
 
                 // Insert payments
-                if (localOrd.payments && localOrd.payments.length > 0) {
-                    const paymentsPayload = localOrd.payments.map((p: any) => {
+                const paymentsArray = localOrd.payments || [{ mode: localOrd.paymentMethod || 'CASH', amount: Number(localOrd.total || 0) }];
+                if (paymentsArray.length > 0) {
+                    const paymentsPayload = paymentsArray.map((p: any) => {
                         const payUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
                         return {
                             ...(payUuid ? { id: payUuid } : {}),
                             order_id: serverOrder.id,
                             mode: p.mode || 'CASH',
                             amount: Number(p.amount || localOrd.total || 0),
-                            created_at: p.createdAt || new Date().toISOString(),
+                            created_at: p.createdAt || localOrd.createdAt || new Date().toISOString(),
                         };
                     });
                     await supabase.from('payments').insert(paymentsPayload);
                 }
                 syncedCount++;
                 logger.info(`[Sync] Order #${localOrd.orderNumber} successfully synced to Supabase:`, serverOrder.id);
+            } else if (orderErr) {
+                logger.warn(`[Sync] Order #${localOrd.orderNumber} insert error:`, orderErr);
             }
         } catch (syncErr) {
             logger.warn(`[Sync] Failed to sync order #${localOrd.orderNumber}:`, syncErr);
@@ -295,7 +327,31 @@ export const ordersAPI = {
             // 3. Format remote orders
             const formattedRemote = rawOrders.map((o: any) => {
                 const num = Number(o.order_number || o.daily_order_no || 1);
-                const orderItems = itemsByOrder.get(o.id) || (Array.isArray(o.items) ? o.items : []);
+                let orderItems = itemsByOrder.get(o.id);
+                if (!orderItems || orderItems.length === 0) {
+                    if (typeof o.items === 'string') {
+                        try {
+                            const parsed = JSON.parse(o.items);
+                            if (Array.isArray(parsed)) {
+                                orderItems = parsed.map((it: any) => ({
+                                    id: it.id || `it-${Math.random()}`,
+                                    name: it.name || it.menuItem?.name || it.itemName || 'Item',
+                                    quantity: Number(it.quantity || 1),
+                                    unitPrice: Number(it.unitPrice || it.price || it.unit_price || 0),
+                                    total: Number(it.total || (Number(it.unitPrice || it.price || 0) * Number(it.quantity || 1))),
+                                    notes: it.notes,
+                                    menuItemId: it.menuItemId || it.menu_item_id || it.id,
+                                    menuItem: { id: it.menuItemId || it.menu_item_id || it.id, name: it.name || it.menuItem?.name || 'Item' },
+                                    variant: it.variant,
+                                }));
+                            }
+                        } catch {}
+                    } else if (Array.isArray(o.items)) {
+                        orderItems = o.items;
+                    }
+                }
+                if (!orderItems) orderItems = [];
+
                 const orderPayments = paymentsByOrder.get(o.id) || (Array.isArray(o.payments) ? o.payments : []);
                 const tableInfo = o.table_id ? tableMap.get(o.table_id) : undefined;
 
@@ -323,6 +379,7 @@ export const ordersAPI = {
                     table: tableInfo ? { id: tableInfo.id, name: tableInfo.name } : undefined,
                     items: orderItems,
                     payments: orderPayments,
+                    syncedToCloud: true,
                 };
             });
 
@@ -550,6 +607,7 @@ export const ordersAPI = {
                 status: (data as any).status || 'PENDING',
                 customer_name: data.customerName || null,
                 customer_phone: data.customerPhone || null,
+                items: JSON.stringify(formattedItems),
                 subtotal: subtotal,
                 total: total,
                 total_amount: total,
@@ -580,27 +638,28 @@ export const ordersAPI = {
                 .select()
                 .single();
 
-            const finalOrderId = serverOrder?.id || clientGeneratedOrderId || assignedOrderId;
-
-            if (!orderErr && finalOrderId) {
-                assignedOrderId = finalOrderId;
-                baseOrder.id = finalOrderId;
+            if (!orderErr && serverOrder) {
+                assignedOrderId = serverOrder.id;
+                baseOrder.id = serverOrder.id;
+                (baseOrder as any).syncedToCloud = true;
 
                 // Insert items into Supabase
-                if (items.length > 0) {
+                if (formattedItems.length > 0) {
                     try {
-                        const orderItemsPayload = items.map((it: any) => {
+                        const orderItemsPayload = formattedItems.map((it: any) => {
                             const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
                             const rawMenuId = it.menuItemId || it.id || (it as any).menuItem?.id;
+                            const dishName = it.name || it.menuItem?.name || 'Item';
                             return {
                                 ...(itemUuid ? { id: itemUuid } : {}),
-                                order_id: finalOrderId,
+                                order_id: serverOrder.id,
+                                name: dishName,
                                 menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
                                 quantity: Number(it.quantity || 1),
                                 unit_price: Number(it.unitPrice || it.price || (it.total / (it.quantity || 1)) || 0),
                                 total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
                                 notes: it.notes || null,
-                                status: 'PENDING',
+                                status: (data as any).status || 'PENDING',
                             };
                         });
 
@@ -609,12 +668,14 @@ export const ordersAPI = {
                         logger.warn('Could not insert items into order_items table:', itemInsertErr);
                     }
                 }
-                logger.info(`[POS] Order #${nextOrderNumber} saved to Supabase:`, finalOrderId);
-            } else if (orderErr) {
-                logger.error('[POS] Supabase order insert error:', orderErr);
+                logger.info(`[POS] Order #${nextOrderNumber} saved to Supabase:`, serverOrder.id);
+            } else {
+                if (orderErr) logger.error('[POS] Supabase order insert error:', orderErr);
+                (baseOrder as any).syncedToCloud = false;
             }
         } catch (supErr) {
             logger.error('[POS] Supabase order insert exception:', supErr);
+            (baseOrder as any).syncedToCloud = false;
         }
 
         // Save order with latest ID to local cache as backup
@@ -649,14 +710,14 @@ export const ordersAPI = {
         }
 
         try {
-            if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
+            if (isValidUUID(id)) {
                 try {
                     const payUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
                     await supabase.from('payments').insert([{
                         ...(payUuid ? { id: payUuid } : {}),
                         order_id: id,
                         mode: data.mode || 'CASH',
-                        amount: data.amount,
+                        amount: Number(data.amount || 0),
                         created_at: new Date().toISOString(),
                     }]);
                 } catch (payErr) {
@@ -665,6 +726,8 @@ export const ordersAPI = {
 
                 await supabase.from('orders').update({
                     status: 'COMPLETED',
+                    payment_status: 'PAID',
+                    payment_method: data.mode || 'CASH',
                     completed_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                 }).eq('id', id);

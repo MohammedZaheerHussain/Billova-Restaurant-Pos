@@ -304,7 +304,7 @@ export const useAuthStore = create<AuthStore>()(
                 token,
                 user,
                 isAuthenticated: true,
-                tokenExpiry: Date.now() + 24 * 60 * 60 * 1000, // 24h from now
+                tokenExpiry: Date.now() + 90 * 24 * 60 * 60 * 1000, // 90 days persistent session
             }),
             logout: () => set({ token: null, tokenExpiry: null, user: null, isAuthenticated: false }),
             isTokenExpired: () => {
