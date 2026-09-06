@@ -2,11 +2,29 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const buildTimestamp = Date.now();
+
 export default defineConfig({
+    define: {
+        __APP_BUILD_TIME__: JSON.stringify(buildTimestamp),
+    },
     plugins: [
         react(),
+        {
+            name: 'emit-version-json',
+            generateBundle() {
+                this.emitFile({
+                    type: 'asset',
+                    fileName: 'version.json',
+                    source: JSON.stringify({
+                        buildTime: buildTimestamp,
+                        buildDate: new Date(buildTimestamp).toISOString(),
+                    }, null, 2),
+                });
+            },
+        },
         VitePWA({
-            registerType: 'autoUpdate',
+            registerType: 'prompt',
             includeAssets: ['logo.png', 'apple-touch-icon.png', 'favicon.png', 'favicon.ico'],
             manifest: {
                 name: 'Billova POS',
@@ -33,7 +51,6 @@ export default defineConfig({
             },
             workbox: {
                 clientsClaim: true,
-                skipWaiting: true,
                 navigateFallback: '/index.html',
                 navigateFallbackDenylist: [/^\/api\//],
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
