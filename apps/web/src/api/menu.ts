@@ -23,41 +23,51 @@ export const menuAPI = {
             try { return await api.get('/menu', { params: { branchId, categoryId } }); } catch { /* fallback */ }
         }
         try {
-            let query = supabase.from('menu_items').select('*, category:categories(*)');
-            if (branchId) query = query.eq('branch_id', branchId);
-            if (categoryId) query = query.eq('category_id', categoryId);
-            const { data, error } = await query;
-            if (error) {
-                logger.warn('[menuAPI.getAll] Relational query failed, retrying simple select:', error?.message || error);
+            let data: any[] | null = null;
+
+            // Strategy 1: Branch matching OR branch_id is null (global items)
+            if (branchId) {
+                let query = supabase.from('menu_items').select('*, category:categories(*)');
+                query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+                if (categoryId) query = query.eq('category_id', categoryId);
+                const { data: bData, error: bErr } = await query;
+                if (!bErr && bData && bData.length > 0) {
+                    data = bData;
+                }
+            }
+
+            // Strategy 2: If no data yet, query all menu items with category relation
+            if (!data || data.length === 0) {
+                let allQuery = supabase.from('menu_items').select('*, category:categories(*)');
+                if (categoryId) allQuery = allQuery.eq('category_id', categoryId);
+                const { data: allData, error: allErr } = await allQuery;
+                if (!allErr && allData && allData.length > 0) {
+                    data = allData;
+                }
+            }
+
+            // Strategy 3: If relational query had an error or 0 items, try simple flat select
+            if (!data || data.length === 0) {
                 let simpleQuery = supabase.from('menu_items').select('*');
-                if (branchId) simpleQuery = simpleQuery.eq('branch_id', branchId);
+                if (branchId) {
+                    simpleQuery = simpleQuery.or(`branch_id.eq.${branchId},branch_id.is.null`);
+                }
+                if (categoryId) simpleQuery = simpleQuery.eq('category_id', categoryId);
                 const { data: simpleData } = await simpleQuery;
                 if (simpleData && simpleData.length > 0) {
-                    const formatted = simpleData.map((m: any) => ({
-                        id: m.id,
-                        name: m.name,
-                        price: Number(m.price || 0),
-                        categoryId: m.category_id,
-                        isVeg: m.is_veg ?? true,
-                        isAvailable: m.is_available ?? true,
-                        description: m.description,
-                    }));
-                    // Deduplicate by name
-                    const uniqueMap = new Map<string, any>();
-                    for (const item of formatted) {
-                        const key = item.name.trim().toLowerCase();
-                        if (!uniqueMap.has(key)) {
-                            uniqueMap.set(key, item);
-                        } else {
-                            const existing = uniqueMap.get(key);
-                            if (!existing.categoryId && item.categoryId) uniqueMap.set(key, item);
-                        }
+                    data = simpleData;
+                } else {
+                    // Strategy 4: Simple select across ALL menu_items table
+                    let fallbackQuery = supabase.from('menu_items').select('*');
+                    if (categoryId) fallbackQuery = fallbackQuery.eq('category_id', categoryId);
+                    const { data: fallbackData } = await fallbackQuery;
+                    if (fallbackData && fallbackData.length > 0) {
+                        data = fallbackData;
                     }
-                    const deduplicated = Array.from(uniqueMap.values());
-                    try { localStorage.setItem(cacheKey, JSON.stringify(deduplicated)); } catch {}
-                    return { data: deduplicated };
                 }
-            } else if (data && data.length > 0) {
+            }
+
+            if (data && data.length > 0) {
                 const formatted = data.map((m: any) => ({
                     id: m.id,
                     name: m.name,
@@ -68,10 +78,11 @@ export const menuAPI = {
                     isAvailable: m.is_available ?? true,
                     description: m.description,
                 }));
+
                 // Deduplicate by name
                 const uniqueMap = new Map<string, any>();
                 for (const item of formatted) {
-                    const key = item.name.trim().toLowerCase();
+                    const key = (item.name || '').trim().toLowerCase();
                     if (!uniqueMap.has(key)) {
                         uniqueMap.set(key, item);
                     } else {
@@ -80,16 +91,19 @@ export const menuAPI = {
                     }
                 }
                 const deduplicated = Array.from(uniqueMap.values());
-                try { localStorage.setItem(cacheKey, JSON.stringify(deduplicated)); } catch {}
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(deduplicated));
+                    localStorage.setItem('billova_menu_cache_default', JSON.stringify(deduplicated));
+                } catch {}
                 return { data: deduplicated };
             }
         } catch (netErr) {
             logger.warn('[menuAPI.getAll] Network query failed, checking offline cache:', netErr);
         }
 
-        // Offline Fallback from tenant-scoped cache
+        // Offline Fallback from tenant-scoped cache OR default cache
         try {
-            const cached = localStorage.getItem(cacheKey);
+            const cached = localStorage.getItem(cacheKey) || localStorage.getItem('billova_menu_cache_default');
             if (cached) {
                 const parsed = JSON.parse(cached);
                 if (Array.isArray(parsed) && parsed.length > 0) {
@@ -622,10 +636,32 @@ export const categoriesAPI = {
             try { return await api.get('/categories', { params: { branchId } }); } catch { /* fallback */ }
         }
         try {
-            let query = supabase.from('categories').select('*').order('name');
-            if (branchId) query = query.eq('branch_id', branchId);
-            const { data, error } = await query;
-            if (!error && data && data.length > 0) {
+            let data: any[] | null = null;
+
+            // Strategy 1: Branch matching OR branch_id is null (global categories)
+            if (branchId) {
+                const { data: bData, error: bErr } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .or(`branch_id.eq.${branchId},branch_id.is.null`)
+                    .order('name');
+                if (!bErr && bData && bData.length > 0) {
+                    data = bData;
+                }
+            }
+
+            // Strategy 2: If no data yet, query all categories table
+            if (!data || data.length === 0) {
+                const { data: allData, error: allErr } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .order('name');
+                if (!allErr && allData && allData.length > 0) {
+                    data = allData;
+                }
+            }
+
+            if (data && data.length > 0) {
                 const uniqueMap = new Map<string, any>();
                 for (const c of data) {
                     const key = c.name.trim().toLowerCase();
@@ -643,16 +679,19 @@ export const categoriesAPI = {
                 }
 
                 const formatted = Array.from(uniqueMap.values());
-                try { localStorage.setItem(cacheKey, JSON.stringify(formatted)); } catch {}
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify(formatted));
+                    localStorage.setItem('billova_categories_cache_default', JSON.stringify(formatted));
+                } catch {}
                 return { data: formatted };
             }
         } catch (netErr) {
             logger.warn('[categoriesAPI.getAll] Network query failed, checking offline cache:', netErr);
         }
 
-        // Offline Fallback from tenant-scoped cache
+        // Offline Fallback from tenant-scoped cache OR default cache
         try {
-            const cached = localStorage.getItem(cacheKey);
+            const cached = localStorage.getItem(cacheKey) || localStorage.getItem('billova_categories_cache_default');
             if (cached) {
                 const parsed = JSON.parse(cached);
                 if (Array.isArray(parsed) && parsed.length > 0) {

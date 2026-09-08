@@ -203,7 +203,7 @@ export default function POSPage() {
         if (isQuickPicksActive) {
             // In Quick Picks mode, show items that match search query
             const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
-            return matchesSearch && item.isAvailable;
+            return matchesSearch && item.isAvailable !== false;
         }
 
         const catObj = categories.find((c) => c.id === selectedCategory);
@@ -216,7 +216,7 @@ export default function POSPage() {
         const matchesSearch = !searchQuery ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-        return matchesCategory && matchesSearch && item.isAvailable;
+        return matchesCategory && matchesSearch && item.isAvailable !== false;
     });
 
     // If Quick Picks is active, limit to top 10 items

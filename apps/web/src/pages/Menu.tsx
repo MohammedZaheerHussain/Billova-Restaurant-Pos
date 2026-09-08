@@ -341,7 +341,9 @@ export default function MenuPage() {
     };
 
     const filteredItems = items.filter((item) => {
-        const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+        const catObj = categories.find((c) => c.id === selectedCategory);
+        const catIds = catObj && (catObj as any).ids ? (catObj as any).ids : (selectedCategory ? [selectedCategory] : []);
+        const matchesCategory = !selectedCategory || item.categoryId === selectedCategory || catIds.includes(item.categoryId);
         const matchesSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
