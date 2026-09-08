@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Warehouse as WarehouseIcon, Plus, Package, ArrowRightLeft,
+    Plus, ArrowRightLeft,
     Building2, X, Check, Truck, ChevronRight, MapPin,
     Users, AlertTriangle, Grid3X3
 } from 'lucide-react';
@@ -263,16 +263,6 @@ export default function WarehousePage() {
         });
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'PENDING': return '#f59e0b';
-            case 'APPROVED': return '#3b82f6';
-            case 'IN_TRANSIT': return '#8b5cf6';
-            case 'COMPLETED': return '#10b981';
-            case 'CANCELLED': return '#ef4444';
-            default: return '#6b7280';
-        }
-    };
 
     if (loading) {
         return (
@@ -287,20 +277,20 @@ export default function WarehousePage() {
             <Toaster position="top-center" />
 
             {/* Header */}
-            <header className="wh-header">
+            <div className="page-header">
                 <div>
-                    <h1><WarehouseIcon size={28} /> Warehouse Management</h1>
+                    <h1>Warehouse Management</h1>
                     <p>{warehouses.length} warehouses • {transfers.filter(t => t.status === 'PENDING').length} pending transfers</p>
                 </div>
                 <div className="header-actions">
-                    <button className="btn-secondary" onClick={() => setShowTransfer(true)}>
-                        <ArrowRightLeft size={18} /> Stock Transfer
+                    <button className="btn btn-secondary" onClick={() => setShowTransfer(true)}>
+                        <ArrowRightLeft size={16} /> Stock Transfer
                     </button>
-                    <button className="btn-primary" onClick={() => setShowAddWarehouse(true)}>
-                        <Plus size={18} /> Add Warehouse
+                    <button className="btn btn-primary" onClick={() => setShowAddWarehouse(true)}>
+                        <Plus size={16} /> Add Warehouse
                     </button>
                 </div>
-            </header>
+            </div>
 
             {/* Tabs */}
             <div className="wh-tabs">
@@ -308,258 +298,317 @@ export default function WarehousePage() {
                     className={`wh-tab ${activeTab === 'warehouses' ? 'active' : ''}`}
                     onClick={() => setActiveTab('warehouses')}
                 >
-                    <Building2 size={18} /> Warehouses
+                    <Building2 size={16} /> Warehouses
                 </button>
                 <button
                     className={`wh-tab ${activeTab === 'transfers' ? 'active' : ''}`}
                     onClick={() => setActiveTab('transfers')}
                 >
-                    <Truck size={18} /> Transfers
+                    <Truck size={16} /> Transfers
                 </button>
                 <button
                     className={`wh-tab ${activeTab === 'locations' ? 'active' : ''}`}
                     onClick={() => setActiveTab('locations')}
                 >
-                    <MapPin size={18} /> Locations
+                    <MapPin size={16} /> Locations
                 </button>
                 <button
                     className={`wh-tab ${activeTab === 'suppliers' ? 'active' : ''}`}
                     onClick={() => setActiveTab('suppliers')}
                 >
-                    <Users size={18} /> Suppliers
+                    <Users size={16} /> Suppliers
                 </button>
                 <button
                     className={`wh-tab ${activeTab === 'adjustments' ? 'active' : ''}`}
                     onClick={() => setActiveTab('adjustments')}
                 >
-                    <AlertTriangle size={18} /> Adjustments
+                    <AlertTriangle size={16} /> Adjustments
                 </button>
             </div>
 
-            {/* Content */}
-            {activeTab === 'warehouses' ? (
-                <div className="wh-grid">
-                    {warehouses.map((wh) => (
-                        <motion.div
-                            key={wh.id}
-                            className="wh-card"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                        >
-                            <div className="wh-card-header">
-                                <Building2 size={24} />
-                                <div>
-                                    <h3>{wh.name}</h3>
-                                    {wh.isMain && <span className="main-badge">Main</span>}
-                                </div>
-                            </div>
-                            {wh.address && <p className="wh-address">{wh.address}</p>}
-                            <div className="wh-stats">
-                                <Package size={16} />
-                                <span>{wh._count?.stock || 0} items in stock</span>
-                            </div>
-                            <button className="view-stock-btn">
-                                View Stock <ChevronRight size={16} />
-                            </button>
-                        </motion.div>
-                    ))}
-
-                    {warehouses.length === 0 && (
-                        <div className="empty-state">
-                            <WarehouseIcon size={48} />
-                            <p>No warehouses yet. Add your first warehouse to get started.</p>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="transfers-list">
-                    {transfers.map((transfer) => (
-                        <motion.div
-                            key={transfer.id}
-                            className="transfer-card"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                        >
-                            <div className="transfer-header">
-                                <span className="transfer-number">#{transfer.transferNumber}</span>
-                                <span
-                                    className="transfer-status"
-                                    style={{ background: getStatusColor(transfer.status) }}
-                                >
-                                    {transfer.status}
-                                </span>
-                            </div>
-                            <div className="transfer-route">
-                                <span>{transfer.fromWarehouse.name}</span>
-                                <ArrowRightLeft size={16} />
-                                <span>{transfer.toWarehouse.name}</span>
-                            </div>
-                            <div className="transfer-items">
-                                {transfer.items.slice(0, 3).map((item, i) => (
-                                    <span key={i}>{item.quantity} {item.inventoryItem.unit} {item.inventoryItem.name}</span>
-                                ))}
-                                {transfer.items.length > 3 && <span>+{transfer.items.length - 3} more</span>}
-                            </div>
-                            {transfer.status === 'PENDING' && (
-                                <div className="transfer-actions">
-                                    <button onClick={() => updateTransferStatus(transfer.id, 'APPROVED')}>
-                                        <Check size={16} /> Approve
-                                    </button>
-                                    <button className="cancel" onClick={() => updateTransferStatus(transfer.id, 'CANCELLED')}>
-                                        <X size={16} /> Cancel
-                                    </button>
-                                </div>
-                            )}
-                            {transfer.status === 'APPROVED' && (
-                                <button
-                                    className="complete-btn"
-                                    onClick={() => updateTransferStatus(transfer.id, 'COMPLETED')}
-                                >
-                                    Mark Completed
-                                </button>
-                            )}
-                        </motion.div>
-                    ))}
-
-                    {transfers.length === 0 && (
-                        <div className="empty-state">
-                            <Truck size={48} />
-                            <p>No transfers yet.</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Locations Tab */}
-            {activeTab === 'locations' && (
-                <div className="locations-section">
-                    <div className="location-header">
-                        <div className="form-group inline">
-                            <label>Select Warehouse:</label>
-                            <select
-                                value={selectedWarehouse}
-                                onChange={(e) => {
-                                    setSelectedWarehouse(e.target.value);
-                                    if (e.target.value) fetchZones(e.target.value);
-                                }}
+            {/* Content Body */}
+            <div className="wh-content">
+                {/* Warehouses Tab */}
+                {activeTab === 'warehouses' && (
+                    <div className="wh-grid">
+                        {warehouses.map((wh) => (
+                            <motion.div
+                                key={wh.id}
+                                className="wh-card"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
                             >
-                                <option value="">Choose warehouse</option>
-                                {warehouses.map(w => (
-                                    <option key={w.id} value={w.id}>{w.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        {selectedWarehouse && (
-                            <button className="btn-primary" onClick={() => setShowAddZone(true)}>
-                                <Plus size={16} /> Add Zone
-                            </button>
-                        )}
-                    </div>
-
-                    {selectedWarehouse ? (
-                        <div className="zones-grid">
-                            {zones.map(zone => (
-                                <motion.div key={zone.id} className="zone-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                    <div className="zone-header">
-                                        <Grid3X3 size={20} />
-                                        <span className="zone-code">{zone.code}</span>
-                                    </div>
-                                    <h4>{zone.name}</h4>
-                                    <p>{zone._count?.racks || 0} racks</p>
-                                </motion.div>
-                            ))}
-                            {zones.length === 0 && (
-                                <div className="empty-state">
-                                    <MapPin size={48} />
-                                    <p>No zones yet. Create zones to organize your warehouse.</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="empty-state">
-                            <MapPin size={48} />
-                            <p>Select a warehouse to view its location hierarchy.</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Suppliers Tab */}
-            {activeTab === 'suppliers' && (
-                <div className="suppliers-section">
-                    <div className="section-header">
-                        <h3><Users size={20} /> Suppliers ({suppliers.length})</h3>
-                        <button className="btn-primary" onClick={() => setShowAddSupplier(true)}>
-                            <Plus size={16} /> Add Supplier
-                        </button>
-                    </div>
-                    <div className="suppliers-grid">
-                        {suppliers.map(supplier => (
-                            <motion.div key={supplier.id} className="supplier-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                                <div className="supplier-header">
-                                    <Users size={20} />
-                                    <div>
-                                        <h4>{supplier.name}</h4>
-                                        {supplier.code && <span className="supplier-code">{supplier.code}</span>}
+                                <div className="wh-card-header">
+                                    <div className="wh-card-title-group">
+                                        <div className="wh-icon-box">
+                                            <Building2 size={20} />
+                                        </div>
+                                        <div>
+                                            <h3>{wh.name}</h3>
+                                            {wh.isMain && <span className="main-badge">Main Warehouse</span>}
+                                        </div>
                                     </div>
                                 </div>
-                                {supplier.phone && <p className="supplier-contact">📞 {supplier.phone}</p>}
-                                {supplier.email && <p className="supplier-contact">✉️ {supplier.email}</p>}
-                                {supplier.gstNumber && <p className="supplier-gst">GST: {supplier.gstNumber}</p>}
+                                {wh.address && <p className="wh-address">📍 {wh.address}</p>}
+                                <div className="wh-stats">
+                                    <div className="wh-stat">
+                                        <span className="wh-stat-value">{wh._count?.stock || 0}</span>
+                                        <span className="wh-stat-label">Items in Stock</span>
+                                    </div>
+                                </div>
+                                <button className="view-stock-btn">
+                                    View Warehouse Stock <ChevronRight size={15} />
+                                </button>
                             </motion.div>
                         ))}
-                        {suppliers.length === 0 && (
+
+                        {warehouses.length === 0 && (
                             <div className="empty-state">
-                                <Users size={48} />
-                                <p>No suppliers yet. Add your first supplier.</p>
+                                <div className="empty-state-icon-box">
+                                    <Building2 size={32} />
+                                </div>
+                                <h3>No warehouses yet</h3>
+                                <p>Create your primary warehouse or stock rooms to track multi-location supplies.</p>
+                                <button className="btn btn-primary" onClick={() => setShowAddWarehouse(true)}>
+                                    <Plus size={16} /> Add First Warehouse
+                                </button>
                             </div>
                         )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Adjustments Tab */}
-            {activeTab === 'adjustments' && (
-                <div className="adjustments-section">
-                    <div className="section-header">
-                        <h3><AlertTriangle size={20} /> Stock Adjustments</h3>
-                        <button className="btn-primary" onClick={() => setShowAddAdjustment(true)}>
-                            <Plus size={16} /> New Adjustment
-                        </button>
-                    </div>
-                    <div className="adjustments-list">
-                        {adjustments.map(adj => (
-                            <motion.div key={adj.id} className="adjustment-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                <div className="adjustment-header">
-                                    <span className={`adj-type adj-${adj.adjustmentType.toLowerCase()}`}>
-                                        {adj.adjustmentType}
-                                    </span>
-                                    <span className={`adj-status status-${adj.status.toLowerCase()}`}>
-                                        {adj.status}
+                {/* Transfers Tab */}
+                {activeTab === 'transfers' && (
+                    <div className="transfers-list">
+                        {transfers.map((transfer) => (
+                            <motion.div
+                                key={transfer.id}
+                                className="transfer-card"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                            >
+                                <div className="transfer-header">
+                                    <span className="transfer-number">#{transfer.transferNumber}</span>
+                                    <span
+                                        className={`transfer-status status-${transfer.status.toLowerCase()}`}
+                                    >
+                                        {transfer.status}
                                     </span>
                                 </div>
-                                <div className="adjustment-details">
-                                    <p><strong>{adj.inventoryItem?.name}</strong> - {adj.quantity} {adj.inventoryItem?.unit}</p>
-                                    <p className="adj-reason">{adj.reason}</p>
+                                <div className="transfer-route">
+                                    <span>{transfer.fromWarehouse.name}</span>
+                                    <ArrowRightLeft size={16} />
+                                    <span>{transfer.toWarehouse.name}</span>
                                 </div>
-                                {adj.status === 'PENDING' && (
-                                    <div className="adjustment-actions">
-                                        <button className="approve-btn" onClick={() => approveAdjustment(adj.id)}>
+                                <div className="transfer-items">
+                                    {transfer.items.slice(0, 3).map((item, i) => (
+                                        <span key={i} className="transfer-item-pill">
+                                            {item.quantity} {item.inventoryItem.unit} {item.inventoryItem.name}
+                                        </span>
+                                    ))}
+                                    {transfer.items.length > 3 && <span className="transfer-more">+{transfer.items.length - 3} more</span>}
+                                </div>
+                                {transfer.status === 'PENDING' && (
+                                    <div className="transfer-actions">
+                                        <button className="btn-approve" onClick={() => updateTransferStatus(transfer.id, 'APPROVED')}>
                                             <Check size={14} /> Approve
+                                        </button>
+                                        <button className="btn-cancel" onClick={() => updateTransferStatus(transfer.id, 'CANCELLED')}>
+                                            <X size={14} /> Cancel
                                         </button>
                                     </div>
                                 )}
+                                {transfer.status === 'APPROVED' && (
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => updateTransferStatus(transfer.id, 'COMPLETED')}
+                                    >
+                                        Mark Completed
+                                    </button>
+                                )}
                             </motion.div>
                         ))}
-                        {adjustments.length === 0 && (
+
+                        {transfers.length === 0 && (
                             <div className="empty-state">
-                                <AlertTriangle size={48} />
-                                <p>No adjustments recorded. Use adjustments to track damage, expired, or wasted stock.</p>
+                                <div className="empty-state-icon-box">
+                                    <Truck size={32} />
+                                </div>
+                                <h3>No transfers recorded</h3>
+                                <p>Create stock transfers between branch warehouses and kitchens seamlessly.</p>
+                                <button className="btn btn-primary" onClick={() => setShowTransfer(true)}>
+                                    <ArrowRightLeft size={16} /> Create Transfer
+                                </button>
                             </div>
                         )}
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* Locations Tab */}
+                {activeTab === 'locations' && (
+                    <div className="locations-section">
+                        <div className="location-filter-bar">
+                            <div className="form-group-inline">
+                                <label>Warehouse:</label>
+                                <select
+                                    value={selectedWarehouse}
+                                    onChange={(e) => {
+                                        setSelectedWarehouse(e.target.value);
+                                        if (e.target.value) fetchZones(e.target.value);
+                                    }}
+                                    className="wh-select"
+                                >
+                                    <option value="">Select a warehouse</option>
+                                    {warehouses.map(w => (
+                                        <option key={w.id} value={w.id}>{w.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {selectedWarehouse && (
+                                <button className="btn btn-primary" onClick={() => setShowAddZone(true)}>
+                                    <Plus size={16} /> Add Zone
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedWarehouse ? (
+                            <div className="zones-grid">
+                                {zones.map(zone => (
+                                    <motion.div key={zone.id} className="zone-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                        <div className="zone-header">
+                                            <Grid3X3 size={18} />
+                                            <span className="zone-code">{zone.code}</span>
+                                        </div>
+                                        <h4>{zone.name}</h4>
+                                        <p>{zone._count?.racks || 0} racks configured</p>
+                                    </motion.div>
+                                ))}
+                                {zones.length === 0 && (
+                                    <div className="empty-state">
+                                        <div className="empty-state-icon-box">
+                                            <MapPin size={32} />
+                                        </div>
+                                        <h3>No zones yet</h3>
+                                        <p>Create storage zones, aisles, and cold storage sections to organize inventory.</p>
+                                        <button className="btn btn-primary" onClick={() => setShowAddZone(true)}>
+                                            <Plus size={16} /> Add Zone
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="empty-state">
+                                <div className="empty-state-icon-box">
+                                    <MapPin size={32} />
+                                </div>
+                                <h3>Select a Warehouse</h3>
+                                <p>Choose a warehouse from the dropdown above to view its zones, racks, and locations.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Suppliers Tab */}
+                {activeTab === 'suppliers' && (
+                    <div className="suppliers-section">
+                        <div className="section-header">
+                            <div>
+                                <h3>Registered Suppliers ({suppliers.length})</h3>
+                                <p>Vendor contacts, tax IDs, and supply partner directory</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={() => setShowAddSupplier(true)}>
+                                <Plus size={16} /> Add Supplier
+                            </button>
+                        </div>
+                        <div className="suppliers-grid">
+                            {suppliers.map(supplier => (
+                                <motion.div key={supplier.id} className="supplier-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                    <div className="supplier-header">
+                                        <div className="supplier-icon-box">
+                                            <Users size={18} />
+                                        </div>
+                                        <div>
+                                            <h4>{supplier.name}</h4>
+                                            {supplier.code && <span className="supplier-code">{supplier.code}</span>}
+                                        </div>
+                                    </div>
+                                    <div className="supplier-details">
+                                        {supplier.phone && <p className="supplier-contact">📞 {supplier.phone}</p>}
+                                        {supplier.email && <p className="supplier-contact">✉️ {supplier.email}</p>}
+                                        {supplier.gstNumber && <p className="supplier-gst">GSTIN: {supplier.gstNumber}</p>}
+                                    </div>
+                                </motion.div>
+                            ))}
+                            {suppliers.length === 0 && (
+                                <div className="empty-state">
+                                    <div className="empty-state-icon-box">
+                                        <Users size={32} />
+                                    </div>
+                                    <h3>No suppliers yet</h3>
+                                    <p>Add vendor details, contact numbers, and GST info for purchase tracking.</p>
+                                    <button className="btn btn-primary" onClick={() => setShowAddSupplier(true)}>
+                                        <Plus size={16} /> Add First Supplier
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Adjustments Tab */}
+                {activeTab === 'adjustments' && (
+                    <div className="adjustments-section">
+                        <div className="section-header">
+                            <div>
+                                <h3>Stock Adjustments & Waste Log</h3>
+                                <p>Track wastage, breakage, sample usage, and inventory reconciliations</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={() => setShowAddAdjustment(true)}>
+                                <Plus size={16} /> New Adjustment
+                            </button>
+                        </div>
+                        <div className="adjustments-list">
+                            {adjustments.map(adj => (
+                                <motion.div key={adj.id} className="adjustment-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                    <div className="adjustment-header">
+                                        <span className={`adj-type adj-${adj.adjustmentType.toLowerCase()}`}>
+                                            {adj.adjustmentType}
+                                        </span>
+                                        <span className={`adj-status status-${adj.status.toLowerCase()}`}>
+                                            {adj.status}
+                                        </span>
+                                    </div>
+                                    <div className="adjustment-details">
+                                        <p className="adj-item-title">
+                                            <strong>{adj.inventoryItem?.name}</strong> - {adj.quantity} {adj.inventoryItem?.unit}
+                                        </p>
+                                        <p className="adj-reason">{adj.reason}</p>
+                                    </div>
+                                    {adj.status === 'PENDING' && (
+                                        <div className="adjustment-actions">
+                                            <button className="btn-approve" onClick={() => approveAdjustment(adj.id)}>
+                                                <Check size={14} /> Approve
+                                            </button>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            ))}
+                            {adjustments.length === 0 && (
+                                <div className="empty-state">
+                                    <div className="empty-state-icon-box">
+                                        <AlertTriangle size={32} />
+                                    </div>
+                                    <h3>No adjustments recorded</h3>
+                                    <p>Track shrinkage, spoilage, damaged items, and manual inventory adjustments.</p>
+                                    <button className="btn btn-primary" onClick={() => setShowAddAdjustment(true)}>
+                                        <Plus size={16} /> New Adjustment
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Add Warehouse Modal */}
             <AnimatePresence>

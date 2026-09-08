@@ -1,8 +1,7 @@
-// PWA Update Prompt Component - Instant Update Detection & Modern Icebox UI
 import { useState, useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, X, Sparkles } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import './PWAUpdatePrompt.css';
 import { logger } from '../../utils/logger';
 
@@ -185,10 +184,6 @@ export function PWAUpdatePrompt() {
                         <div className="pwa-update-info">
                             <div className="pwa-update-title-row">
                                 <h4>New Update Available</h4>
-                                <span className="pwa-new-badge">
-                                    <Sparkles size={10} style={{ display: 'inline', marginRight: 2 }} />
-                                    NEW
-                                </span>
                             </div>
                             <p>A fresh version of Billova with new features is ready to load.</p>
                         </div>

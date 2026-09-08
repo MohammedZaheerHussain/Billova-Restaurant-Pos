@@ -19,111 +19,76 @@ export function InventorySummaryGrid({ summary }: InventorySummaryGridProps) {
     return (
         <div className="summary-grid">
             <motion.div
-                className="summary-card glass-card"
-                initial={{ opacity: 0, y: 20 }}
+                className="summary-card total"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
+                transition={{ duration: 0.2 }}
             >
                 <div className="summary-icon total">
-                    <Package size={24} />
+                    <Package size={20} />
                 </div>
                 <div className="summary-content">
-                    <motion.span
-                        className="summary-value"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.2 }}
-                    >
-                        {summary.totalItems}
-                    </motion.span>
+                    <span className="summary-value">{summary.totalItems}</span>
                     <span className="summary-label">Total Items</span>
                 </div>
             </motion.div>
 
             <motion.div
-                className="summary-card glass-card sufficient"
-                initial={{ opacity: 0, y: 20 }}
+                className="summary-card sufficient"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
+                transition={{ duration: 0.2, delay: 0.04 }}
             >
                 <div className="summary-icon sufficient">
-                    <CheckCircle size={24} />
+                    <CheckCircle size={20} />
                 </div>
                 <div className="summary-content">
-                    <motion.span
-                        className="summary-value"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.25 }}
-                    >
-                        {summary.sufficient}
-                    </motion.span>
+                    <span className="summary-value">{summary.sufficient}</span>
                     <span className="summary-label">Sufficient</span>
                 </div>
             </motion.div>
 
             <motion.div
-                className="summary-card glass-card low"
-                initial={{ opacity: 0, y: 20 }}
+                className="summary-card low"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ duration: 0.2, delay: 0.08 }}
             >
                 <div className="summary-icon low">
-                    <TrendingDown size={24} />
+                    <TrendingDown size={20} />
                 </div>
                 <div className="summary-content">
-                    <motion.span
-                        className="summary-value"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.3 }}
-                    >
-                        {summary.lowStock}
-                    </motion.span>
+                    <span className="summary-value">{summary.lowStock}</span>
                     <span className="summary-label">Low Stock</span>
                 </div>
             </motion.div>
 
             <motion.div
-                className="summary-card glass-card critical"
-                initial={{ opacity: 0, y: 20 }}
+                className="summary-card critical"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
+                transition={{ duration: 0.2, delay: 0.12 }}
             >
                 <div className="summary-icon critical">
-                    <AlertTriangle size={24} />
+                    <AlertTriangle size={20} />
                 </div>
                 <div className="summary-content">
-                    <motion.span
-                        className="summary-value"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.35 }}
-                    >
-                        {summary.critical}
-                    </motion.span>
+                    <span className="summary-value">{summary.critical}</span>
                     <span className="summary-label">Critical</span>
                 </div>
             </motion.div>
 
             <motion.div
-                className="summary-card glass-card out"
-                initial={{ opacity: 0, y: 20 }}
+                className="summary-card out"
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ duration: 0.2, delay: 0.16 }}
             >
                 <div className="summary-icon out">
-                    <AlertCircle size={24} />
+                    <AlertCircle size={20} />
                 </div>
                 <div className="summary-content">
-                    <motion.span
-                        className="summary-value"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.4 }}
-                    >
-                        {summary.outOfStock}
-                    </motion.span>
+                    <span className="summary-value">{summary.outOfStock}</span>
                     <span className="summary-label">Out of Stock</span>
                 </div>
             </motion.div>

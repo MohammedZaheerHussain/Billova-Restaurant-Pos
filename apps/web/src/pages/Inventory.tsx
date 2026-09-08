@@ -367,18 +367,18 @@ export default function InventoryPage() {
             {/* Header */}
             <div className="page-header">
                 <div>
-                    <h1>📦 Inventory Management</h1>
+                    <h1>Inventory Management</h1>
                     <p>Track stock levels, consumption, and alerts</p>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-glass" onClick={() => setShowAlerts(true)}>
-                        <Bell size={18} />
+                    <button className="btn btn-glass" onClick={() => setShowAlerts(true)} title="Stock Alerts">
+                        <Bell size={16} />
                         {summary && summary.unreadAlerts > 0 && (
                             <span className="badge-count">{summary.unreadAlerts}</span>
                         )}
                     </button>
-                    <label className="btn btn-glass">
-                        <Upload size={18} /> Import CSV
+                    <label className="btn btn-glass" style={{ cursor: 'pointer' }}>
+                        <Upload size={16} /> Import CSV
                         <input
                             type="file"
                             accept=".csv"
@@ -388,7 +388,7 @@ export default function InventoryPage() {
                         />
                     </label>
                     <button className="btn btn-primary" onClick={openAddModal}>
-                        <Plus size={18} /> Add Item
+                        <Plus size={16} /> Add Item
                     </button>
                 </div>
             </div>
@@ -397,9 +397,9 @@ export default function InventoryPage() {
             {summary && <InventorySummaryGrid summary={summary} />}
 
             {/* Filters */}
-            <div className="filters-bar glass-card">
+            <div className="filters-bar">
                 <div className="search-box">
-                    <Search size={18} />
+                    <Search size={16} />
                     <input
                         type="text"
                         placeholder="Search by name or SKU..."
@@ -432,23 +432,26 @@ export default function InventoryPage() {
                     <option value="OUT_OF_STOCK">Out of Stock</option>
                 </select>
 
-                <button className="btn btn-glass" onClick={fetchData}>
-                    <RefreshCw size={18} />
+                <button className="btn btn-glass" onClick={fetchData} title="Refresh inventory">
+                    <RefreshCw size={15} />
                 </button>
             </div>
 
             {/* Inventory Table */}
-            <div className="inventory-table-container glass-card">
+            <div className="inventory-table-container">
                 {loading ? (
                     <div className="loading-state">
                         <div className="spinner" />
                     </div>
                 ) : filteredItems.length === 0 ? (
                     <div className="empty-state">
-                        <Package size={48} />
-                        <p>No inventory items found</p>
+                        <div className="empty-state-icon-box">
+                            <Package size={32} />
+                        </div>
+                        <h3>No inventory items found</h3>
+                        <p>Track stock levels, consumption, raw materials, and depletion alerts.</p>
                         <button className="btn btn-primary" onClick={openAddModal}>
-                            Add First Item
+                            <Plus size={16} /> Add First Item
                         </button>
                     </div>
                 ) : (
