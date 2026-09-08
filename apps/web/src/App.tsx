@@ -32,7 +32,6 @@ const PrinterSettingsPage = lazy(() => import('./pages/PrinterSettings'));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard'));
 const AddClientPage = lazy(() => import('./pages/AddClient'));
 const ClientDetailPage = lazy(() => import('./pages/ClientDetail'));
-const AddonsPage = lazy(() => import('./pages/Addons'));
 
 // Route loading fallback
 function PageLoader() {
@@ -211,7 +210,7 @@ function App() {
                         <Route path="delivery" element={<DeliveryPage />} />
                         <Route path="printer-settings" element={<PrinterSettingsPage />} />
                         <Route path="dashboard" element={<OwnerDashboard />} />
-                        <Route path="addons" element={<AddonsPage />} />
+                        <Route path="addons" element={<Navigate to="/menu" replace />} />
                     </Route>
 
                     {/* Public Route - Customer Self Order (No Auth) */}

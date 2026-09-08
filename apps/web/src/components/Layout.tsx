@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
     LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
     BarChart3, Users, Settings, LogOut, Shield, Package, Lock, Warehouse,
-    Puzzle, LayoutDashboard, Sun, Moon, Search,
+    LayoutDashboard, Sun, Moon, Search,
     Menu as MenuIcon
 } from 'lucide-react';
 import { useAuthStore, useUIStore } from '../store';
@@ -32,7 +32,6 @@ const navItems: NavItem[] = [
     { path: '/reports', icon: BarChart3, label: 'Reports', requiredFeature: 'reports' },
     { path: '/inventory', icon: Package, label: 'Inventory', requiredFeature: 'inventory' },
     { path: '/warehouse', icon: Warehouse, label: 'Warehouse', requiredFeature: 'inventory' },
-    { path: '/addons', icon: Puzzle, label: 'Addons', requiredFeature: 'inventory' },
     { path: '/users', icon: Users, label: 'Users', requiredRoles: ['OWNER', 'ADMIN', 'SUPER_ADMIN'] },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', requiredRoles: ['OWNER', 'ADMIN', 'owner', 'admin'] },
     { path: '/settings', icon: Settings, label: 'Settings' },

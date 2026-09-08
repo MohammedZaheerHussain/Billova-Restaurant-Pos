@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Search, LayoutGrid, ShoppingBag, Grid3X3, UtensilsCrossed,
-    BarChart3, Users, Settings, Package, Warehouse, Puzzle,
+    BarChart3, Users, Settings, Package, Warehouse,
     LayoutDashboard, Shield
 } from 'lucide-react';
 import { useAuthStore } from '../../store';
@@ -44,7 +44,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         { id: 'reports', label: 'View Analytics & Financial Reports', icon: BarChart3, action: () => navigate('/reports') },
         { id: 'inventory', label: 'Check Inventory Stocks', icon: Package, action: () => navigate('/inventory') },
         { id: 'warehouse', label: 'Manage Warehouse Supplies', icon: Warehouse, action: () => navigate('/warehouse') },
-        { id: 'addons', label: 'Manage Addons & Variants', icon: Puzzle, action: () => navigate('/addons') },
         { id: 'users', label: 'Manage Staff & Roles', icon: Users, action: () => navigate('/users') },
         { id: 'dashboard', label: 'Owner Business Dashboard', icon: LayoutDashboard, action: () => navigate('/dashboard') },
         { id: 'settings', label: 'Restaurant & POS Settings', icon: Settings, action: () => navigate('/settings') },
