@@ -83,27 +83,50 @@ export const reportsAPI = {
         }
         const orders = await getResilientOrders();
         const targetDateStr = date || getLocalDate();
-        const todayOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o) === targetDateStr);
-        const totalSales = todayOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
-        const paymentBreakdown: Record<string, number> = {};
+        const targetOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o) === targetDateStr);
+        const totalSales = targetOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
+        const paymentBreakdown: Record<string, number> = { CASH: 0, UPI: 0, CARD: 0, ONLINE: 0 };
         const orderTypeBreakdown: Record<string, { count: number; total: number }> = {};
-        todayOrders.forEach((o: any) => {
-            const pm = (o.payments?.[0]?.mode || o.paymentMethod || o.payment_method || (o.orderType === 'ONLINE' ? 'ONLINE' : 'CASH')).toUpperCase();
-            const amt = Number(o.total || o.totalAmount || o.total_amount || 0);
-            paymentBreakdown[pm] = (paymentBreakdown[pm] || 0) + amt;
+        
+        targetOrders.forEach((o: any) => {
+            if (o.payments && Array.isArray(o.payments) && o.payments.length > 0) {
+                o.payments.forEach((p: any) => {
+                    const pm = (p.mode || p.method || 'CASH').toUpperCase();
+                    const amt = Number(p.amount || 0);
+                    paymentBreakdown[pm] = (paymentBreakdown[pm] || 0) + amt;
+                });
+            } else {
+                const pm = (o.paymentMethod || o.payment_method || (o.orderType === 'ONLINE' ? 'ONLINE' : 'CASH')).toUpperCase();
+                const amt = Number(o.total || o.totalAmount || o.total_amount || 0);
+                paymentBreakdown[pm] = (paymentBreakdown[pm] || 0) + amt;
+            }
             const ot = o.orderType || o.order_type || o.type || 'DINE_IN';
             if (!orderTypeBreakdown[ot]) orderTypeBreakdown[ot] = { count: 0, total: 0 };
             orderTypeBreakdown[ot].count++;
-            orderTypeBreakdown[ot].total += amt;
+            orderTypeBreakdown[ot].total += Number(o.total || o.totalAmount || o.total_amount || 0);
         });
+
+        const hourlyBreakdown = Array.from({ length: 24 }, (_, hour) => {
+            const hourOrders = targetOrders.filter((o: any) => {
+                const raw = o.createdAt || o.created_at;
+                return raw && new Date(raw).getHours() === hour;
+            });
+            return {
+                hour,
+                orders: hourOrders.length,
+                sales: hourOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0)
+            };
+        });
+
         return {
             data: {
+                date: targetDateStr,
                 totalSales,
-                totalOrders: todayOrders.length,
-                avgOrderValue: todayOrders.length ? Math.round(totalSales / todayOrders.length) : 0,
+                totalOrders: targetOrders.length,
+                avgOrderValue: targetOrders.length ? Math.round(totalSales / targetOrders.length) : 0,
                 paymentBreakdown,
                 orderTypeBreakdown,
-                hourlyBreakdown: [],
+                hourlyBreakdown,
             }
         };
     },
@@ -116,7 +139,20 @@ export const reportsAPI = {
             getMenuLookup(),
         ]);
         const itemMap: Record<string, { name: string; quantity: number; total: number }> = {};
-        orders.forEach((o: any) => {
+        
+        const filteredOrders = orders.filter((o: any) => {
+            if (o.status === 'CANCELLED') return false;
+            const d = getOrderDateStr(o);
+            if (!d) return false;
+            if (startDate && endDate) {
+                return d >= startDate && d <= endDate;
+            } else if (startDate) {
+                return d === startDate;
+            }
+            return true;
+        });
+
+        filteredOrders.forEach((o: any) => {
             const items = o.items || [];
             items.forEach((it: any) => {
                 const name = resolveItemName(it, idMap, priceMap);
@@ -136,13 +172,15 @@ export const reportsAPI = {
         }
         return { data: [] };
     },
-    hourlySales: async () => {
+    hourlySales: async (date?: string) => {
         if (hasExpressBackend()) {
-            try { return await api.get('/reports/hourly-sales'); } catch { /* fallback */ }
+            try { return await api.get('/reports/hourly-sales', { params: { date } }); } catch { /* fallback */ }
         }
         const orders = await getResilientOrders();
+        const targetDateStr = date || getLocalDate();
+        const dayOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o) === targetDateStr);
         const hourly: { hour: number; orders: number; total: number }[] = Array.from({ length: 24 }, (_, h) => ({ hour: h, orders: 0, total: 0 }));
-        orders.forEach((o: any) => {
+        dayOrders.forEach((o: any) => {
             const raw = o.createdAt || o.created_at;
             const h = new Date(raw || Date.now()).getHours();
             hourly[h].orders++;
@@ -150,19 +188,26 @@ export const reportsAPI = {
         });
         return { data: hourly };
     },
-    daily14Days: async () => {
+    daily14Days: async (refDateStr?: string) => {
         if (hasExpressBackend()) {
-            try { return await api.get('/reports/daily-14-days'); } catch { /* fallback */ }
+            try { return await api.get('/reports/daily-14-days', { params: { refDate: refDateStr } }); } catch { /* fallback */ }
         }
         const orders = await getResilientOrders();
         const days: { date: string; label: string; sales: number; orders: number }[] = [];
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        let refDate = new Date();
+        if (refDateStr) {
+            const [y, m, d] = refDateStr.split('-').map(Number);
+            if (y && m && d) refDate = new Date(y, m - 1, d);
+        }
+
         for (let i = 13; i >= 0; i--) {
-            const d = new Date();
+            const d = new Date(refDate);
             d.setDate(d.getDate() - i);
             const dateStr = getLocalDate(d);
             const label = `${d.getDate()} ${monthNames[d.getMonth()]}`;
-            const dayOrders = orders.filter((o: any) => getOrderDateStr(o) === dateStr);
+            const dayOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o) === dateStr);
             const sales = dayOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
             days.push({
                 date: dateStr,
@@ -173,23 +218,30 @@ export const reportsAPI = {
         }
         return { data: days };
     },
-    weekly4Weeks: async () => {
+    weekly4Weeks: async (refDateStr?: string) => {
         if (hasExpressBackend()) {
-            try { return await api.get('/reports/weekly-4-weeks'); } catch { /* fallback */ }
+            try { return await api.get('/reports/weekly-4-weeks', { params: { refDate: refDateStr } }); } catch { /* fallback */ }
         }
         const orders = await getResilientOrders();
         const weeks: { label: string; sales: number; orders: number }[] = [];
         const weekLabels = ['4w ago', '3w ago', '2w ago', 'This week'];
-        const now = Date.now();
+        
+        let refDate = new Date();
+        if (refDateStr) {
+            const [y, m, d] = refDateStr.split('-').map(Number);
+            if (y && m && d) refDate = new Date(y, m - 1, d, 23, 59, 59);
+        }
+        const nowMs = refDate.getTime();
         const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
         for (let w = 3; w >= 0; w--) {
-            const startMs = now - (w + 1) * 7 * MS_PER_DAY;
-            const endMs = now - w * 7 * MS_PER_DAY;
+            const startMs = nowMs - (w + 1) * 7 * MS_PER_DAY;
+            const endMs = nowMs - w * 7 * MS_PER_DAY;
             const weekOrders = orders.filter((o: any) => {
+                if (o.status === 'CANCELLED') return false;
                 const raw = o.createdAt || o.created_at;
                 const orderMs = new Date(raw || Date.now()).getTime();
-                return orderMs >= startMs && (w === 0 ? orderMs <= now : orderMs < endMs);
+                return orderMs >= startMs && (w === 0 ? orderMs <= nowMs : orderMs < endMs);
             });
             const sales = weekOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
             weeks.push({
@@ -210,7 +262,7 @@ export const reportsAPI = {
         for (let i = 6; i >= 0; i--) {
             const d = new Date(); d.setDate(d.getDate() - i);
             const dateStr = getLocalDate(d);
-            const dayOrders = orders.filter((o: any) => getOrderDateStr(o) === dateStr);
+            const dayOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o) === dateStr);
             days.push({
                 date: dateStr,
                 dayName: dayNames[d.getDay()],
@@ -229,20 +281,24 @@ export const reportsAPI = {
             }
         };
     },
-    monthlySummary: async () => {
+    monthlySummary: async (refDateStr?: string) => {
         if (hasExpressBackend()) {
-            try { return await api.get('/reports/monthly-summary'); } catch { /* fallback */ }
+            try { return await api.get('/reports/monthly-summary', { params: { refDate: refDateStr } }); } catch { /* fallback */ }
         }
         const orders = await getResilientOrders();
-        const now = new Date();
+        let refDate = new Date();
+        if (refDateStr) {
+            const [y, m, d] = refDateStr.split('-').map(Number);
+            if (y && m && d) refDate = new Date(y, m - 1, d);
+        }
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const months: { label: string; sales: number; orders: number }[] = [];
         
-        // Past 3 months + current month
+        // Past 3 months + target month
         for (let m = 3; m >= 0; m--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+            const d = new Date(refDate.getFullYear(), refDate.getMonth() - m, 1);
             const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const mOrders = orders.filter((o: any) => getOrderDateStr(o).startsWith(monthPrefix));
+            const mOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o).startsWith(monthPrefix));
             const sales = mOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
             months.push({
                 label: `${monthNames[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
@@ -251,13 +307,13 @@ export const reportsAPI = {
             });
         }
 
-        const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        const currentMonthOrders = orders.filter((o: any) => getOrderDateStr(o).startsWith(currentMonthPrefix));
+        const currentMonthPrefix = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthOrders = orders.filter((o: any) => o.status !== 'CANCELLED' && getOrderDateStr(o).startsWith(currentMonthPrefix));
         const totalSales = currentMonthOrders.reduce((s: number, o: any) => s + Number(o.total || o.totalAmount || o.total_amount || 0), 0);
-        const daysElapsed = now.getDate();
+        const daysElapsed = refDate.getDate();
         return {
             data: {
-                month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                month: refDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
                 totalSales,
                 totalOrders: currentMonthOrders.length,
                 trend: 0,

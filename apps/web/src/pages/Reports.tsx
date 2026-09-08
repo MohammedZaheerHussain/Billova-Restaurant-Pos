@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Award, Activity } from 'lucide-react';
+import { Award, Activity, TrendingUp, ShoppingBag, Receipt, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsAPI, inventoryAPI } from '../api';
 import { useAuthStore } from '../store';
 import './Reports.css';
 import { ReportsSkeleton } from '../components/Skeleton';
+import { DatePicker } from '../components/ui';
 
 type ReportTab = 'sales' | 'shifts' | 'inventory';
 
@@ -32,11 +33,35 @@ export default function ReportsPage() {
     const [activeTab, setActiveTab] = useState<ReportTab>('sales');
     const [loading, setLoading] = useState(true);
 
+    // Date filtering (defaults to local today)
+    const getLocalDateString = (d = new Date()) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalDateString();
+    const [selectedDate, setSelectedDate] = useState(todayStr);
+
+    const formatDateHuman = (dateStr: string) => {
+        if (!dateStr) return '';
+        const today = getLocalDateString();
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const date = new Date(y, m - 1, d);
+        const formatted = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        if (dateStr === today) return `Today (${formatted})`;
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (dateStr === getLocalDateString(yesterday)) return `Yesterday (${formatted})`;
+        return formatted;
+    };
+
     // Data States
     const [daily14, setDaily14] = useState<Day14Item[]>([]);
     const [weekly4, setWeekly4] = useState<Week4Item[]>([]);
     const [monthlyData, setMonthlyData] = useState<MonthItem[]>([]);
     const [topProducts, setTopProducts] = useState<any[]>([]);
+    const [dailySalesData, setDailySalesData] = useState<any>(null);
     const [paymentBreakdown, setPaymentBreakdown] = useState<Record<string, number>>({});
     const [inventoryItems, setInventoryItems] = useState<any[]>([]);
     const [hovered14Idx, setHovered14Idx] = useState<number | null>(null);
@@ -65,18 +90,18 @@ export default function ReportsPage() {
     }, []);
 
     useEffect(() => {
-        fetchAllReports();
-    }, []);
+        fetchAllReports(selectedDate);
+    }, [selectedDate]);
 
-    const fetchAllReports = async () => {
+    const fetchAllReports = async (dateStr = selectedDate) => {
         try {
             setLoading(true);
             const [daily14Res, weekly4Res, monthlyRes, itemsRes, dailyRes, invRes] = await Promise.all([
-                reportsAPI.daily14Days(),
-                reportsAPI.weekly4Weeks(),
-                reportsAPI.monthlySummary(),
-                reportsAPI.itemSales(),
-                reportsAPI.dailySales(),
+                reportsAPI.daily14Days(dateStr),
+                reportsAPI.weekly4Weeks(dateStr),
+                reportsAPI.monthlySummary(dateStr),
+                reportsAPI.itemSales(dateStr, dateStr),
+                reportsAPI.dailySales(dateStr),
                 inventoryAPI.getAll().catch(() => ({ data: [] })),
             ]);
 
@@ -84,6 +109,7 @@ export default function ReportsPage() {
             setWeekly4(weekly4Res.data || []);
             setMonthlyData(monthlyRes.data?.months || []);
             setTopProducts(itemsRes.data?.items || []);
+            setDailySalesData(dailyRes.data || null);
             setPaymentBreakdown(dailyRes.data?.paymentBreakdown || {});
             setInventoryItems(invRes.data || []);
         } catch (error) {
@@ -96,6 +122,11 @@ export default function ReportsPage() {
     const formatCurrency = (value: number) => {
         return `₹${Number(value || 0).toLocaleString('en-IN')}`;
     };
+
+    // Selected date summary metrics
+    const selectedDateRevenue = dailySalesData?.totalSales ?? 0;
+    const selectedDateOrders = dailySalesData?.totalOrders ?? 0;
+    const selectedDateAOV = dailySalesData?.avgOrderValue ?? 0;
 
     // Calculate dynamic Y-axis steps for 14-day chart
     const max14Sales = useMemo(() => {
@@ -141,6 +172,8 @@ export default function ReportsPage() {
         return methods;
     }, [paymentBreakdown]);
 
+    const digitalSalesTotal = (paymentBreakdown['UPI'] || 0) + (paymentBreakdown['CARD'] || 0) + (paymentBreakdown['ONLINE'] || 0);
+
     // Low stock items
     const lowStockItems = useMemo(() => {
         return inventoryItems.filter(i => (i.currentStock || i.quantity || 0) <= (i.minStock || i.safetyStock || 5));
@@ -163,7 +196,16 @@ export default function ReportsPage() {
                 </div>
 
                 <div className="reports-header-right">
-                    <button className="reports-refresh-btn" onClick={fetchAllReports} title="Refresh analytics">
+                    {/* Date Picker Filter with Navigator and Presets */}
+                    <DatePicker
+                        value={selectedDate}
+                        onChange={(newDate) => {
+                            setSelectedDate(newDate);
+                        }}
+                        maxDate={todayStr}
+                    />
+
+                    <button className="reports-refresh-btn" onClick={() => fetchAllReports(selectedDate)} title="Refresh analytics">
                         <Activity size={15} />
                         <span>Live Sync</span>
                     </button>
@@ -200,10 +242,48 @@ export default function ReportsPage() {
                     <ReportsSkeleton />
                 ) : activeTab === 'sales' ? (
                     <div className="sales-reports-view">
-                        {/* ── 1. Hero Chart: Daily sales — last 14 days ── */}
+                        {/* ── Date Summary KPI Metric Ribbon ── */}
+                        <div className="shifts-kpi-grid">
+                            <div className="shifts-kpi-card date-metric-card">
+                                <div className="kpi-card-header">
+                                    <span className="kpi-label">Revenue ({formatDateHuman(selectedDate)})</span>
+                                    <TrendingUp size={16} className="kpi-icon text-primary" />
+                                </div>
+                                <span className="kpi-value highlight-val">{formatCurrency(selectedDateRevenue)}</span>
+                            </div>
+
+                            <div className="shifts-kpi-card date-metric-card">
+                                <div className="kpi-card-header">
+                                    <span className="kpi-label">Total Completed Orders</span>
+                                    <ShoppingBag size={16} className="kpi-icon text-blue" />
+                                </div>
+                                <span className="kpi-value">{selectedDateOrders} {selectedDateOrders === 1 ? 'order' : 'orders'}</span>
+                            </div>
+
+                            <div className="shifts-kpi-card date-metric-card">
+                                <div className="kpi-card-header">
+                                    <span className="kpi-label">Average Order Value</span>
+                                    <Receipt size={16} className="kpi-icon text-green" />
+                                </div>
+                                <span className="kpi-value">{formatCurrency(selectedDateAOV)}</span>
+                            </div>
+
+                            <div className="shifts-kpi-card date-metric-card">
+                                <div className="kpi-card-header">
+                                    <span className="kpi-label">Digital / UPI Collection</span>
+                                    <CreditCard size={16} className="kpi-icon text-purple" />
+                                </div>
+                                <span className="kpi-value positive">{formatCurrency(digitalSalesTotal)}</span>
+                            </div>
+                        </div>
+
+                        {/* ── 1. Hero Chart: Daily sales — 14 days ending selected date ── */}
                         <div className="ice-chart-card hero-chart-card">
                             <div className="ice-card-header">
-                                <h3 className="ice-card-title">Daily sales — last 14 days</h3>
+                                <div className="chart-header-title-group">
+                                    <h3 className="ice-card-title">Daily sales — 14 days ending {formatDateHuman(selectedDate)}</h3>
+                                    <span className="chart-header-sub">Click on any date column to inspect specific day</span>
+                                </div>
                             </div>
 
                             <div className="ice-barchart-wrapper">
@@ -223,19 +303,23 @@ export default function ReportsPage() {
                                         const ceilMax = yAxis14Steps[0] || 1200;
                                         const heightPercent = ceilMax > 0 ? Math.min(100, Math.max(3, (item.sales / ceilMax) * 100)) : 3;
                                         const isHovered = hovered14Idx === idx;
+                                        const isSelectedDay = item.date === selectedDate;
 
                                         return (
                                             <div
                                                 key={idx}
-                                                className={`chart-bar-column ${isHovered ? 'hovered' : ''}`}
+                                                className={`chart-bar-column ${isHovered ? 'hovered' : ''} ${isSelectedDay ? 'selected-day' : ''}`}
                                                 onMouseEnter={() => setHovered14Idx(idx)}
                                                 onMouseLeave={() => setHovered14Idx(null)}
+                                                onClick={() => setSelectedDate(item.date)}
+                                                title={`Click to filter ${item.label}`}
                                             >
                                                 {/* Tooltip */}
                                                 {isHovered && (
                                                     <div className="chart-tooltip-box">
                                                         <span className="tooltip-date">{item.label}</span>
                                                         <span className="tooltip-revenue">revenue : {formatCurrency(item.sales)}</span>
+                                                        <span className="tooltip-orders">{item.orders} orders</span>
                                                     </div>
                                                 )}
 
@@ -245,13 +329,15 @@ export default function ReportsPage() {
                                                 {/* Active Bar */}
                                                 <div className="bar-column-fill-wrap">
                                                     <div
-                                                        className="bar-column-fill purple-fill"
+                                                        className={`bar-column-fill ${isSelectedDay ? 'orange-fill' : 'purple-fill'}`}
                                                         style={{ height: `${heightPercent}%` }}
                                                     />
                                                 </div>
 
                                                 {/* X-Axis Label */}
-                                                <span className="chart-x-label">{item.label}</span>
+                                                <span className={`chart-x-label ${isSelectedDay ? 'active-label' : ''}`}>
+                                                    {item.label}
+                                                </span>
                                             </div>
                                         );
                                     })}
@@ -264,7 +350,7 @@ export default function ReportsPage() {
                             {/* Weekly sales */}
                             <div className="ice-chart-card">
                                 <div className="ice-card-header">
-                                    <h3 className="ice-card-title">Weekly sales</h3>
+                                    <h3 className="ice-card-title">Weekly sales (4-week trend)</h3>
                                 </div>
 
                                 <div className="ice-barchart-wrapper mini-chart">
@@ -294,6 +380,7 @@ export default function ReportsPage() {
                                                         <div className="chart-tooltip-box">
                                                             <span className="tooltip-date">{item.label}</span>
                                                             <span className="tooltip-revenue">revenue : {formatCurrency(item.sales)}</span>
+                                                            <span className="tooltip-orders">{item.orders} orders</span>
                                                         </div>
                                                     )}
                                                     <div className="bar-column-bg" />
@@ -314,7 +401,7 @@ export default function ReportsPage() {
                             {/* Monthly sales */}
                             <div className="ice-chart-card">
                                 <div className="ice-card-header">
-                                    <h3 className="ice-card-title">Monthly sales</h3>
+                                    <h3 className="ice-card-title">Monthly sales (4-month summary)</h3>
                                 </div>
 
                                 <div className="ice-barchart-wrapper mini-chart">
@@ -344,6 +431,7 @@ export default function ReportsPage() {
                                                         <div className="chart-tooltip-box">
                                                             <span className="tooltip-date">{item.label}</span>
                                                             <span className="tooltip-revenue">revenue : {formatCurrency(item.sales)}</span>
+                                                            <span className="tooltip-orders">{item.orders} orders</span>
                                                         </div>
                                                     )}
                                                     <div className="bar-column-bg" />
@@ -367,14 +455,14 @@ export default function ReportsPage() {
                             {/* Top selling products */}
                             <div className="ice-data-card">
                                 <div className="ice-card-header">
-                                    <h3 className="ice-card-title">Top selling products</h3>
+                                    <h3 className="ice-card-title">Top selling products ({formatDateHuman(selectedDate)})</h3>
                                 </div>
 
                                 <div className="top-products-list">
                                     {topProducts.length === 0 ? (
                                         <div className="ice-empty-card-state">
                                             <Award size={32} />
-                                            <span>No product sales data recorded yet</span>
+                                            <span>No product sales recorded for {formatDateHuman(selectedDate)}</span>
                                         </div>
                                     ) : (
                                         topProducts.slice(0, 8).map((product, idx) => (
@@ -392,10 +480,10 @@ export default function ReportsPage() {
                                 </div>
                             </div>
 
-                            {/* Payment breakdown (today) */}
+                            {/* Payment breakdown */}
                             <div className="ice-data-card">
                                 <div className="ice-card-header">
-                                    <h3 className="ice-card-title">Payment breakdown (today)</h3>
+                                    <h3 className="ice-card-title">Payment breakdown ({formatDateHuman(selectedDate)})</h3>
                                 </div>
 
                                 <div className="payment-breakdown-list">
@@ -414,23 +502,25 @@ export default function ReportsPage() {
                         {/* Summary KPI Strip */}
                         <div className="shifts-kpi-grid">
                             <div className="shifts-kpi-card">
-                                <span className="kpi-label">Today's Cash Collected</span>
+                                <span className="kpi-label">{formatDateHuman(selectedDate)} Cash Collected</span>
                                 <span className="kpi-value">{formatCurrency(paymentBreakdown['CASH'] || 0)}</span>
                             </div>
                             <div className="shifts-kpi-card">
-                                <span className="kpi-label">Digital / UPI Sales</span>
-                                <span className="kpi-value">{formatCurrency((paymentBreakdown['UPI'] || 0) + (paymentBreakdown['CARD'] || 0) + (paymentBreakdown['ONLINE'] || 0))}</span>
+                                <span className="kpi-label">Digital / UPI Sales ({formatDateHuman(selectedDate)})</span>
+                                <span className="kpi-value">{formatCurrency(digitalSalesTotal)}</span>
                             </div>
                             <div className="shifts-kpi-card">
-                                <span className="kpi-label">Active Register</span>
-                                <span className="kpi-value positive">Online & Synced</span>
+                                <span className="kpi-label">Register Status</span>
+                                <span className={`kpi-value ${selectedDate === todayStr ? 'positive' : ''}`}>
+                                    {selectedDate === todayStr ? 'Online & Synced' : 'Archived Day'}
+                                </span>
                             </div>
                         </div>
 
                         {/* Shifts Table */}
                         <div className="ice-data-card full-table-card">
                             <div className="ice-card-header">
-                                <h3 className="ice-card-title">Cashier Shifts History</h3>
+                                <h3 className="ice-card-title">Cashier Shifts History ({formatDateHuman(selectedDate)})</h3>
                             </div>
                             <div className="shifts-table-wrap">
                                 <table className="ice-table">
@@ -450,12 +540,14 @@ export default function ReportsPage() {
                                                 <div className="staff-avatar">{user?.name?.slice(0, 1) || 'A'}</div>
                                                 <span className="staff-name">{user?.name || 'Current Admin'}</span>
                                             </td>
-                                            <td>Today, 09:00 AM – Active</td>
+                                            <td>{formatDateHuman(selectedDate)}, 09:00 AM – {selectedDate === todayStr ? 'Active' : 'Closed'}</td>
                                             <td>₹500.00</td>
                                             <td>{formatCurrency(paymentBreakdown['CASH'] || 0)}</td>
-                                            <td>{formatCurrency((paymentBreakdown['UPI'] || 0) + (paymentBreakdown['CARD'] || 0))}</td>
+                                            <td>{formatCurrency(digitalSalesTotal)}</td>
                                             <td>
-                                                <span className="ice-status-pill green">ACTIVE SHIFT</span>
+                                                <span className={`ice-status-pill ${selectedDate === todayStr ? 'green' : 'amber'}`}>
+                                                    {selectedDate === todayStr ? 'ACTIVE SHIFT' : 'COMPLETED'}
+                                                </span>
                                             </td>
                                         </tr>
                                     </tbody>
