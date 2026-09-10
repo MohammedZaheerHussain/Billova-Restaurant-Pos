@@ -108,10 +108,11 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
 
     // ==========================================
     // ── SECTION 1: CUSTOMER TAX INVOICE ──
-    // (Only for in-store DINE_IN, TAKEAWAY, DELIVERY)
-    // (Skipped for ONLINE Swiggy/Zomato orders)
+    // (Only for in-store DINE_IN, TAKEAWAY, DELIVERY, or when includeKOT is false)
+    // (Skipped for ONLINE Swiggy/Zomato orders unless customer receipt requested)
     // ==========================================
-    if (!isOnline) {
+    const shouldIncludeCustomerBill = !isOnline || data.includeKOT === false;
+    if (shouldIncludeCustomerBill) {
         encoder.align(TextAlign.CENTER);
 
         // Business Header
@@ -242,7 +243,7 @@ export function generateReceipt(data: ReceiptData, printerWidth: 48 | 32 = 48): 
     // ==========================================
     // ── SECTION 2: KITCHEN ORDER TICKET (K.O.T.) ──
     // ==========================================
-    const shouldIncludeKOT = data.includeKOT !== false || isOnline;
+    const shouldIncludeKOT = data.includeKOT === true || (data.includeKOT === undefined && isOnline);
     if (shouldIncludeKOT) {
         encoder.feed(1);
         encoder.align(TextAlign.CENTER);
@@ -399,8 +400,10 @@ export function generateReceiptHTML(data: ReceiptData): string {
 
     const isOnline = data.orderType === 'ONLINE' || Boolean(data.onlinePlatform);
     const platformName = (data.onlinePlatform || 'ONLINE').toUpperCase();
+    const shouldIncludeCustomerBill = !isOnline || data.includeKOT === false;
+    const shouldIncludeKOT = data.includeKOT === true || (data.includeKOT === undefined && isOnline);
 
-    const customerBillSection = isOnline ? '' : `
+    const customerBillSection = shouldIncludeCustomerBill ? `
             <!-- ========================================== -->
             <!-- ── SECTION 1: CUSTOMER TAX BILL / INVOICE ── -->
             <!-- ========================================== -->
@@ -492,12 +495,9 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="powered-msg">--- Powered by Billova POS ---</div>
                 </div>
             </div>
-    `;
+    ` : '';
 
-    return `
-        <div class="thermal-document">
-            ${customerBillSection}
-
+    const kotSection = shouldIncludeKOT ? `
             <!-- ========================================== -->
             <!-- ── SECTION 2: KITCHEN ORDER TICKET (K.O.T.) ── -->
             <!-- ========================================== -->
@@ -550,6 +550,12 @@ export function generateReceiptHTML(data: ReceiptData): string {
                     <div class="powered-msg">*** END OF KOT ***</div>
                 </div>
             </div>
+    ` : '';
+
+    return `
+        <div class="thermal-document">
+            ${customerBillSection}
+            ${kotSection}
         </div>
 
         <style>

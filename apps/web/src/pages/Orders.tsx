@@ -367,7 +367,7 @@ export default function OrdersPage() {
             gstAmount: Number(order.gstAmount || 0),
             total: Number(order.total),
             paymentMode: order.payments?.[0]?.mode || 'CASH',
-            includeKOT: true,
+            includeKOT: false,
         };
 
         try {
