@@ -1,4 +1,4 @@
-// Warehouse Management Page - Streamlined 3-Pillar Indian Restaurant Edition
+// Warehouse Management Page - Streamlined 3-Pillar Indian Restaurant Edition (Offline-First)
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -62,6 +62,7 @@ export interface InventoryItemOption {
     id: string;
     name: string;
     unit: string;
+    quantity?: number;
     currentStock?: number;
     costPerUnit?: number;
     category?: string;
@@ -69,12 +70,13 @@ export interface InventoryItemOption {
 
 type TabType = 'godowns' | 'transfers' | 'wastage';
 
-// ── Local Storage Fallback Keys ──
+// ── Local Storage Fallback Keys (Offline-First) ──
 const STORAGE_GODOWNS = 'billova_warehouse_godowns';
 const STORAGE_TRANSFERS = 'billova_warehouse_transfers';
 const STORAGE_WASTAGE = 'billova_warehouse_wastage';
+const STORAGE_INVENTORY = 'billova_inventory_items';
 
-// Default starter Godowns if fresh
+// Default starter Godowns if fresh install
 const DEFAULT_STARTER_GODOWNS: GodownLocation[] = [
     {
         id: 'wh-main-01',
@@ -94,6 +96,18 @@ const DEFAULT_STARTER_GODOWNS: GodownLocation[] = [
         itemCount: 0,
         createdAt: new Date().toISOString(),
     }
+];
+
+// Offline starter ingredients if fresh install
+const DEFAULT_STARTER_ITEMS: InventoryItemOption[] = [
+    { id: 'inv-rice-01', name: 'Basmati Rice (Daawat)', unit: 'kg', currentStock: 50, costPerUnit: 110, category: 'Grains' },
+    { id: 'inv-paneer-01', name: 'Fresh Malai Paneer', unit: 'kg', currentStock: 15, costPerUnit: 340, category: 'Dairy' },
+    { id: 'inv-chicken-01', name: 'Fresh Chicken Breast', unit: 'kg', currentStock: 25, costPerUnit: 240, category: 'Meat' },
+    { id: 'inv-oil-01', name: 'Refined Sunflower Oil', unit: 'L', currentStock: 30, costPerUnit: 140, category: 'Oil' },
+    { id: 'inv-milk-01', name: 'Full Cream Milk (Amul)', unit: 'L', currentStock: 20, costPerUnit: 66, category: 'Dairy' },
+    { id: 'inv-onion-01', name: 'Red Onions (Nashik)', unit: 'kg', currentStock: 40, costPerUnit: 35, category: 'Vegetables' },
+    { id: 'inv-tomato-01', name: 'Hybrid Tomatoes', unit: 'kg', currentStock: 30, costPerUnit: 40, category: 'Vegetables' },
+    { id: 'inv-masala-01', name: 'Special Garam Masala Blend', unit: 'kg', currentStock: 5, costPerUnit: 450, category: 'Spices' },
 ];
 
 export default function WarehousePage() {
@@ -141,7 +155,7 @@ export default function WarehousePage() {
         loadAllData();
     }, []);
 
-    // ── Load All Data (API with Multi-Tier Fallback) ──
+    // ── Load All Data (Offline-First with Multi-Tier API Fallback) ──
     const loadAllData = async () => {
         try {
             setLoading(true);
@@ -150,12 +164,20 @@ export default function WarehousePage() {
             let items: InventoryItemOption[] = [];
             try {
                 const invRes = await inventoryAPI.getAll();
-                if (Array.isArray(invRes?.data)) {
+                if (Array.isArray(invRes?.data) && invRes.data.length > 0) {
                     items = invRes.data;
+                    localStorage.setItem(STORAGE_INVENTORY, JSON.stringify(items));
                 }
             } catch {
-                const localInv = localStorage.getItem('billova_inventory_items');
-                if (localInv) items = JSON.parse(localInv);
+                // Read from local storage
+                const localInv = localStorage.getItem(STORAGE_INVENTORY);
+                if (localInv) {
+                    try { items = JSON.parse(localInv); } catch { /* ignore */ }
+                }
+            }
+            if (items.length === 0) {
+                items = DEFAULT_STARTER_ITEMS;
+                localStorage.setItem(STORAGE_INVENTORY, JSON.stringify(items));
             }
             setInventoryItems(items);
 
@@ -174,12 +196,19 @@ export default function WarehousePage() {
                             itemCount: w._count?.stock || items.length,
                             createdAt: w.createdAt,
                         }));
+                        localStorage.setItem(STORAGE_GODOWNS, JSON.stringify(fetchedGodowns));
                     }
                 } catch { /* fallback to local */ }
             }
             if (fetchedGodowns.length === 0) {
                 const stored = localStorage.getItem(STORAGE_GODOWNS);
-                fetchedGodowns = stored ? JSON.parse(stored) : DEFAULT_STARTER_GODOWNS;
+                if (stored) {
+                    try { fetchedGodowns = JSON.parse(stored); } catch { /* ignore */ }
+                }
+            }
+            if (fetchedGodowns.length === 0) {
+                fetchedGodowns = DEFAULT_STARTER_GODOWNS;
+                localStorage.setItem(STORAGE_GODOWNS, JSON.stringify(fetchedGodowns));
             }
             setGodowns(fetchedGodowns);
 
@@ -207,12 +236,15 @@ export default function WarehousePage() {
                             notes: t.notes,
                             createdAt: t.createdAt || new Date().toISOString(),
                         }));
+                        localStorage.setItem(STORAGE_TRANSFERS, JSON.stringify(fetchedTransfers));
                     }
                 } catch { /* fallback */ }
             }
             if (fetchedTransfers.length === 0) {
                 const stored = localStorage.getItem(STORAGE_TRANSFERS);
-                fetchedTransfers = stored ? JSON.parse(stored) : [];
+                if (stored) {
+                    try { fetchedTransfers = JSON.parse(stored); } catch { /* ignore */ }
+                }
             }
             setTransfers(fetchedTransfers);
 
@@ -235,12 +267,15 @@ export default function WarehousePage() {
                             notes: a.reason,
                             createdAt: a.createdAt || new Date().toISOString(),
                         }));
+                        localStorage.setItem(STORAGE_WASTAGE, JSON.stringify(fetchedWastage));
                     }
                 } catch { /* fallback */ }
             }
             if (fetchedWastage.length === 0) {
                 const stored = localStorage.getItem(STORAGE_WASTAGE);
-                fetchedWastage = stored ? JSON.parse(stored) : [];
+                if (stored) {
+                    try { fetchedWastage = JSON.parse(stored); } catch { /* ignore */ }
+                }
             }
             setWastageList(fetchedWastage);
 
@@ -307,6 +342,21 @@ export default function WarehousePage() {
         toast.success(`Storage "${created.name}" created!`);
         setShowAddGodown(false);
         setNewGodown({ name: '', type: 'GODOWN', description: '', isMain: false });
+    };
+
+    // ── Delete Godown / Location ──
+    const handleDeleteGodown = (id: string, name: string) => {
+        if (godowns.length <= 1) {
+            toast.error('Cannot remove the only remaining storage location');
+            return;
+        }
+        const updated = godowns.filter(g => g.id !== id);
+        // If deleted was main, make first one main
+        if (updated.length > 0 && !updated.some(g => g.isMain)) {
+            updated[0].isMain = true;
+        }
+        persistGodowns(updated);
+        toast.success(`Location "${name}" removed`);
     };
 
     // ── Create Quick Stock Transfer (1-Click Issue) ──
@@ -418,6 +468,18 @@ export default function WarehousePage() {
             } catch { /* fallback */ }
         }
 
+        // Deduct from local inventory item quantity offline
+        const updatedInventory = inventoryItems.map(item => {
+            if (item.id === wastageForm.inventoryItemId) {
+                const current = Number(item.currentStock || item.quantity || 0);
+                const nextQty = Math.max(0, current - Number(wastageForm.quantity));
+                return { ...item, currentStock: nextQty, quantity: nextQty };
+            }
+            return item;
+        });
+        setInventoryItems(updatedInventory);
+        localStorage.setItem(STORAGE_INVENTORY, JSON.stringify(updatedInventory));
+
         persistWastage([record, ...wastageList]);
         toast.success(`Wastage logged for ${inv?.name || 'item'}!`);
         setShowWastageModal(false);
@@ -490,7 +552,7 @@ export default function WarehousePage() {
         <div className="warehouse-page">
             <Toaster position="top-center" />
 
-            {/* ── Header Bar ── */}
+            {/* Header Bar */}
             <div className="wh-header-bar">
                 <div className="header-left">
                     <h1 className="page-title">Warehouse & Stores</h1>
@@ -504,7 +566,17 @@ export default function WarehousePage() {
                 <div className="header-actions">
                     <button
                         className="wh-btn wh-btn-secondary"
-                        onClick={() => setShowTransferModal(true)}
+                        onClick={() => {
+                            if (godowns.length >= 2) {
+                                setTransferForm({
+                                    fromLocationId: godowns[0]?.id || '',
+                                    toLocationId: godowns[1]?.id || '',
+                                    items: [{ inventoryItemId: inventoryItems[0]?.id || '', quantity: 1, notes: '' }],
+                                    notes: '',
+                                });
+                            }
+                            setShowTransferModal(true);
+                        }}
                         title="Quick Stock Transfer"
                     >
                         <ArrowRightLeft size={15} />
@@ -513,7 +585,16 @@ export default function WarehousePage() {
 
                     <button
                         className="wh-btn wh-btn-danger"
-                        onClick={() => setShowWastageModal(true)}
+                        onClick={() => {
+                            setWastageForm({
+                                inventoryItemId: inventoryItems[0]?.id || '',
+                                locationId: godowns[0]?.id || '',
+                                quantity: 1,
+                                reason: 'SPOILED',
+                                notes: '',
+                            });
+                            setShowWastageModal(true);
+                        }}
                         title="Record Kitchen Wastage"
                     >
                         <Trash2 size={15} />
@@ -531,7 +612,7 @@ export default function WarehousePage() {
                 </div>
             </div>
 
-            {/* ── 3-Pillar Tab Pill Bar ── */}
+            {/* 3-Pillar Tab Pill Bar */}
             <div className="wh-nav-bar">
                 <div className="wh-tabs-pills">
                     <button
@@ -578,7 +659,7 @@ export default function WarehousePage() {
                 </div>
             </div>
 
-            {/* ── Main Content Area ── */}
+            {/* Main Content Area */}
             <div className="wh-main-container">
                 {loading ? (
                     <div className="wh-loading-state">
@@ -586,9 +667,7 @@ export default function WarehousePage() {
                         <span>Loading storage data...</span>
                     </div>
                 ) : activeTab === 'godowns' ? (
-                    /* ═════════════════════════════════════════════ */
-                    /* ── PILLAR 1: GODOWNS & STORES ── */
-                    /* ═════════════════════════════════════════════ */
+                    /* Pillar 1: Godowns & Stores */
                     <div className="wh-tab-content">
                         <div className="godowns-grid">
                             {filteredGodowns.map((g) => (
@@ -609,6 +688,15 @@ export default function WarehousePage() {
                                             </div>
                                             <span className="godown-type-label">{g.type.replace('_', ' ')}</span>
                                         </div>
+                                        {!g.isMain && godowns.length > 1 && (
+                                            <button
+                                                className="godown-delete-btn"
+                                                onClick={() => handleDeleteGodown(g.id, g.name)}
+                                                title="Delete Storage Location"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
                                     </div>
 
                                     {g.description && <p className="godown-desc">{g.description}</p>}
@@ -628,9 +716,12 @@ export default function WarehousePage() {
                                         <button
                                             className="godown-action-btn primary"
                                             onClick={() => {
+                                                const dest = godowns.find(other => other.id !== g.id)?.id || '';
                                                 setTransferForm({
-                                                    ...transferForm,
                                                     fromLocationId: g.id,
+                                                    toLocationId: dest,
+                                                    items: [{ inventoryItemId: inventoryItems[0]?.id || '', quantity: 1, notes: '' }],
+                                                    notes: '',
                                                 });
                                                 setShowTransferModal(true);
                                             }}
@@ -657,9 +748,7 @@ export default function WarehousePage() {
                         </div>
                     </div>
                 ) : activeTab === 'transfers' ? (
-                    /* ═════════════════════════════════════════════ */
-                    /* ── PILLAR 2: STOCK TRANSFERS & ISSUES ── */
-                    /* ═════════════════════════════════════════════ */
+                    /* Pillar 2: Stock Transfers & Issues */
                     <div className="wh-tab-content">
                         <div className="transfers-timeline-list">
                             {filteredTransfers.map((t) => (
@@ -718,7 +807,20 @@ export default function WarehousePage() {
                                     </div>
                                     <h3>No stock transfers recorded</h3>
                                     <p>Move raw ingredients and supplies from your Godown to Kitchen in 2 clicks.</p>
-                                    <button className="wh-btn wh-btn-primary" onClick={() => setShowTransferModal(true)}>
+                                    <button
+                                        className="wh-btn wh-btn-primary"
+                                        onClick={() => {
+                                            if (godowns.length >= 2) {
+                                                setTransferForm({
+                                                    fromLocationId: godowns[0]?.id || '',
+                                                    toLocationId: godowns[1]?.id || '',
+                                                    items: [{ inventoryItemId: inventoryItems[0]?.id || '', quantity: 1, notes: '' }],
+                                                    notes: '',
+                                                });
+                                            }
+                                            setShowTransferModal(true);
+                                        }}
+                                    >
                                         <ArrowRightLeft size={15} /> Create Stock Transfer
                                     </button>
                                 </div>
@@ -726,9 +828,7 @@ export default function WarehousePage() {
                         </div>
                     </div>
                 ) : (
-                    /* ═════════════════════════════════════════════ */
-                    /* ── PILLAR 3: KITCHEN WASTAGE & SPOILAGE ── */
-                    /* ═════════════════════════════════════════════ */
+                    /* Pillar 3: Kitchen Wastage & Spoilage */
                     <div className="wh-tab-content">
                         {/* Wastage Summary Banner */}
                         <div className="wastage-summary-strip">
@@ -741,7 +841,19 @@ export default function WarehousePage() {
                                 <span className="metric-value text-danger">₹{totalWastageCost.toLocaleString('en-IN')}</span>
                             </div>
                             <div className="wastage-metric-card action-card">
-                                <button className="wh-btn wh-btn-danger" onClick={() => setShowWastageModal(true)}>
+                                <button
+                                    className="wh-btn wh-btn-danger"
+                                    onClick={() => {
+                                        setWastageForm({
+                                            inventoryItemId: inventoryItems[0]?.id || '',
+                                            locationId: godowns[0]?.id || '',
+                                            quantity: 1,
+                                            reason: 'SPOILED',
+                                            notes: '',
+                                        });
+                                        setShowWastageModal(true);
+                                    }}
+                                >
                                     <Trash2 size={15} /> Record New Wastage
                                 </button>
                             </div>
@@ -807,9 +919,7 @@ export default function WarehousePage() {
                 )}
             </div>
 
-            {/* ═════════════════════════════════════════════ */}
-            /* ── MODAL 1: ADD STORAGE GODOWN ── */
-            /* ═════════════════════════════════════════════ */
+            {/* Modal 1: Add Storage Godown */}
             <AnimatePresence>
                 {showAddGodown && (
                     <motion.div
@@ -899,9 +1009,7 @@ export default function WarehousePage() {
                 )}
             </AnimatePresence>
 
-            {/* ═════════════════════════════════════════════ */}
-            /* ── MODAL 2: QUICK STOCK TRANSFER ── */
-            /* ═════════════════════════════════════════════ */
+            {/* Modal 2: Quick Stock Transfer */}
             <AnimatePresence>
                 {showTransferModal && (
                     <motion.div
@@ -1057,9 +1165,7 @@ export default function WarehousePage() {
                 )}
             </AnimatePresence>
 
-            {/* ═════════════════════════════════════════════ */}
-            /* ── MODAL 3: RECORD KITCHEN WASTAGE ── */
-            /* ═════════════════════════════════════════════ */
+            {/* Modal 3: Record Kitchen Wastage */}
             <AnimatePresence>
                 {showWastageModal && (
                     <motion.div
