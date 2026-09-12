@@ -29,7 +29,7 @@
     flex-direction: column;
     justify-content: space-between;
     padding: 44px;
-    background: #0f172a;
+    background: #0f172a url('/login-video-poster.webp') center/cover no-repeat;
 }
 
 .login-bg-video-stream {

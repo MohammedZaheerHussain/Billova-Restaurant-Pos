@@ -246,6 +246,8 @@ export default function LoginPage() {
                     loop
                     muted
                     playsInline
+                    preload="auto"
+                    poster="/login-video-poster.webp"
                 >
                     <source src="/1786010883001336.mp4" type="video/mp4" />
                 </video>
