@@ -1,9 +1,9 @@
 // Login Page - Split Screen Hero Auth (Supabase Auth Only)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogIn, Mail, Lock, Eye, EyeOff, ShieldCheck, Phone } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { logger } from '../utils/logger';
@@ -21,6 +21,7 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
     const [checkingSetup, setCheckingSetup] = useState(true);
+    const isLoggingInRef = useRef(false);
 
     // Check if setup is needed (cached per session to prevent rate limits)
     useEffect(() => {
@@ -78,6 +79,8 @@ export default function LoginPage() {
 
     // Fetch user profile from profiles table
     const fetchUserProfile = async (userId: string) => {
+        if (isLoggingInRef.current) return;
+        isLoggingInRef.current = true;
         logger.debug('[Login] fetchUserProfile started for:', userId);
         try {
             logger.debug('[Login] Querying profiles table...');
@@ -149,7 +152,7 @@ export default function LoginPage() {
                     loadBranchSettings(activeBranchId).catch(() => {});
                 }
 
-                toast.success('Welcome back!');
+                toast.success('Welcome back!', { id: 'auth-welcome-toast', duration: 2500 });
 
                 logger.debug('[Login] Navigating based on role:', user.role);
                 if (user.role === 'SUPER_ADMIN') {
@@ -159,6 +162,7 @@ export default function LoginPage() {
                 }
             }
         } catch (error) {
+            isLoggingInRef.current = false;
             logger.error('[Login] Error fetching profile:', error);
 
             const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -175,6 +179,8 @@ export default function LoginPage() {
 
                 logger.debug('[Login] Fallback user:', fallbackUser);
                 login('supabase-session', fallbackUser);
+
+                toast.success('Welcome back!', { id: 'auth-welcome-toast', duration: 2500 });
 
                 if (fallbackUser.role === 'SUPER_ADMIN') {
                     navigate('/super-admin');
@@ -217,6 +223,7 @@ export default function LoginPage() {
                 await fetchUserProfile(data.user.id);
             }
         } catch (error: any) {
+            isLoggingInRef.current = false;
             logger.error('[Login] Login error:', error);
             toast.error(error.message || 'Login failed');
         } finally {
@@ -234,8 +241,6 @@ export default function LoginPage() {
 
     return (
         <div className="login-split-page">
-            <Toaster position="top-center" />
-
             {/* ═══════════════════════════════════════════════
                LEFT PANE: Ambient Video & Brand Showcase
                ═══════════════════════════════════════════════ */}

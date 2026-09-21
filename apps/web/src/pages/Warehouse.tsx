@@ -6,7 +6,7 @@ import {
     Package, AlertCircle, Clock, Search,
     Sparkles, ArrowRight, ShieldCheck, Flame, Apple
 } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import api, { inventoryAPI } from '../api';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import './Warehouse.css';
@@ -550,8 +550,6 @@ export default function WarehousePage() {
 
     return (
         <div className="warehouse-page">
-            <Toaster position="top-center" />
-
             {/* Header Bar */}
             <div className="wh-header-bar">
                 <div className="header-left">
