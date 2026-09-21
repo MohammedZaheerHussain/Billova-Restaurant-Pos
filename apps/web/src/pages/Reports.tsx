@@ -49,10 +49,10 @@ export default function ReportsPage() {
         const [y, m, d] = dateStr.split('-').map(Number);
         const date = new Date(y, m - 1, d);
         const formatted = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-        if (dateStr === today) return `Today (${formatted})`;
+        if (dateStr === today) return `Today, ${formatted}`;
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        if (dateStr === getLocalDateString(yesterday)) return `Yesterday (${formatted})`;
+        if (dateStr === getLocalDateString(yesterday)) return `Yesterday, ${formatted}`;
         return formatted;
     };
 
