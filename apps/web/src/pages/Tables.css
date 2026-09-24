@@ -819,3 +819,118 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ── Tables Subscription Locked Screen ── */
+.tables-locked-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 54px);
+    background: var(--bg-root);
+    padding: 24px;
+}
+
+.tables-locked-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 540px;
+}
+
+.tables-locked-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 32px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.tables-locked-badge {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(249, 115, 22, 0.12);
+    border: 1px solid rgba(249, 115, 22, 0.3);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+
+.tables-locked-card h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.tables-locked-sub {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.tables-locked-features {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 8px 0;
+    text-align: left;
+}
+
+.tables-locked-features .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.tables-locked-features .feature-check {
+    color: #22c55e;
+    flex-shrink: 0;
+}
+
+.tables-locked-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.current-plan-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.current-plan-badge strong {
+    color: var(--primary);
+}
+
+.tables-locked-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}

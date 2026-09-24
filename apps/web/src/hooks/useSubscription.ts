@@ -16,7 +16,7 @@ export const PLAN_LIMITS = {
             orderHistory: true,
             reports: true,
             inventory: false,
-            tables: true,
+            tables: false, // PRO & PREMIUM only
             aiExtraction: false,
             exportPdf: false,
             staffManagement: false, // Premium only
@@ -82,12 +82,10 @@ export function useSubscription() {
 
     // Get current plan from user's branch (default to BASIC)
     const rawPlan = user?.branch?.subscriptionPlan as SubscriptionPlan;
-    // Demo accounts (email ends in @billova.test) always get DEMO_PREMIUM features
-    const isDemoAccount = user?.email?.endsWith('@billova.test') || false;
-    // Validate plan exists in PLAN_LIMITS; demo accounts force DEMO_PREMIUM
-    const currentPlan: SubscriptionPlan = isDemoAccount
-        ? 'DEMO_PREMIUM'
-        : ((rawPlan && PLAN_LIMITS[rawPlan]) ? rawPlan : 'BASIC');
+    // Respect explicit branch plan if valid; fallback to DEMO_PREMIUM for legacy demo accounts or BASIC
+    const currentPlan: SubscriptionPlan = (rawPlan && PLAN_LIMITS[rawPlan])
+        ? rawPlan
+        : (user?.email?.endsWith('@billova.test') ? 'DEMO_PREMIUM' : 'BASIC');
     const planConfig = PLAN_LIMITS[currentPlan];
 
     // Check if a feature is available

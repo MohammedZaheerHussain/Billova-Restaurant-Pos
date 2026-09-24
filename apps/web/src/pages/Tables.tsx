@@ -3,10 +3,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users, Plus, Trash2, X, QrCode, Copy, ExternalLink,
-    Grid3X3, Search, CheckCircle2, RotateCcw, Sparkles
+    Grid3X3, Search, CheckCircle2, RotateCcw, Sparkles, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { tablesAPI } from '../api';
+import useSubscription from '../hooks/useSubscription';
 import './Tables.css';
 
 interface Table {
@@ -19,6 +20,7 @@ interface Table {
 }
 
 export default function TablesPage() {
+    const { hasFeature, currentPlan } = useSubscription();
     const [tables, setTables] = useState<Table[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -30,8 +32,10 @@ export default function TablesPage() {
     const [qrModal, setQrModal] = useState<{ tableId: string; tableName: string; qrUrl: string } | null>(null);
 
     useEffect(() => {
-        fetchTables();
-    }, []);
+        if (hasFeature('tables')) {
+            fetchTables();
+        }
+    }, [hasFeature]);
 
     const fetchTables = async () => {
         try {
@@ -132,6 +136,46 @@ export default function TablesPage() {
     }, [tables, searchTerm, statusFilter]);
 
     const occupancyRate = tables.length > 0 ? Math.round((occupiedCount / tables.length) * 100) : 0;
+
+    if (!hasFeature('tables')) {
+        return (
+            <div className="tables-page tables-locked-page">
+                <div className="tables-locked-container">
+                    <div className="tables-locked-card">
+                        <div className="tables-locked-badge">
+                            <Lock size={32} />
+                        </div>
+                        <h2>Table & Floor Plan Management</h2>
+                        <p className="tables-locked-sub">
+                            Table layout and dine-in seating management is available on <strong>PRO</strong> and <strong>PREMIUM</strong> plans.
+                        </p>
+                        <div className="tables-locked-features">
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} className="feature-check" />
+                                <span>Visual floor plan with customizable table capacities</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} className="feature-check" />
+                                <span>Live table occupancy, guest status & running tabs</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} className="feature-check" />
+                                <span>Dine-in billing with instant KOT & split tickets</span>
+                            </div>
+                            <div className="feature-item">
+                                <CheckCircle2 size={16} className="feature-check" />
+                                <span>Table QR code generator for contactless ordering</span>
+                            </div>
+                        </div>
+                        <div className="tables-locked-footer">
+                            <span className="current-plan-badge">Current Plan: <strong>{currentPlan}</strong></span>
+                            <span className="tables-locked-hint">Upgrade to PRO or PREMIUM to activate Table Management.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="tables-page">

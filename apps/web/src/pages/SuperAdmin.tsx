@@ -1013,9 +1013,9 @@ export default function SuperAdminPage() {
                                         <div className="sky-form-group">
                                             <label>Account Tier Type *</label>
                                             <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                                <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Recommended)</option>
-                                                <option value="PRO">PRO — POS + Reports + Inventory</option>
-                                                <option value="BASIC">BASIC — POS Terminal Only</option>
+                                                <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Multi-User + Tables + Inventory)</option>
+                                                <option value="PRO">PRO — POS + Table Management + Inventory</option>
+                                                <option value="BASIC">BASIC — Counter POS Only (No Tables / Single User)</option>
                                             </select>
                                         </div>
                                     </>
@@ -1062,9 +1062,9 @@ export default function SuperAdminPage() {
                                             <div className="sky-form-group">
                                                 <label>Plan Tier</label>
                                                 <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                                    <option value="BASIC">BASIC — POS Terminal Only</option>
-                                                    <option value="PRO">PRO — POS + Reports + Inventory</option>
-                                                    <option value="PREMIUM">PREMIUM — Full Enterprise Suite</option>
+                                                    <option value="BASIC">BASIC — Counter POS Only (No Tables / Single User)</option>
+                                                    <option value="PRO">PRO — POS + Table Management + Inventory</option>
+                                                    <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Multi-User + Tables + Inventory)</option>
                                                 </select>
                                             </div>
                                             <div className="sky-form-group">
