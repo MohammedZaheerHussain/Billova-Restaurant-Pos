@@ -1,7 +1,7 @@
 // Menu Management Page
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, X, Upload, FileImage, FolderPlus, FolderCog, Sparkles, Loader, UtensilsCrossed, Search, Power, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Upload, FileImage, Sparkles, Loader, UtensilsCrossed, Search, Power } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuAPI, categoriesAPI } from '../api';
 import { useAuthStore, MenuItem, Category } from '../store';
@@ -27,7 +27,7 @@ const emptyForm: MenuItemForm = {
     gstPercent: '5',
 };
 
-// Rich collection of 48 food, beverage, dessert, and dining emojis
+// Rich collection of food, beverage, dessert, and dining emojis
 const CATEGORY_ICONS = [
     // Mains & Fast Food
     '🍽️', '🍕', '🍔', '🌭', '🥪', '🌮', '🌯', '🥙',
@@ -57,23 +57,17 @@ export default function MenuPage() {
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+    // Inline Category Creator inside Add/Edit Item Modal
+    const [showInlineNewCat, setShowInlineNewCat] = useState(false);
+    const [newCatName, setNewCatName] = useState('');
+    const [newCatIcon, setNewCatIcon] = useState('🍽️');
+    const [creatingCat, setCreatingCat] = useState(false);
+
     const menuCardInputRef = useRef<HTMLInputElement>(null);
-
-    // Category Modal
-    const [showCategoryModal, setShowCategoryModal] = useState(false);
-    const [categoryForm, setCategoryForm] = useState({ name: '', icon: '🍽️' });
-    const [savingCategory, setSavingCategory] = useState(false);
-
-    // Manage Categories Modal & Editing
-    const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const [editCatName, setEditCatName] = useState('');
-    const [editCatIcon, setEditCatIcon] = useState('🍽️');
 
     // Menu Card Upload
     const [showMenuCardModal, setShowMenuCardModal] = useState(false);
     const [menuCardImage, setMenuCardImage] = useState<string>('');
-    // menuCardSide removed — Groq AI Vision handles any page automatically
     const [extractedItems, setExtractedItems] = useState<Array<{ name: string; price: string; isVeg: boolean; categoryId: string }>>([]);
     const [extracting, setExtracting] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -110,7 +104,11 @@ export default function MenuPage() {
 
     const openAddModal = () => {
         setEditingItem(null);
-        setForm({ ...emptyForm, categoryId: categories[0]?.id || '' });
+        const defaultCatId = categories[0]?.id || '';
+        setForm({ ...emptyForm, categoryId: defaultCatId });
+        setShowInlineNewCat(categories.length === 0);
+        setNewCatName('');
+        setNewCatIcon('🍽️');
         setShowModal(true);
     };
 
@@ -125,6 +123,9 @@ export default function MenuPage() {
             hasGST: (item as any).hasGST !== false,
             gstPercent: String((item as any).gstPercent || 5),
         });
+        setShowInlineNewCat(false);
+        setNewCatName('');
+        setNewCatIcon('🍽️');
         setShowModal(true);
     };
 
@@ -132,13 +133,68 @@ export default function MenuPage() {
         setShowModal(false);
         setEditingItem(null);
         setForm(emptyForm);
+        setShowInlineNewCat(false);
+        setNewCatName('');
+        setNewCatIcon('🍽️');
+    };
+
+    // Quick inline category creation inside Add/Edit Item modal
+    const handleCreateCategoryInline = async () => {
+        if (!newCatName.trim()) {
+            toast.error('Please enter category name');
+            return;
+        }
+        try {
+            setCreatingCat(true);
+            const res = await categoriesAPI.create({
+                name: newCatName.trim(),
+                icon: newCatIcon || '🍽️',
+                branchId: user?.branch?.id,
+            });
+            const createdCat = res.data;
+            toast.success(`Category "${createdCat.name}" created!`);
+
+            // Add to categories list and select it immediately
+            const updatedCategories = [...categories, createdCat];
+            setCategories(updatedCategories);
+            setForm((prev) => ({ ...prev, categoryId: createdCat.id }));
+
+            // Close inline creator and reset
+            setShowInlineNewCat(false);
+            setNewCatName('');
+            setNewCatIcon('🍽️');
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || 'Failed to create category');
+        } finally {
+            setCreatingCat(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!form.name || !form.price || !form.categoryId) {
-            toast.error('Please fill in all required fields');
+        // If user typed a category name in inline creator, auto-create it seamlessly
+        let activeCategoryId = form.categoryId;
+        if (showInlineNewCat && newCatName.trim()) {
+            try {
+                setSaving(true);
+                const res = await categoriesAPI.create({
+                    name: newCatName.trim(),
+                    icon: newCatIcon || '🍽️',
+                    branchId: user?.branch?.id,
+                });
+                const createdCat = res.data;
+                setCategories((prev) => [...prev, createdCat]);
+                activeCategoryId = createdCat.id;
+            } catch (err: any) {
+                toast.error(err.response?.data?.error || 'Failed to create category');
+                setSaving(false);
+                return;
+            }
+        }
+
+        if (!form.name || !form.price || !activeCategoryId) {
+            toast.error('Please fill in item name, price, and category');
             return;
         }
 
@@ -148,7 +204,7 @@ export default function MenuPage() {
                 name: form.name,
                 description: form.description || undefined,
                 price: parseFloat(form.price),
-                categoryId: form.categoryId,
+                categoryId: activeCategoryId,
                 branchId: user?.branch?.id,
                 isVeg: form.isVeg,
                 hasGST: form.hasGST,
@@ -180,59 +236,6 @@ export default function MenuPage() {
             fetchData();
         } catch (error) {
             toast.error('Failed to delete item');
-        }
-    };
-
-    // Handle Add Category
-    const handleAddCategory = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!categoryForm.name) {
-            toast.error('Please enter category name');
-            return;
-        }
-        try {
-            setSavingCategory(true);
-            await categoriesAPI.create({
-                name: categoryForm.name,
-                icon: categoryForm.icon,
-                branchId: user?.branch?.id,
-            });
-            toast.success('Category added!');
-            setShowCategoryModal(false);
-            setCategoryForm({ name: '', icon: '🍽️' });
-            fetchData();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Failed to add category');
-        } finally {
-            setSavingCategory(false);
-        }
-    };
-
-
-    // Update Category
-    const handleUpdateCategory = async (id: string, name: string, icon: string) => {
-        if (!name.trim()) {
-            toast.error('Category name is required');
-            return;
-        }
-        try {
-            await categoriesAPI.update(id, { name, icon });
-            toast.success('Category updated!');
-            setEditingCategory(null);
-            fetchData();
-        } catch {
-            toast.error('Failed to update category');
-        }
-    };
-
-    // Delete Category
-    const handleDeleteCategory = async (id: string) => {
-        try {
-            await categoriesAPI.delete(id);
-            toast.success('Category deleted!');
-            fetchData();
-        } catch {
-            toast.error('Failed to delete category');
         }
     };
 
@@ -357,12 +360,6 @@ export default function MenuPage() {
                     <p>{items.length} items across {categories.length} categories</p>
                 </div>
                 <div className="header-actions">
-                    <button className="btn btn-secondary" onClick={() => setShowManageCategoriesModal(true)}>
-                        <FolderCog size={16} /> Categories
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setShowCategoryModal(true)}>
-                        <FolderPlus size={16} /> + Category
-                    </button>
                     <button className="btn btn-secondary" onClick={() => setShowMenuCardModal(true)}>
                         <FileImage size={16} /> Upload Menu Card
                     </button>
@@ -554,19 +551,91 @@ export default function MenuPage() {
                                 </div>
 
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Category *</label>
-                                        <select
-                                            value={form.categoryId}
-                                            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                                        >
-                                            <option value="">Select category</option>
-                                            {categories.map((cat) => (
-                                                <option key={cat.id} value={cat.id}>
-                                                    {cat.icon} {cat.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="form-group category-form-group">
+                                        {!showInlineNewCat ? (
+                                            <>
+                                                <div className="category-label-row">
+                                                    <label>Category *</label>
+                                                    <button
+                                                        type="button"
+                                                        className="btn-link-action"
+                                                        onClick={() => setShowInlineNewCat(true)}
+                                                    >
+                                                        + New Category
+                                                    </button>
+                                                </div>
+                                                <select
+                                                    value={form.categoryId}
+                                                    onChange={(e) => {
+                                                        if (e.target.value === '__NEW__') {
+                                                            setShowInlineNewCat(true);
+                                                        } else {
+                                                            setForm({ ...form, categoryId: e.target.value });
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value="">Select category</option>
+                                                    {categories.map((cat) => (
+                                                        <option key={cat.id} value={cat.id}>
+                                                            {cat.icon || '🍽️'} {cat.name}
+                                                        </option>
+                                                    ))}
+                                                    <option value="__NEW__">✨ + Create New Category...</option>
+                                                </select>
+                                            </>
+                                        ) : (
+                                            <div className="inline-category-box">
+                                                <div className="inline-category-header">
+                                                    <span className="inline-cat-title"><Sparkles size={13} /> Create Category</span>
+                                                    {categories.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-link-action"
+                                                            onClick={() => setShowInlineNewCat(false)}
+                                                        >
+                                                            Select Existing
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="inline-category-row">
+                                                    <div className="inline-cat-preview" title="Selected icon">{newCatIcon}</div>
+                                                    <input
+                                                        type="text"
+                                                        className="inline-cat-input"
+                                                        value={newCatName}
+                                                        onChange={(e) => setNewCatName(e.target.value)}
+                                                        placeholder="e.g. Desserts, Soups..."
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                handleCreateCategoryInline();
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="btn-save-inline-cat"
+                                                        onClick={handleCreateCategoryInline}
+                                                        disabled={creatingCat || !newCatName.trim()}
+                                                    >
+                                                        {creatingCat ? <Loader size={13} className="spin" /> : 'Add'}
+                                                    </button>
+                                                </div>
+                                                <div className="inline-icon-palette">
+                                                    {CATEGORY_ICONS.slice(0, 16).map((icon) => (
+                                                        <button
+                                                            key={icon}
+                                                            type="button"
+                                                            className={`palette-icon-btn ${newCatIcon === icon ? 'selected' : ''}`}
+                                                            onClick={() => setNewCatIcon(icon)}
+                                                        >
+                                                            {icon}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Food Type</label>
@@ -665,212 +734,6 @@ export default function MenuPage() {
                                 <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>
                                     Delete
                                 </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Add Category Modal */}
-            <AnimatePresence>
-                {showCategoryModal && (
-                    <motion.div
-                        className="modal-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setShowCategoryModal(false)}
-                    >
-                        <motion.div
-                            className="modal category-modal"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="modal-header">
-                                <h2><FolderPlus size={20} /> Add Category</h2>
-                                <button className="modal-close" onClick={() => setShowCategoryModal(false)}>
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            <form onSubmit={handleAddCategory} className="category-form">
-                                <div className="form-group">
-                                    <label>Category Name *</label>
-                                    <input
-                                        type="text"
-                                        value={categoryForm.name}
-                                        onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                                        placeholder="e.g., Desserts, Soups"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Icon</label>
-                                    <div className="icon-picker">
-                                        {CATEGORY_ICONS.map((icon) => (
-                                            <button
-                                                key={icon}
-                                                type="button"
-                                                className={`icon-option ${categoryForm.icon === icon ? 'selected' : ''}`}
-                                                onClick={() => setCategoryForm({ ...categoryForm, icon })}
-                                                title={icon}
-                                            >
-                                                {icon}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="modal-actions">
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowCategoryModal(false)}>
-                                        Cancel
-                                    </button>
-                                    <button type="submit" className="btn btn-primary" disabled={savingCategory}>
-                                        {savingCategory ? <div className="spinner" /> : 'Add Category'}
-                                    </button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Manage Categories Modal */}
-            <AnimatePresence>
-                {showManageCategoriesModal && (
-                    <motion.div
-                        className="modal-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setShowManageCategoriesModal(false)}
-                    >
-                        <motion.div
-                            className="modal category-manager-modal"
-                            initial={{ opacity: 0, scale: 0.96, y: 15 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: 15 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="modal-header">
-                                <div className="modal-header-left">
-                                    <div className="modal-title-with-icon">
-                                        <div className="cat-modal-header-badge">
-                                            <FolderCog size={18} />
-                                        </div>
-                                        <div>
-                                            <h2>Manage Categories</h2>
-                                            <p className="modal-subtitle">{categories.length} active menu categories</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="modal-header-right">
-                                    <button
-                                        type="button"
-                                        className="btn-create-category"
-                                        onClick={() => {
-                                            setShowManageCategoriesModal(false);
-                                            setShowCategoryModal(true);
-                                        }}
-                                        title="Add a new category"
-                                    >
-                                        <Plus size={14} /> Add Category
-                                    </button>
-                                    <button className="modal-close" onClick={() => setShowManageCategoriesModal(false)}>
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="category-manager-body">
-                                <div className="category-manager-list">
-                                    {categories.map((cat) => {
-                                        const itemCount = items.filter(i => i.categoryId === cat.id || (cat as any).ids?.includes(i.categoryId)).length;
-                                        const isEditing = editingCategory?.id === cat.id;
-
-                                        return (
-                                            <div key={cat.id} className={`category-row-card ${isEditing ? 'is-editing' : ''}`}>
-                                                {isEditing ? (
-                                                    <div className="category-edit-form">
-                                                        <div className="category-edit-top">
-                                                            <div className="cat-emoji-preview">{editCatIcon || '🍽️'}</div>
-                                                            <input
-                                                                type="text"
-                                                                className="category-edit-input"
-                                                                value={editCatName}
-                                                                onChange={(e) => setEditCatName(e.target.value)}
-                                                                placeholder="Category Name"
-                                                                autoFocus
-                                                            />
-                                                            <div className="category-edit-actions">
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn-cat-save"
-                                                                    onClick={() => handleUpdateCategory(cat.id, editCatName, editCatIcon)}
-                                                                >
-                                                                    <Check size={14} /> Save
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn-cat-cancel"
-                                                                    onClick={() => setEditingCategory(null)}
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="icon-picker-strip">
-                                                            {CATEGORY_ICONS.map((icon) => (
-                                                                <button
-                                                                    key={icon}
-                                                                    type="button"
-                                                                    className={`icon-option ${editCatIcon === icon ? 'selected' : ''}`}
-                                                                    onClick={() => setEditCatIcon(icon)}
-                                                                >
-                                                                    {icon}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <div className="category-row-info">
-                                                            <div className="category-emoji-box">
-                                                                <span>{cat.icon || '🍽️'}</span>
-                                                            </div>
-                                                            <div className="category-text-meta">
-                                                                <span className="category-title">{cat.name}</span>
-                                                                <span className="category-item-count">{itemCount} items</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="category-row-actions">
-                                                            <button
-                                                                type="button"
-                                                                className="cat-action-icon edit"
-                                                                onClick={() => {
-                                                                    setEditingCategory(cat);
-                                                                    setEditCatName(cat.name);
-                                                                    setEditCatIcon(cat.icon || '🍽️');
-                                                                }}
-                                                                title="Edit Category"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="cat-action-icon delete"
-                                                                onClick={() => handleDeleteCategory(cat.id)}
-                                                                title="Delete Category"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
                             </div>
                         </motion.div>
                     </motion.div>

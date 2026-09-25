@@ -1529,3 +1529,150 @@
     border-color: var(--primary);
     color: var(--primary);
 }
+
+/* ── Inline Category Creator in Add/Edit Modal ── */
+.category-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.category-label-row label {
+    margin-bottom: 0 !important;
+}
+
+.btn-link-action {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 150ms ease;
+}
+
+.btn-link-action:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+.inline-category-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(249, 115, 22, 0.4);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.inline-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.inline-cat-title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.inline-category-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inline-cat-preview {
+    font-size: 18px;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.inline-cat-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 150ms ease;
+}
+
+.inline-cat-input:focus {
+    border-color: var(--primary);
+}
+
+.btn-save-inline-cat {
+    padding: 8px 14px;
+    background: var(--primary);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 150ms ease;
+    flex-shrink: 0;
+}
+
+.btn-save-inline-cat:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.btn-save-inline-cat:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.inline-icon-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 60px;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+
+.palette-icon-btn {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 120ms ease;
+}
+
+.palette-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.1);
+}
+
+.palette-icon-btn.selected {
+    background: rgba(249, 115, 22, 0.2);
+    border-color: var(--primary);
+}
