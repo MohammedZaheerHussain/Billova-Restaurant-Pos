@@ -1,14 +1,14 @@
-// Inventory Management Page - Premium Glassmorphism UI
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Package, Plus, Edit2, Trash2, X, Search,
     TrendingDown, TrendingUp, Bell, Upload, Link2,
-    RefreshCw
+    RefreshCw, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { inventoryAPI, menuAPI } from '../api';
 import { MenuItem } from '../store';
+import useSubscription from '../hooks/useSubscription';
 import './Inventory.css';
 import { logger } from '../utils/logger';
 import { InventorySummaryGrid } from '../components/inventory/InventorySummaryGrid';
@@ -81,6 +81,7 @@ const categories = [
 const units = ['pcs', 'kg', 'g', 'ltr', 'ml', 'pack', 'box', 'dozen'];
 
 export default function InventoryPage() {
+    const { hasFeature, getUpgradeMessage } = useSubscription();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [alerts, setAlerts] = useState<StockAlert[]>([]);
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -100,8 +101,10 @@ export default function InventoryPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        fetchData();
-    }, [filterStatus, filterCategory]);
+        if (hasFeature('inventory')) {
+            fetchData();
+        }
+    }, [hasFeature, filterStatus, filterCategory]);
 
     const fetchData = async () => {
         try {
@@ -361,6 +364,46 @@ export default function InventoryPage() {
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         (item.sku && item.sku.toLowerCase().includes(search.toLowerCase()))
     );
+
+    if (!hasFeature('inventory')) {
+        return (
+            <div className="inventory-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
+                <div style={{
+                    maxWidth: 480,
+                    textAlign: 'center',
+                    padding: '40px 32px',
+                    background: 'var(--bg-secondary, #1a1a24)',
+                    borderRadius: 16,
+                    border: '1px solid var(--border-color, #2a2a38)',
+                }}>
+                    <div style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 20px',
+                        color: '#ef4444',
+                    }}>
+                        <Lock size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Inventory Tracking Locked</h2>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        {getUpgradeMessage('inventory')}
+                    </p>
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => window.history.back()}
+                        style={{ padding: '10px 24px' }}
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="inventory-page">

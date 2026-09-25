@@ -77,16 +77,23 @@ export const PLAN_LIMITS = {
 
 export type FeatureKey = keyof typeof PLAN_LIMITS.BASIC.features;
 
+export function normalizePlan(raw?: string | null): SubscriptionPlan {
+    if (!raw) return 'BASIC';
+    const upper = raw.trim().toUpperCase();
+    if (upper === 'DEMO_PREMIUM') return 'DEMO_PREMIUM';
+    if (upper.includes('PREMIUM') || upper === 'DEMO') return 'PREMIUM';
+    if (upper.includes('PRO') || upper.includes('PLUS')) return 'PLUS';
+    if (upper.includes('BASIC')) return 'BASIC';
+    return 'BASIC';
+}
+
 export function useSubscription() {
     const user = useAuthStore((state) => state.user);
 
     // Get current plan from user's branch (default to BASIC)
-    const rawPlan = user?.branch?.subscriptionPlan as SubscriptionPlan;
-    // Respect explicit branch plan if valid; fallback to DEMO_PREMIUM for legacy demo accounts or BASIC
-    const currentPlan: SubscriptionPlan = (rawPlan && PLAN_LIMITS[rawPlan])
-        ? rawPlan
-        : (user?.email?.endsWith('@billova.test') ? 'DEMO_PREMIUM' : 'BASIC');
-    const planConfig = PLAN_LIMITS[currentPlan];
+    const rawPlan = user?.branch?.subscriptionPlan;
+    const currentPlan: SubscriptionPlan = normalizePlan(rawPlan);
+    const planConfig = PLAN_LIMITS[currentPlan] || PLAN_LIMITS.BASIC;
 
     // Check if a feature is available
     const hasFeature = (feature: FeatureKey): boolean => {

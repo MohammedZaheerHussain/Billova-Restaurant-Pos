@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Phone, Leaf, Drumstick, Share2, ShoppingBag } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
 import './PublicMenu.css';
 
 interface MenuItem {
@@ -52,6 +53,58 @@ export default function PublicMenuPage() {
     const fetchMenu = async () => {
         try {
             setLoading(true);
+            setError(null);
+
+            // 1. Direct Supabase Query (Strict Branch Isolation)
+            if (branchId) {
+                const { data: branchData } = await supabase
+                    .from('branches')
+                    .select('id, name, phone, address')
+                    .eq('id', branchId)
+                    .maybeSingle();
+
+                if (branchData) {
+                    setBranch(branchData);
+
+                    const { data: catData } = await supabase
+                        .from('categories')
+                        .select('*')
+                        .eq('branch_id', branchId)
+                        .order('sort_order', { ascending: true });
+
+                    const { data: menuData } = await supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('branch_id', branchId)
+                        .eq('is_available', true);
+
+                    const formattedCategories = (catData || []).map((c: any) => ({
+                        id: c.id,
+                        name: c.name,
+                        icon: c.icon,
+                    }));
+
+                    const formattedMenuItems = (menuData || []).map((m: any) => ({
+                        id: m.id,
+                        name: m.name,
+                        description: m.description,
+                        price: Number(m.price || 0),
+                        isVeg: Boolean(m.is_veg),
+                        image: m.image_url || m.image,
+                        categoryId: m.category_id,
+                        variants: m.variants || [],
+                    }));
+
+                    setCategories(formattedCategories);
+                    setMenuItems(formattedMenuItems);
+                    if (formattedCategories.length > 0) {
+                        setSelectedCategory(formattedCategories[0].id);
+                    }
+                    return;
+                }
+            }
+
+            // 2. Express Backend Fallback
             const response = await fetch(`${API_URL}/api/v1/public/menu-full/${branchId}`);
             if (!response.ok) {
                 throw new Error('Restaurant not found');

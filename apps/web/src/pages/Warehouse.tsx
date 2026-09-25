@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Plus, ArrowRightLeft, Building2, Trash2, X, Check,
     Package, AlertCircle, Clock, Search,
-    Sparkles, ArrowRight, ShieldCheck, Flame, Apple
+    Sparkles, ArrowRight, ShieldCheck, Flame, Apple, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { inventoryAPI } from '../api';
 import { hasExpressBackend } from '../lib/superadmin-direct';
+import { useAuthStore } from '../store';
+import useSubscription from '../hooks/useSubscription';
 import './Warehouse.css';
 import { logger } from '../utils/logger';
 
@@ -70,47 +72,16 @@ export interface InventoryItemOption {
 
 type TabType = 'godowns' | 'transfers' | 'wastage';
 
-// ── Local Storage Fallback Keys (Offline-First) ──
-const STORAGE_GODOWNS = 'billova_warehouse_godowns';
-const STORAGE_TRANSFERS = 'billova_warehouse_transfers';
-const STORAGE_WASTAGE = 'billova_warehouse_wastage';
-const STORAGE_INVENTORY = 'billova_inventory_items';
-
-// Default starter Godowns if fresh install
-const DEFAULT_STARTER_GODOWNS: GodownLocation[] = [
-    {
-        id: 'wh-main-01',
-        name: 'Main Godown & Dry Store',
-        type: 'GODOWN',
-        description: 'Primary storage for bulk grains, dry ingredients & spices',
-        isMain: true,
-        itemCount: 0,
-        createdAt: new Date().toISOString(),
-    },
-    {
-        id: 'wh-kitchen-01',
-        name: 'Main Kitchen Prep Store',
-        type: 'KITCHEN',
-        description: 'Daily operational stock for line chefs & prep station',
-        isMain: false,
-        itemCount: 0,
-        createdAt: new Date().toISOString(),
-    }
-];
-
-// Offline starter ingredients if fresh install
-const DEFAULT_STARTER_ITEMS: InventoryItemOption[] = [
-    { id: 'inv-rice-01', name: 'Basmati Rice (Daawat)', unit: 'kg', currentStock: 50, costPerUnit: 110, category: 'Grains' },
-    { id: 'inv-paneer-01', name: 'Fresh Malai Paneer', unit: 'kg', currentStock: 15, costPerUnit: 340, category: 'Dairy' },
-    { id: 'inv-chicken-01', name: 'Fresh Chicken Breast', unit: 'kg', currentStock: 25, costPerUnit: 240, category: 'Meat' },
-    { id: 'inv-oil-01', name: 'Refined Sunflower Oil', unit: 'L', currentStock: 30, costPerUnit: 140, category: 'Oil' },
-    { id: 'inv-milk-01', name: 'Full Cream Milk (Amul)', unit: 'L', currentStock: 20, costPerUnit: 66, category: 'Dairy' },
-    { id: 'inv-onion-01', name: 'Red Onions (Nashik)', unit: 'kg', currentStock: 40, costPerUnit: 35, category: 'Vegetables' },
-    { id: 'inv-tomato-01', name: 'Hybrid Tomatoes', unit: 'kg', currentStock: 30, costPerUnit: 40, category: 'Vegetables' },
-    { id: 'inv-masala-01', name: 'Special Garam Masala Blend', unit: 'kg', currentStock: 5, costPerUnit: 450, category: 'Spices' },
-];
-
 export default function WarehousePage() {
+    const { hasFeature, getUpgradeMessage } = useSubscription();
+    const user = useAuthStore((state) => state.user);
+    const activeBranchId = user?.branch?.id || (user as any)?.branchId || 'default';
+
+    const STORAGE_GODOWNS = `billova_warehouse_godowns_${activeBranchId}`;
+    const STORAGE_TRANSFERS = `billova_warehouse_transfers_${activeBranchId}`;
+    const STORAGE_WASTAGE = `billova_warehouse_wastage_${activeBranchId}`;
+    const STORAGE_INVENTORY = `billova_inventory_items_${activeBranchId}`;
+
     const [activeTab, setActiveTab] = useState<TabType>('godowns');
     const [loading, setLoading] = useState(true);
 
@@ -152,8 +123,10 @@ export default function WarehousePage() {
     });
 
     useEffect(() => {
-        loadAllData();
-    }, []);
+        if (hasFeature('inventory')) {
+            loadAllData();
+        }
+    }, [hasFeature, activeBranchId]);
 
     // ── Load All Data (Offline-First with Multi-Tier API Fallback) ──
     const loadAllData = async () => {
@@ -164,7 +137,7 @@ export default function WarehousePage() {
             let items: InventoryItemOption[] = [];
             try {
                 const invRes = await inventoryAPI.getAll();
-                if (Array.isArray(invRes?.data) && invRes.data.length > 0) {
+                if (Array.isArray(invRes?.data)) {
                     items = invRes.data;
                     localStorage.setItem(STORAGE_INVENTORY, JSON.stringify(items));
                 }
@@ -175,10 +148,7 @@ export default function WarehousePage() {
                     try { items = JSON.parse(localInv); } catch { /* ignore */ }
                 }
             }
-            if (items.length === 0) {
-                items = DEFAULT_STARTER_ITEMS;
-                localStorage.setItem(STORAGE_INVENTORY, JSON.stringify(items));
-            }
+            setInventoryItems(items);
             setInventoryItems(items);
 
             // 2. Godowns / Warehouses
@@ -207,7 +177,17 @@ export default function WarehousePage() {
                 }
             }
             if (fetchedGodowns.length === 0) {
-                fetchedGodowns = DEFAULT_STARTER_GODOWNS;
+                fetchedGodowns = [
+                    {
+                        id: `wh-main-${activeBranchId}`,
+                        name: 'Main Godown & Dry Store',
+                        type: 'GODOWN',
+                        description: 'Primary storage for bulk grains, dry ingredients & spices',
+                        isMain: true,
+                        itemCount: items.length,
+                        createdAt: new Date().toISOString(),
+                    }
+                ];
                 localStorage.setItem(STORAGE_GODOWNS, JSON.stringify(fetchedGodowns));
             }
             setGodowns(fetchedGodowns);
@@ -547,6 +527,46 @@ export default function WarehousePage() {
     const totalWastageCost = useMemo(() => {
         return wastageList.reduce((sum, w) => sum + (w.estimatedCost || 0), 0);
     }, [wastageList]);
+
+    if (!hasFeature('inventory')) {
+        return (
+            <div className="warehouse-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
+                <div style={{
+                    maxWidth: 480,
+                    textAlign: 'center',
+                    padding: '40px 32px',
+                    background: 'var(--bg-secondary, #1a1a24)',
+                    borderRadius: 16,
+                    border: '1px solid var(--border-color, #2a2a38)',
+                }}>
+                    <div style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '50%',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 20px',
+                        color: '#ef4444',
+                    }}>
+                        <Lock size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Warehouse & Godown Management</h2>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        {getUpgradeMessage('inventory')}
+                    </p>
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => window.history.back()}
+                        style={{ padding: '10px 24px' }}
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="warehouse-page">
