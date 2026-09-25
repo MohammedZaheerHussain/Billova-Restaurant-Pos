@@ -338,6 +338,7 @@ export default function OrdersPage() {
         const cleanOrderNumber = order.orderNumber || 1;
         const cleanBillNumber = `#${String(cleanOrderNumber).padStart(3, '0')}`;
 
+        const gstAmount = Number(order.gstAmount || 0);
         const receiptData: ReceiptData = {
             businessName: branchSettings.name || user?.branch?.name || 'Billova POS',
             branchName: branchSettings.name || user?.branch?.name || '',
@@ -364,7 +365,9 @@ export default function OrdersPage() {
             })),
             subtotal: Number(order.subtotal),
             discountAmount: Number(order.discountAmount || 0),
-            gstAmount: Number(order.gstAmount || 0),
+            sgst: gstAmount > 0 ? Math.round((gstAmount / 2) * 100) / 100 : undefined,
+            cgst: gstAmount > 0 ? Math.round((gstAmount / 2) * 100) / 100 : undefined,
+            gstAmount: gstAmount,
             total: Number(order.total),
             paymentMode: order.payments?.[0]?.mode || 'CASH',
             includeKOT: false,

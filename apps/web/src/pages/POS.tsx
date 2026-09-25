@@ -110,6 +110,9 @@ export default function POSPage() {
         clearCart,
         getSubtotal,
         getDiscountAmount,
+        getGSTAmount,
+        getSGST,
+        getCGST,
         getTotal,
         getItemCount,
         discountType,
@@ -120,6 +123,9 @@ export default function POSPage() {
         editingOrderTableName,
         cancelEditingOrder,
     } = useCartStore();
+
+    // Branch settings for GST & business details
+    const { settings: branchSettings } = useBranchSettingsStore();
 
     // Printer settings for daily order reset
     const { settings: printerSettings } = usePrinterConfigStore();
@@ -270,7 +276,9 @@ export default function POSPage() {
 
         try {
             setSubmitting(true);
-            const branchSettings = useBranchSettingsStore.getState().settings;
+            const currentGst = branchSettings.gstEnabled ? getGSTAmount() : 0;
+            const currentSgst = (branchSettings.gstEnabled && currentGst > 0) ? getSGST() : undefined;
+            const currentCgst = (branchSettings.gstEnabled && currentGst > 0) ? getCGST() : undefined;
 
             let targetOrderId = editingOrderId;
             let cleanOrderNumber = editingOrderNumber || 1;
@@ -285,6 +293,7 @@ export default function POSPage() {
                     notes: orderNotes.trim() || undefined,
                     subtotal: getSubtotal(),
                     discountAmount: getDiscountAmount(),
+                    gstAmount: currentGst,
                     total: getTotal(),
                     totalAmount: getTotal(),
                     items: cartItems.map((item) => ({
@@ -309,6 +318,7 @@ export default function POSPage() {
                     onlineOrderId: orderType === 'ONLINE' ? onlineOrderId.trim() : undefined,
                     subtotal: getSubtotal(),
                     discountAmount: getDiscountAmount(),
+                    gstAmount: currentGst,
                     total: getTotal(),
                     totalAmount: getTotal(),
                     items: cartItems.map((item) => ({
@@ -375,7 +385,9 @@ export default function POSPage() {
                 discountType: discountType,
                 discountValue: discountValue || 0,
                 discountAmount: getDiscountAmount(),
-                gstAmount: 0,
+                sgst: currentSgst,
+                cgst: currentCgst,
+                gstAmount: currentGst,
                 total: getTotal(),
                 paymentMode: paymentMode,
                 includeKOT: true,
@@ -430,6 +442,7 @@ export default function POSPage() {
 
         try {
             setSubmitting(true);
+            const currentGst = branchSettings.gstEnabled ? getGSTAmount() : 0;
 
             if (editingOrderId) {
                 // Updating existing pending order
@@ -440,6 +453,7 @@ export default function POSPage() {
                     notes: orderNotes.trim() || undefined,
                     subtotal: getSubtotal(),
                     discountAmount: getDiscountAmount(),
+                    gstAmount: currentGst,
                     total: getTotal(),
                     totalAmount: getTotal(),
                     items: cartItems.map((item) => ({
@@ -500,6 +514,7 @@ export default function POSPage() {
                 onlineOrderId: orderType === 'ONLINE' ? onlineOrderId.trim() : undefined,
                 subtotal: getSubtotal(),
                 discountAmount: getDiscountAmount(),
+                gstAmount: currentGst,
                 total: getTotal(),
                 totalAmount: getTotal(),
                 status: 'PENDING',
@@ -1153,6 +1168,19 @@ export default function POSPage() {
                                 </span>
                                 <span>-₹{getDiscountAmount().toFixed(2)}</span>
                             </div>
+                        )}
+
+                        {branchSettings.gstEnabled && getGSTAmount() > 0 && (
+                            <>
+                                <div className="summary-row tax">
+                                    <span>SGST</span>
+                                    <span>+₹{getSGST().toFixed(2)}</span>
+                                </div>
+                                <div className="summary-row tax">
+                                    <span>CGST</span>
+                                    <span>+₹{getCGST().toFixed(2)}</span>
+                                </div>
+                            </>
                         )}
 
                         <div className="summary-row total-row">

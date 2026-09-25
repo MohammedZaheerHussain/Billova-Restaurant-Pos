@@ -1,6 +1,6 @@
-// Zustand Store for POS State Management
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useBranchSettingsStore } from './branch-settings-store';
 
 // Types
 export interface MenuItem {
@@ -95,6 +95,9 @@ interface CartStore {
     // Computed
     getSubtotal: () => number;
     getDiscountAmount: () => number;
+    getGSTAmount: () => number;
+    getSGST: () => number;
+    getCGST: () => number;
     getTotal: () => number;
     getItemCount: () => number;
 }
@@ -263,11 +266,43 @@ export const useCartStore = create<CartStore>()(
                 if (!discountType || !discountValue) return 0;
 
                 if (discountType === 'PERCENTAGE') {
-                    return subtotal * (Number(discountValue) / 100);
+                    return Math.round(subtotal * (Number(discountValue) / 100) * 100) / 100;
                 }
                 return Number(discountValue) || 0;
             },
-            getTotal: () => Math.max(0, get().getSubtotal() - get().getDiscountAmount()),
+            getGSTAmount: () => {
+                const isGstEnabled = useBranchSettingsStore.getState().settings.gstEnabled;
+                if (!isGstEnabled) return 0;
+
+                const items = get().items || [];
+                const subtotal = get().getSubtotal();
+                const discount = get().getDiscountAmount();
+                const discountRatio = subtotal > 0 ? (discount / subtotal) : 0;
+
+                const totalGst = items.reduce((sum, item) => {
+                    const hasGST = (item.menuItem as any).hasGST !== false && (item.menuItem as any).has_gst !== false;
+                    if (!hasGST) return sum;
+                    const gstPercent = Number((item.menuItem as any).gstPercent ?? (item.menuItem as any).gst_percent ?? 5);
+                    const itemTaxable = (Number(item.total) || 0) * (1 - discountRatio);
+                    return sum + (itemTaxable * (gstPercent / 100));
+                }, 0);
+
+                return Math.round(totalGst * 100) / 100;
+            },
+            getSGST: () => {
+                const totalGst = get().getGSTAmount();
+                return Math.round((totalGst / 2) * 100) / 100;
+            },
+            getCGST: () => {
+                const totalGst = get().getGSTAmount();
+                return Math.round((totalGst / 2) * 100) / 100;
+            },
+            getTotal: () => {
+                const subtotal = get().getSubtotal();
+                const discount = get().getDiscountAmount();
+                const gst = get().getGSTAmount();
+                return Math.max(0, Math.round((subtotal - discount + gst) * 100) / 100);
+            },
             getItemCount: () => {
                 const items = get().items || [];
                 return items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);

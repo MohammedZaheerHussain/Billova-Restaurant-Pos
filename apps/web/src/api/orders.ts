@@ -538,7 +538,7 @@ export const ordersAPI = {
 
         // Calculate item totals
         let subtotal = 0;
-        let gstAmount = 0;
+        let gstAmount = Number((data as any).gstAmount || (data as any).gst_amount || 0);
         const items = data.items || [];
         for (const it of items) {
             const itemQty = Number(it.quantity || 1);

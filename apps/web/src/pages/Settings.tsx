@@ -13,6 +13,7 @@ import { loadBranchSettings, saveBranchSettingsToCloud } from '../api/branches';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Switch } from '../components/ui/Switch';
+import useSubscription from '../hooks/useSubscription';
 import './Settings.css';
 
 type SettingsTab = 'all' | 'branch' | 'sync' | 'printer' | 'orders' | 'menu';
@@ -139,6 +140,8 @@ function getTimeAgo(date: Date): string {
 
 export default function SettingsPage() {
     const user = useAuthStore((state) => state.user);
+    const { hasFeature } = useSubscription();
+    const hasContactlessMenu = hasFeature('contactlessMenu');
     const [saving, setSaving] = useState(false);
     const [loadingSettings, setLoadingSettings] = useState(false);
     const [activeTab, setActiveTab] = useState<SettingsTab>('all');
@@ -250,12 +253,14 @@ export default function SettingsPage() {
                     >
                         Printers
                     </button>
-                    <button
-                        className={`settings-nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('menu')}
-                    >
-                        Online Menu
-                    </button>
+                    {hasContactlessMenu && (
+                        <button
+                            className={`settings-nav-tab ${activeTab === 'menu' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('menu')}
+                        >
+                            Online Menu
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -441,8 +446,8 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                {/* 5. Online Menu Card */}
-                {(activeTab === 'all' || activeTab === 'menu') && (
+                {/* 5. Online Menu Card (PRO & PREMIUM only) */}
+                {hasContactlessMenu && (activeTab === 'all' || activeTab === 'menu') && (
                     <div className="settings-card highlight">
                         <div className="settings-card-header">
                             <div className="card-header-icon-box orange">

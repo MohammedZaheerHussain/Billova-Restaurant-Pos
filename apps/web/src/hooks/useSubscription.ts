@@ -20,6 +20,7 @@ export const PLAN_LIMITS = {
             aiExtraction: false,
             exportPdf: false,
             staffManagement: false, // Premium only
+            contactlessMenu: false, // PRO & PREMIUM only
         },
     },
     PLUS: {
@@ -37,6 +38,7 @@ export const PLAN_LIMITS = {
             aiExtraction: false,
             exportPdf: false,
             staffManagement: true, // Up to 2 staff members (3 users total)
+            contactlessMenu: true,
         },
     },
     PREMIUM: {
@@ -54,6 +56,7 @@ export const PLAN_LIMITS = {
             aiExtraction: true,
             exportPdf: true,
             staffManagement: true, // Can add staff
+            contactlessMenu: true,
         },
     },
     DEMO_PREMIUM: {
@@ -71,6 +74,7 @@ export const PLAN_LIMITS = {
             aiExtraction: true,
             exportPdf: true,
             staffManagement: true,
+            contactlessMenu: true,
         },
     },
 };
@@ -133,6 +137,7 @@ export function useSubscription() {
             aiExtraction: 'AI Menu Extraction',
             exportPdf: 'PDF Export',
             staffManagement: 'Staff Management',
+            contactlessMenu: 'Contactless Online Menu',
         };
         const premiumFeatures: FeatureKey[] = ['aiExtraction', 'exportPdf'];
         return `Upgrade to ${premiumFeatures.includes(feature) ? 'Premium' : 'Pro'} to access ${featureNames[feature]}`;
