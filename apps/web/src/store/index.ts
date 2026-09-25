@@ -118,25 +118,36 @@ export const useCartStore = create<CartStore>()(
             notes: '',
 
             loadOrderForEditing: (order: any) => {
-                const cartItems: CartItem[] = (order.items || []).map((it: any) => ({
-                    id: it.id || ((it.menuItemId || it.menuItem?.id || it.id) + (it.variantId ? `-${it.variantId}` : '')),
-                    menuItem: {
-                        id: it.menuItemId || it.menuItem?.id || it.id,
-                        name: it.name || it.menuItem?.name || 'Item',
-                        price: Number(it.unitPrice || it.price || 0),
-                        isVeg: it.menuItem?.isVeg ?? true,
-                        isAvailable: true,
-                    },
-                    variant: it.variant ? {
-                        id: it.variant.id,
-                        name: it.variant.name,
-                        price: Number(it.unitPrice || it.variant.price || 0),
-                    } : undefined,
-                    quantity: Number(it.quantity || 1),
-                    unitPrice: Number(it.unitPrice || it.price || 0),
-                    total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-                    notes: it.notes || undefined,
-                }));
+                const cartItems: CartItem[] = (order.items || []).map((it: any) => {
+                    const rawMenuId = it.menuItemId || it.menu_item_id || it.menuItem?.id || it.id;
+                    const dishName = it.name || it.menuItem?.name || it.itemName || 'Item';
+                    const unitPrice = Number(it.unitPrice || it.price || it.unit_price || (it.total ? it.total / (Number(it.quantity) || 1) : 0));
+                    const variantObj = (it.variant && typeof it.variant === 'object') ? {
+                        id: it.variant.id || it.variantId || '',
+                        name: it.variant.name || it.variantName || '',
+                        price: Number(it.unitPrice || it.variant.price || unitPrice),
+                    } : ((it.variantId || it.variantName) ? {
+                        id: it.variantId || '',
+                        name: it.variantName || '',
+                        price: unitPrice,
+                    } : undefined);
+
+                    return {
+                        id: it.id || (rawMenuId + (variantObj?.id ? `-${variantObj.id}` : '')),
+                        menuItem: {
+                            id: rawMenuId,
+                            name: dishName,
+                            price: unitPrice,
+                            isVeg: it.menuItem?.isVeg ?? true,
+                            isAvailable: true,
+                        },
+                        variant: variantObj,
+                        quantity: Number(it.quantity || 1),
+                        unitPrice: unitPrice,
+                        total: Number(it.total || (unitPrice * Number(it.quantity || 1))),
+                        notes: it.notes || undefined,
+                    };
+                });
 
                 set({
                     editingOrderId: order.id,

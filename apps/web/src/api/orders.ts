@@ -228,6 +228,36 @@ export async function syncLocalOrdersToSupabase(branchId?: string): Promise<numb
     return syncedCount;
 }
 
+export function formatOrderItem(it: any, idx = 0): any {
+    const rawMenuId = it.menuItemId || it.menu_item_id || it.id || it.menuItem?.id;
+    const dishName = it.name || it.menuItem?.name || it.itemName || 'Item';
+    const variantId = it.variantId || it.variant_id || it.variant?.id || null;
+    const variantName = it.variantName || it.variant_name || it.variant?.name || null;
+    const qty = Number(it.quantity || 1);
+    const unitPrice = Number(it.unitPrice || it.price || it.unit_price || (it.total ? it.total / qty : 0));
+    const total = Number(it.total || (unitPrice * qty));
+
+    return {
+        id: it.id || `item-${Date.now()}-${idx}`,
+        name: dishName,
+        quantity: qty,
+        unitPrice: unitPrice,
+        total: total,
+        notes: it.notes || undefined,
+        menuItemId: rawMenuId,
+        variantId: variantId,
+        variantName: variantName,
+        menuItem: {
+            id: rawMenuId,
+            name: dishName,
+        },
+        variant: (variantId || variantName) ? {
+            id: variantId || '',
+            name: variantName || '',
+        } : undefined,
+    };
+}
+
 export const ordersAPI = {
     /**
      * Get all orders with items, payments, and table details
@@ -324,33 +354,52 @@ export const ordersAPI = {
                 paymentsByOrder.set(p.order_id, list);
             });
 
-            // 3. Format remote orders
+            // 3. Format remote orders (Prioritize rich orders.items JSON column)
             const formattedRemote = rawOrders.map((o: any) => {
                 const num = Number(o.order_number || o.daily_order_no || 1);
-                let orderItems = itemsByOrder.get(o.id);
-                if (!orderItems || orderItems.length === 0) {
-                    if (typeof o.items === 'string') {
-                        try {
-                            const parsed = JSON.parse(o.items);
-                            if (Array.isArray(parsed)) {
-                                orderItems = parsed.map((it: any) => ({
-                                    id: it.id || `it-${Math.random()}`,
-                                    name: it.name || it.menuItem?.name || it.itemName || 'Item',
+                let orderItems: any[] = [];
+
+                if (o.items) {
+                    try {
+                        const parsed = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            orderItems = parsed.map((it: any, idx: number) => {
+                                const rawMenuId = it.menuItemId || it.menu_item_id || it.id || it.menuItem?.id;
+                                const menuItem = rawMenuId ? menuMap.get(rawMenuId) : undefined;
+                                const dishName = it.name || it.menuItem?.name || menuItem?.name || it.itemName || 'Item';
+                                const variantObj = it.variant ? {
+                                    id: it.variant.id || it.variantId || '',
+                                    name: it.variant.name || it.variantName || '',
+                                } : (it.variantId || it.variantName ? {
+                                    id: it.variantId || '',
+                                    name: it.variantName || '',
+                                } : undefined);
+
+                                return {
+                                    id: it.id || `it-${o.id}-${idx}`,
+                                    name: dishName,
                                     quantity: Number(it.quantity || 1),
-                                    unitPrice: Number(it.unitPrice || it.price || it.unit_price || 0),
-                                    total: Number(it.total || (Number(it.unitPrice || it.price || 0) * Number(it.quantity || 1))),
+                                    unitPrice: Number(it.unitPrice || it.price || it.unit_price || menuItem?.price || 0),
+                                    total: Number(it.total || (Number(it.unitPrice || it.price || menuItem?.price || 0) * Number(it.quantity || 1))),
                                     notes: it.notes,
-                                    menuItemId: it.menuItemId || it.menu_item_id || it.id,
-                                    menuItem: { id: it.menuItemId || it.menu_item_id || it.id, name: it.name || it.menuItem?.name || 'Item' },
-                                    variant: it.variant,
-                                }));
-                            }
-                        } catch {}
-                    } else if (Array.isArray(o.items)) {
-                        orderItems = o.items;
+                                    menuItemId: rawMenuId,
+                                    menuItem: {
+                                        id: rawMenuId || `item-${idx}`,
+                                        name: dishName,
+                                    },
+                                    variant: variantObj,
+                                };
+                            });
+                        }
+                    } catch {}
+                }
+
+                if (orderItems.length === 0) {
+                    const fromTable = itemsByOrder.get(o.id);
+                    if (Array.isArray(fromTable) && fromTable.length > 0) {
+                        orderItems = fromTable;
                     }
                 }
-                if (!orderItems) orderItems = [];
 
                 const orderPayments = paymentsByOrder.get(o.id) || (Array.isArray(o.payments) ? o.payments : []);
                 const tableInfo = o.table_id ? tableMap.get(o.table_id) : undefined;
@@ -399,14 +448,32 @@ export const ordersAPI = {
                 : localOrders;
 
             // Combine and deduplicate
+            const localMap = new Map<string, any>();
+            filteredLocal.forEach(lo => {
+                if (lo.id) localMap.set(lo.id, lo);
+                if (lo.orderNumber) localMap.set(`num_${lo.orderNumber}`, lo);
+            });
+
             const seenIds = new Set<string>();
             const seenOrderNums = new Set<number>();
             const combined: any[] = [];
 
-            // Add remote orders first
+            // Add remote orders first, enriching with local items if local has more items
             for (const ord of formattedRemote) {
                 seenIds.add(ord.id);
                 seenOrderNums.add(ord.orderNumber);
+
+                const localMatch = localMap.get(ord.id) || localMap.get(`num_${ord.orderNumber}`);
+                if (localMatch) {
+                    if ((!ord.items || ord.items.length === 0) && (localMatch.items && localMatch.items.length > 0)) {
+                        ord.items = localMatch.items;
+                    } else if (localMatch.items && localMatch.items.length > ord.items.length) {
+                        ord.items = localMatch.items;
+                        ord.subtotal = localMatch.subtotal || ord.subtotal;
+                        ord.total = localMatch.total || ord.total;
+                    }
+                }
+
                 combined.push(ord);
             }
 
@@ -444,13 +511,50 @@ export const ordersAPI = {
 
             if (error) throw error;
 
-            const [itemsRes, paymentsRes] = await Promise.allSettled([
-                supabase.from('order_items').select('*').eq('order_id', id),
-                supabase.from('payments').select('*').eq('order_id', id),
-            ]);
+            let items: any[] = [];
+            if (data.items) {
+                try {
+                    const parsed = typeof data.items === 'string' ? JSON.parse(data.items) : data.items;
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        items = parsed.map((it: any, idx: number) => ({
+                            id: it.id || `it-${id}-${idx}`,
+                            name: it.name || it.menuItem?.name || it.itemName || 'Item',
+                            quantity: Number(it.quantity || 1),
+                            unitPrice: Number(it.unitPrice || it.price || it.unit_price || 0),
+                            total: Number(it.total || (Number(it.unitPrice || it.price || 0) * Number(it.quantity || 1))),
+                            notes: it.notes,
+                            menuItemId: it.menuItemId || it.menu_item_id || it.id,
+                            menuItem: {
+                                id: it.menuItemId || it.menu_item_id || it.id,
+                                name: it.name || it.menuItem?.name || it.itemName || 'Item',
+                            },
+                            variant: it.variant || (it.variantId || it.variantName ? {
+                                id: it.variantId || '',
+                                name: it.variantName || '',
+                            } : undefined),
+                        }));
+                    }
+                } catch {}
+            }
 
-            const items = itemsRes.status === 'fulfilled' ? (itemsRes.value.data || []) : [];
-            const payments = paymentsRes.status === 'fulfilled' ? (paymentsRes.value.data || []) : [];
+            if (items.length === 0) {
+                const { data: tableItems } = await supabase.from('order_items').select('*').eq('order_id', id);
+                if (tableItems && tableItems.length > 0) {
+                    items = tableItems.map((it: any) => ({
+                        id: it.id,
+                        name: it.name || 'Item',
+                        quantity: Number(it.quantity || 1),
+                        unit_price: Number(it.unit_price || 0),
+                        total: Number(it.total || 0),
+                        notes: it.notes,
+                        menuItemId: it.menu_item_id,
+                        menuItem: { id: it.menu_item_id || it.id, name: it.name || 'Item' },
+                        variant: it.variant_id ? { id: it.variant_id, name: it.variant_name || '' } : undefined,
+                    }));
+                }
+            }
+
+            const { data: payments } = await supabase.from('payments').select('*').eq('order_id', id);
 
             return {
                 data: {
@@ -459,7 +563,7 @@ export const ordersAPI = {
                     dailyOrderNo: Number(data.daily_order_no || data.order_number || 1),
                     billNumber: `#${String(data.order_number || 1).padStart(3, '0')}`,
                     items,
-                    payments,
+                    payments: payments || [],
                 }
             };
         } catch {
@@ -779,10 +883,15 @@ export const ordersAPI = {
      * Update an existing order (e.g. adding items to a pending order)
      */
     updateOrder: async (id: string, data: any) => {
+        const formattedItems = (data.items || []).map((it: any, idx: number) => formatOrderItem(it, idx));
+
         const localList = getStoredLocalOrders();
         const existing = localList.find(o => o.id === id);
         if (existing) {
-            Object.assign(existing, data, { updatedAt: new Date().toISOString() });
+            Object.assign(existing, data, {
+                items: formattedItems,
+                updatedAt: new Date().toISOString()
+            });
             saveLocalOrder(existing);
         }
 
@@ -795,40 +904,51 @@ export const ordersAPI = {
                     discount_amount: Number(data.discountAmount || 0),
                     gst_amount: Number(data.gstAmount || 0),
                     notes: data.notes || null,
+                    items: JSON.stringify(formattedItems),
                     updated_at: new Date().toISOString(),
                 };
-                if (data.customerName) updatePayload.customer_name = data.customerName;
-                if (data.customerPhone) updatePayload.customer_phone = data.customerPhone;
-                if (data.discountType) updatePayload.discount_type = data.discountType;
-                if (data.discountValue) updatePayload.discount_value = Number(data.discountValue);
+                if (data.orderType) updatePayload.order_type = data.orderType;
+                if (data.customerName !== undefined) updatePayload.customer_name = data.customerName || null;
+                if (data.customerPhone !== undefined) updatePayload.customer_phone = data.customerPhone || null;
+                if (data.discountType !== undefined) updatePayload.discount_type = data.discountType;
+                if (data.discountValue !== undefined) updatePayload.discount_value = Number(data.discountValue || 0);
 
-                await supabase.from('orders').update(updatePayload).eq('id', id);
+                const { error: updateErr } = await supabase.from('orders').update(updatePayload).eq('id', id);
+                if (updateErr) {
+                    logger.warn('Failed to update orders table in Supabase:', updateErr);
+                }
 
                 // Update items in order_items table
-                if (data.items && data.items.length > 0) {
-                    await supabase.from('order_items').delete().eq('order_id', id);
-                    const orderItemsPayload = data.items.map((it: any) => {
-                        const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
-                        const rawMenuId = it.menuItemId || it.id || it.menuItem?.id;
-                        return {
-                            ...(itemUuid ? { id: itemUuid } : {}),
-                            order_id: id,
-                            menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
-                            quantity: Number(it.quantity || 1),
-                            unit_price: Number(it.unitPrice || it.price || 0),
-                            total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
-                            notes: it.notes || null,
-                            status: 'PENDING',
-                        };
-                    });
-                    await supabase.from('order_items').insert(orderItemsPayload);
+                if (formattedItems.length > 0) {
+                    try {
+                        await supabase.from('order_items').delete().eq('order_id', id);
+                        const orderItemsPayload = formattedItems.map((it: any) => {
+                            const itemUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+                            const rawMenuId = it.menuItemId || it.id || it.menuItem?.id;
+                            return {
+                                ...(itemUuid ? { id: itemUuid } : {}),
+                                order_id: id,
+                                name: it.name || it.menuItem?.name || 'Item',
+                                menu_item_id: isValidUUID(rawMenuId) ? rawMenuId : null,
+                                variant_id: isValidUUID(it.variantId) ? it.variantId : null,
+                                quantity: Number(it.quantity || 1),
+                                unit_price: Number(it.unitPrice || it.price || 0),
+                                total: Number(it.total || (Number(it.unitPrice || 0) * Number(it.quantity || 1))),
+                                notes: it.notes || null,
+                                status: data.status || 'PENDING',
+                            };
+                        });
+                        await supabase.from('order_items').insert(orderItemsPayload);
+                    } catch (itemErr) {
+                        logger.warn('Could not sync order_items table on updateOrder:', itemErr);
+                    }
                 }
             } catch (err) {
                 logger.error('Update order error:', err);
             }
         }
 
-        return { data: { id, ...data } };
+        return { data: { id, ...data, items: formattedItems } };
     },
 
     /**
@@ -844,24 +964,41 @@ export const ordersAPI = {
     /**
      * Add items to an existing order
      */
-    addItems: async (id: string, items: Array<{ menuItemId: string; quantity: number; notes?: string; variantId?: string }>) => {
+    addItems: async (id: string, items: Array<{ menuItemId: string; quantity: number; notes?: string; variantId?: string; name?: string; unitPrice?: number; total?: number; variantName?: string }>) => {
         if (hasExpressBackend()) {
             try { return await api.post(`/orders/${id}/add-items`, { items }); } catch { /* fallback */ }
         }
         try {
-            if (!id.startsWith('ord-') && !id.startsWith('temp-')) {
-                const orderItemsPayload = items.map((it: any) => ({
-                    order_id: id,
-                    menu_item_id: it.menuItemId,
-                    variant_id: it.variantId || null,
-                    quantity: Number(it.quantity || 1),
-                    unit_price: Number(it.unitPrice || it.price || 0),
-                    total: Number(it.total || 0),
-                    notes: it.notes || null,
-                    status: 'PENDING',
-                }));
+            let currentOrder: any = null;
+            if (isValidUUID(id)) {
+                const { data } = await supabase.from('orders').select('*').eq('id', id).single();
+                currentOrder = data;
+            }
+            if (!currentOrder) {
+                currentOrder = getStoredLocalOrders().find(o => o.id === id);
+            }
 
-                await supabase.from('order_items').insert(orderItemsPayload);
+            if (currentOrder) {
+                let existingItems: any[] = [];
+                if (currentOrder.items) {
+                    try {
+                        const parsed = typeof currentOrder.items === 'string' ? JSON.parse(currentOrder.items) : currentOrder.items;
+                        if (Array.isArray(parsed)) existingItems = parsed;
+                    } catch {}
+                }
+
+                const formattedNew = items.map((it, idx) => formatOrderItem(it, existingItems.length + idx));
+                const allItems = [...existingItems, ...formattedNew];
+                const addedSubtotal = formattedNew.reduce((sum, i) => sum + Number(i.total || 0), 0);
+                const newSubtotal = Number(currentOrder.subtotal || 0) + addedSubtotal;
+                const newTotal = Number(currentOrder.total || currentOrder.total_amount || 0) + addedSubtotal;
+
+                await ordersAPI.updateOrder(id, {
+                    items: allItems,
+                    subtotal: newSubtotal,
+                    total: newTotal,
+                    totalAmount: newTotal,
+                });
             }
             return { data: { success: true } };
         } catch (error) {

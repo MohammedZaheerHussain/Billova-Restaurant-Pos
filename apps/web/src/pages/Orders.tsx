@@ -252,11 +252,21 @@ export default function OrdersPage() {
 
         try {
             setAddingItems(true);
-            const items = newItems.map(ni => ({
-                menuItemId: ni.menuItem.id,
-                variantId: ni.variantId || undefined,
-                quantity: ni.quantity,
-            }));
+            const items = newItems.map(ni => {
+                const variant = ni.menuItem.variants?.find(v => v.id === ni.variantId);
+                const unitPrice = Number(variant?.price || ni.menuItem.price || 0);
+                return {
+                    menuItemId: ni.menuItem.id,
+                    variantId: ni.variantId || undefined,
+                    variantName: variant?.name || undefined,
+                    name: ni.menuItem.name,
+                    quantity: ni.quantity,
+                    unitPrice: unitPrice,
+                    total: unitPrice * ni.quantity,
+                    menuItem: { id: ni.menuItem.id, name: ni.menuItem.name },
+                    variant: variant ? { id: variant.id, name: variant.name } : undefined,
+                };
+            });
 
             await ordersAPI.addItems(editingOrder.id, items);
             toast.success('Items added successfully!');
@@ -355,12 +365,12 @@ export default function OrdersPage() {
             onlinePlatform: (order as any).onlinePlatform || (order as any).online_platform,
             onlineOrderId: (order as any).onlineOrderId || (order as any).online_order_id,
             tableName: order.table?.name,
-            items: order.items.map(item => ({
-                name: item.menuItem.name,
-                variant: item.variant?.name,
-                quantity: item.quantity,
-                unitPrice: Number(item.unitPrice),
-                total: Number(item.total),
+            items: (order.items || []).map(item => ({
+                name: item.menuItem?.name || (item as any).name || (item as any).itemName || 'Item',
+                variant: item.variant?.name || (item as any).variantName || (typeof item.variant === 'string' ? item.variant : undefined),
+                quantity: Number(item.quantity || 1),
+                unitPrice: Number(item.unitPrice || (item as any).price || 0),
+                total: Number(item.total || (Number(item.unitPrice || (item as any).price || 0) * Number(item.quantity || 1))),
                 notes: item.notes,
             })),
             subtotal: Number(order.subtotal),
@@ -400,10 +410,10 @@ export default function OrdersPage() {
             tableName: order.table?.name || (order.orderType === 'DINE_IN' ? 'Counter' : undefined),
             createdAt: new Date(order.createdAt),
             orderNotes: order.notes,
-            items: order.items.map(item => ({
-                name: item.menuItem?.name || (item as any).name || 'Item',
-                variant: item.variant?.name,
-                quantity: item.quantity,
+            items: (order.items || []).map(item => ({
+                name: item.menuItem?.name || (item as any).name || (item as any).itemName || 'Item',
+                variant: item.variant?.name || (item as any).variantName || (typeof item.variant === 'string' ? item.variant : undefined),
+                quantity: Number(item.quantity || 1),
                 notes: item.notes,
             })),
         };
@@ -757,17 +767,21 @@ export default function OrdersPage() {
                                     <span>Price</span>
                                     <span>Total</span>
                                 </div>
-                                {selectedOrder.items.map((item, idx) => (
-                                    <div key={item.id} className="item-row">
-                                        <span className="item-name">
-                                            {idx + 1}. {item.menuItem.name}
-                                            {item.variant && <small> ({item.variant.name})</small>}
-                                        </span>
-                                        <span className="item-qty">x{item.quantity}</span>
-                                        <span className="item-price">₹{Number(item.unitPrice).toFixed(2)}</span>
-                                        <span className="item-total">₹{Number(item.total).toFixed(2)}</span>
-                                    </div>
-                                ))}
+                                {(selectedOrder.items || []).map((item, idx) => {
+                                    const itemName = item.menuItem?.name || (item as any).name || (item as any).itemName || 'Item';
+                                    const variantName = item.variant?.name || (item as any).variantName || (typeof item.variant === 'string' ? item.variant : '');
+                                    return (
+                                        <div key={item.id || `item-${idx}`} className="item-row">
+                                            <span className="item-name">
+                                                {idx + 1}. {itemName}
+                                                {variantName ? <small> ({variantName})</small> : null}
+                                            </span>
+                                            <span className="item-qty">x{item.quantity}</span>
+                                            <span className="item-price">₹{Number(item.unitPrice || 0).toFixed(2)}</span>
+                                            <span className="item-total">₹{Number(item.total || 0).toFixed(2)}</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div className="bill-summary-section">

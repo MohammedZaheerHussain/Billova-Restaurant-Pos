@@ -299,11 +299,20 @@ export default function POSPage() {
                     items: cartItems.map((item) => ({
                         menuItemId: item.menuItem.id,
                         variantId: item.variant?.id || null,
+                        variantName: item.variant?.name || null,
                         name: item.menuItem.name,
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
                         total: item.total,
                         notes: item.notes || null,
+                        menuItem: {
+                            id: item.menuItem.id,
+                            name: item.menuItem.name,
+                        },
+                        variant: item.variant ? {
+                            id: item.variant.id,
+                            name: item.variant.name,
+                        } : undefined,
                     })),
                     discountType: discountType || undefined,
                     discountValue: discountValue || undefined,
@@ -459,11 +468,20 @@ export default function POSPage() {
                     items: cartItems.map((item) => ({
                         menuItemId: item.menuItem.id,
                         variantId: item.variant?.id || null,
+                        variantName: item.variant?.name || null,
                         name: item.menuItem.name,
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
                         total: item.total,
                         notes: item.notes || null,
+                        menuItem: {
+                            id: item.menuItem.id,
+                            name: item.menuItem.name,
+                        },
+                        variant: item.variant ? {
+                            id: item.variant.id,
+                            name: item.variant.name,
+                        } : undefined,
                     })),
                     discountType: discountType || undefined,
                     discountValue: discountValue || undefined,
