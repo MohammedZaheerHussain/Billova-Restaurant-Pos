@@ -83,83 +83,76 @@ export default function LoginPage() {
         isLoggingInRef.current = true;
         logger.debug('[Login] fetchUserProfile started for:', userId);
         try {
-            logger.debug('[Login] Querying profiles table...');
-            const { data: profile, error } = await supabase
+            logger.debug('[Login] Querying profiles table & auth metadata...');
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            const meta = authUser?.user_metadata || {};
+
+            let { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
-                .single();
+                .maybeSingle();
 
-            logger.debug('[Login] Profile query result:', { profile, error });
+            let activeBranchId = profile?.branch_id || meta.branch_id;
+            let role = (profile?.role || meta.role || 'OWNER').toUpperCase();
+            let name = profile?.name || meta.name || authUser?.email?.split('@')[0] || 'User';
+            let email = profile?.email || authUser?.email || '';
 
-            if (error) {
-                logger.error('[Login] Profile query error:', error);
-                throw error;
+            // If profile does not exist or branch_id missing in DB, sync profile row
+            if (!profile || !profile.branch_id) {
+                if (activeBranchId) {
+                    await supabase.from('profiles').upsert([{
+                        id: userId,
+                        name,
+                        email,
+                        role,
+                        branch_id: activeBranchId,
+                    }]).then(() => {});
+                }
             }
 
-            if (profile) {
-                let branchData = undefined;
-                let activeBranchId = profile.branch_id;
+            let branchData = undefined;
+            if (activeBranchId) {
+                logger.debug('[Login] Fetching branch:', activeBranchId);
+                const { data: branch } = await supabase
+                    .from('branches')
+                    .select('*')
+                    .eq('id', activeBranchId)
+                    .maybeSingle();
 
-                if (!activeBranchId) {
-                    logger.debug('[Login] No branch_id on profile, discovering available branch...');
-                    const { data: firstBranch } = await supabase
-                        .from('branches')
-                        .select('id, name, subscription_plan, subscription_expiry')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (firstBranch) {
-                        activeBranchId = firstBranch.id;
-                        await supabase
-                            .from('profiles')
-                            .update({ branch_id: firstBranch.id })
-                            .eq('id', profile.id);
-                    }
+                if (branch) {
+                    branchData = {
+                        id: branch.id,
+                        name: branch.name,
+                        subscriptionPlan: branch.subscription_plan,
+                        subscriptionExpiry: branch.subscription_expiry,
+                    };
                 }
+            }
 
-                if (activeBranchId) {
-                    logger.debug('[Login] Fetching branch:', activeBranchId);
-                    const { data: branch } = await supabase
-                        .from('branches')
-                        .select('*')
-                        .eq('id', activeBranchId)
-                        .maybeSingle();
+            const user = {
+                id: userId,
+                name,
+                email,
+                role,
+                branch: branchData,
+            };
 
-                    if (branch) {
-                        branchData = {
-                            id: branch.id,
-                            name: branch.name,
-                            subscriptionPlan: branch.subscription_plan,
-                            subscriptionExpiry: branch.subscription_expiry,
-                        };
-                    }
-                }
+            logger.debug('[Login] User constructed:', user.email, user.role, user.branch?.name);
 
-                const user = {
-                    id: profile.id,
-                    name: profile.name,
-                    email: profile.email,
-                    role: profile.role?.toUpperCase() || 'CASHIER',
-                    branch: branchData,
-                };
+            login('supabase-session', user);
 
-                logger.debug('[Login] User constructed:', user.email, user.role);
+            if (activeBranchId) {
+                loadBranchSettings(activeBranchId).catch(() => {});
+            }
 
-                login('supabase-session', user);
+            toast.success('Welcome back!', { id: 'auth-welcome-toast', duration: 2500 });
 
-                if (activeBranchId) {
-                    loadBranchSettings(activeBranchId).catch(() => {});
-                }
-
-                toast.success('Welcome back!', { id: 'auth-welcome-toast', duration: 2500 });
-
-                logger.debug('[Login] Navigating based on role:', user.role);
-                if (user.role === 'SUPER_ADMIN') {
-                    navigate('/super-admin');
-                } else {
-                    navigate('/');
-                }
+            logger.debug('[Login] Navigating based on role:', user.role);
+            if (user.role === 'SUPER_ADMIN') {
+                navigate('/super-admin');
+            } else {
+                navigate('/');
             }
         } catch (error) {
             isLoggingInRef.current = false;

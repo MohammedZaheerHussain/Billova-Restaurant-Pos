@@ -316,7 +316,7 @@ export default function SuperAdminPage() {
                 if (authErr) throw authErr;
 
                 if (authData.user) {
-                    await supabase.from('profiles').insert([{
+                    await supabase.from('profiles').upsert([{
                         id: authData.user.id,
                         name: ownerName,
                         email: ownerEmail,

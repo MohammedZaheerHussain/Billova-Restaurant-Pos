@@ -3,13 +3,17 @@ import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { CreateUserDTO } from '@billova/types';
 
+import { useAuthStore } from '../store';
+
 export const usersAPI = {
-    getAll: async () => {
+    getAll: async (branchId?: string) => {
+        const activeBranchId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
-            try { return await api.get('/users'); } catch { /* fallback */ }
+            try { return await api.get('/users', { params: { branchId: activeBranchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('profiles').select('*').order('name');
+            if (!activeBranchId) return { data: [] };
+            const { data, error } = await supabase.from('profiles').select('*').eq('branch_id', activeBranchId).order('name');
             if (error) return { data: [] };
             const formatted = (data || []).map((u: any) => ({
                 id: u.id,

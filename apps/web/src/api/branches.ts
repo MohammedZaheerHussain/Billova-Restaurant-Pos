@@ -37,19 +37,12 @@ export async function loadBranchSettings(forcedBranchId?: string): Promise<Branc
             if (profile?.branch_id) {
                 branchId = profile.branch_id;
             } else {
-                // Fallback to first available branch
-                const { data: firstBranch } = await supabase
-                    .from('branches')
-                    .select('id, name')
-                    .limit(1)
-                    .maybeSingle();
-
-                if (firstBranch) {
-                    branchId = firstBranch.id;
-                    // Link profile to branch
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (authUser?.user_metadata?.branch_id) {
+                    branchId = authUser.user_metadata.branch_id;
                     await supabase
                         .from('profiles')
-                        .update({ branch_id: firstBranch.id })
+                        .update({ branch_id: branchId })
                         .eq('id', user.id);
                 }
             }

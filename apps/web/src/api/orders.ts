@@ -116,7 +116,7 @@ export async function syncLocalOrdersToSupabase(branchId?: string): Promise<numb
         // Query Supabase for existing order IDs & numbers to accurately detect ANY un-synced orders (even if local ID is UUID)
         let query = supabase.from('orders').select('id, order_number, created_at');
         if (isValidUUID(activeBranchId)) {
-            query = query.or(`branch_id.eq.${activeBranchId},branch_id.is.null`);
+            query = query.eq('branch_id', activeBranchId);
         }
         const { data: existingRemote } = await query.limit(1000);
         const remoteIdSet = new Set((existingRemote || []).map((r: any) => r.id));
@@ -250,7 +250,7 @@ export const ordersAPI = {
                 .order('created_at', { ascending: false });
 
             if (branchId) {
-                query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+                query = query.eq('branch_id', branchId);
             }
 
             if (params?.date) {
@@ -274,8 +274,8 @@ export const ordersAPI = {
             const [itemsRes, paymentsRes, tablesRes, menuRes] = await Promise.allSettled([
                 orderIds.length > 0 ? supabase.from('order_items').select('*').in('order_id', orderIds) : Promise.resolve({ data: [] }),
                 orderIds.length > 0 ? supabase.from('payments').select('*').in('order_id', orderIds) : Promise.resolve({ data: [] }),
-                supabase.from('tables').select('id, name'),
-                supabase.from('menu_items').select('id, name, price'),
+                branchId ? supabase.from('tables').select('id, name').eq('branch_id', branchId) : supabase.from('tables').select('id, name'),
+                branchId ? supabase.from('menu_items').select('id, name, price').eq('branch_id', branchId) : supabase.from('menu_items').select('id, name, price'),
             ]);
 
             const allItems = itemsRes.status === 'fulfilled' ? (itemsRes.value.data || []) : [];

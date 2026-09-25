@@ -3,13 +3,17 @@ import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
 import { CreateTableDTO, TableStatus } from '@billova/types';
 
+import { useAuthStore } from '../store';
+
 export const tablesAPI = {
-    getAll: async () => {
+    getAll: async (branchId?: string) => {
+        const activeBranchId = branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
-            try { return await api.get('/tables'); } catch { /* fallback */ }
+            try { return await api.get('/tables', { params: { branchId: activeBranchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('tables').select('*').order('name');
+            if (!activeBranchId) return { data: [] };
+            const { data, error } = await supabase.from('tables').select('*').eq('branch_id', activeBranchId).order('name');
             if (error) return { data: [] };
             const formatted = (data || []).map((t: any) => ({
                 id: t.id,
@@ -23,15 +27,18 @@ export const tablesAPI = {
         }
     },
     create: async (data: CreateTableDTO) => {
+        const activeBranchId = (data as any).branchId || useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
             try { return await api.post('/tables', data); } catch { /* fallback */ }
         }
         try {
-            const { data: created, error } = await supabase.from('tables').insert([{
+            const insertPayload: any = {
                 name: data.name,
                 capacity: data.capacity || 4,
                 status: 'EMPTY',
-            }]).select().single();
+            };
+            if (activeBranchId) insertPayload.branch_id = activeBranchId;
+            const { data: created, error } = await supabase.from('tables').insert([insertPayload]).select().single();
             if (error) throw error;
             return { data: created };
         } catch {

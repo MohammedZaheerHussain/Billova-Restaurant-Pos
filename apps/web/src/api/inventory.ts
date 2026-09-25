@@ -1,14 +1,18 @@
 import api from './client';
 import { supabase } from '../lib/supabase';
 import { hasExpressBackend } from '../lib/superadmin-direct';
+import { useAuthStore } from '../store';
 
 export const inventoryAPI = {
     getAll: async (params?: Record<string, unknown>) => {
+        const activeBranchId = useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
-            try { return await api.get('/inventory', { params }); } catch { /* fallback */ }
+            try { return await api.get('/inventory', { params: { ...params, branchId: activeBranchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('inventory_items').select('*');
+            if (!activeBranchId) return { data: [] };
+            let query = supabase.from('inventory_items').select('*').eq('branch_id', activeBranchId);
+            const { data, error } = await query;
             if (error) return { data: [] };
             const formatted = (data || []).map((i: any) => ({
                 id: i.id,
@@ -43,11 +47,14 @@ export const inventoryAPI = {
         }
     },
     create: async (data: Record<string, unknown>) => {
+        const activeBranchId = useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
             try { return await api.post('/inventory', data); } catch { /* fallback */ }
         }
         try {
-            const { data: item, error } = await supabase.from('inventory_items').insert([data]).select().single();
+            const payload = { ...data };
+            if (activeBranchId && !payload.branch_id) payload.branch_id = activeBranchId;
+            const { data: item, error } = await supabase.from('inventory_items').insert([payload]).select().single();
             if (error) throw error;
             return { data: item };
         } catch {
@@ -86,11 +93,13 @@ export const inventoryAPI = {
         return Promise.resolve({ data: { successCount: data.items.length, failedCount: 0 } });
     },
     getAlerts: async () => {
+        const activeBranchId = useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
-            try { return await api.get('/inventory/alerts/list'); } catch { /* fallback */ }
+            try { return await api.get('/inventory/alerts/list', { params: { branchId: activeBranchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data } = await supabase.from('inventory_items').select('*');
+            if (!activeBranchId) return { data: [] };
+            const { data } = await supabase.from('inventory_items').select('*').eq('branch_id', activeBranchId);
             const items = data || [];
             const lowStockItems = items.filter((i: any) => Number(i.quantity ?? i.current_stock ?? 0) <= Number(i.minStock ?? i.min_stock ?? 0));
             const alerts = lowStockItems.map((item: any) => ({
@@ -115,11 +124,25 @@ export const inventoryAPI = {
         return Promise.resolve({ data: { success: true } });
     },
     getDashboardSummary: async () => {
+        const activeBranchId = useAuthStore.getState().user?.branch?.id || (useAuthStore.getState().user as any)?.branchId;
         if (hasExpressBackend()) {
-            try { return await api.get('/inventory/dashboard-summary'); } catch { /* fallback */ }
+            try { return await api.get('/inventory/dashboard-summary', { params: { branchId: activeBranchId } }); } catch { /* fallback */ }
         }
         try {
-            const { data, error } = await supabase.from('inventory_items').select('*');
+            if (!activeBranchId) {
+                return {
+                    data: {
+                        totalItems: 0,
+                        outOfStock: 0,
+                        critical: 0,
+                        lowStock: 0,
+                        sufficient: 0,
+                        unreadAlerts: 0,
+                        pendingApprovals: 0,
+                    }
+                };
+            }
+            const { data, error } = await supabase.from('inventory_items').select('*').eq('branch_id', activeBranchId);
             if (error) throw error;
             const items = data || [];
             const lowStockCount = items.filter((i: any) => Number(i.quantity ?? i.current_stock ?? 0) <= Number(i.minStock ?? i.min_stock ?? 0)).length;
