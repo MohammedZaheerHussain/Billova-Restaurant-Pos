@@ -1013,9 +1013,9 @@ export default function SuperAdminPage() {
                                         <div className="sky-form-group">
                                             <label>Account Tier Type *</label>
                                             <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                                <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Multi-User + Tables + Inventory)</option>
-                                                <option value="PRO">PRO — POS + Table Management + Inventory</option>
-                                                <option value="BASIC">BASIC — Counter POS Only (No Tables / Single User)</option>
+                                                <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Unlimited Staff + Tables + Inventory)</option>
+                                                <option value="PRO">PRO — POS + Tables + Inventory + 2 Staff (3 Users Total)</option>
+                                                <option value="BASIC">BASIC — Counter POS Only (No Tables / 1 Owner Only)</option>
                                             </select>
                                         </div>
                                     </>
@@ -1062,9 +1062,9 @@ export default function SuperAdminPage() {
                                             <div className="sky-form-group">
                                                 <label>Plan Tier</label>
                                                 <select value={newCustomer.plan} onChange={e => setNewCustomer({ ...newCustomer, plan: e.target.value })}>
-                                                    <option value="BASIC">BASIC — Counter POS Only (No Tables / Single User)</option>
-                                                    <option value="PRO">PRO — POS + Table Management + Inventory</option>
-                                                    <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Multi-User + Tables + Inventory)</option>
+                                                    <option value="BASIC">BASIC — Counter POS Only (No Tables / 1 Owner Only)</option>
+                                                    <option value="PRO">PRO — POS + Tables + Inventory + 2 Staff (3 Users Total)</option>
+                                                    <option value="PREMIUM">PREMIUM — Full Enterprise Suite (Unlimited Staff + Tables + Inventory)</option>
                                                 </select>
                                             </div>
                                             <div className="sky-form-group">

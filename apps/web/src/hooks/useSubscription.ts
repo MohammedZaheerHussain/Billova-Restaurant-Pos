@@ -23,10 +23,10 @@ export const PLAN_LIMITS = {
         },
     },
     PLUS: {
-        name: 'Plus',
+        name: 'Pro',
         menuItems: Infinity,
         orderHistoryDays: Infinity,
-        maxUsers: 1,  // Owner only - upgrade to Premium for staff
+        maxUsers: 3,  // 1 Owner + 2 Staff members
         features: {
             pos: true,
             menuManagement: true,
@@ -36,7 +36,7 @@ export const PLAN_LIMITS = {
             tables: true,
             aiExtraction: false,
             exportPdf: false,
-            staffManagement: false, // Premium only
+            staffManagement: true, // Up to 2 staff members (3 users total)
         },
     },
     PREMIUM: {
@@ -127,8 +127,8 @@ export function useSubscription() {
             exportPdf: 'PDF Export',
             staffManagement: 'Staff Management',
         };
-        const premiumFeatures: FeatureKey[] = ['aiExtraction', 'exportPdf', 'staffManagement'];
-        return `Upgrade to ${premiumFeatures.includes(feature) ? 'Premium' : 'Plus'} to access ${featureNames[feature]}`;
+        const premiumFeatures: FeatureKey[] = ['aiExtraction', 'exportPdf'];
+        return `Upgrade to ${premiumFeatures.includes(feature) ? 'Premium' : 'Pro'} to access ${featureNames[feature]}`;
     };
 
     // Calculate expiry & demo lock status
