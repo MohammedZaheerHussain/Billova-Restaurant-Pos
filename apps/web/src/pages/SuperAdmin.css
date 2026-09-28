@@ -4,12 +4,14 @@
    ======================================================= */
 
 .sky-admin-root {
-    min-height: 100vh;
+    min-height: 0;
+    flex: 1;
     background: var(--bg-root);
     color: var(--text-primary);
     display: flex;
     flex-direction: column;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow-y: auto;
 }
 
 .sky-admin-loading {
@@ -227,8 +229,6 @@
     display: flex;
     flex-direction: column;
     gap: 24px;
-    max-width: 1600px;
-    margin: 0 auto;
     width: 100%;
 }
 
