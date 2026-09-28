@@ -879,7 +879,7 @@
     letter-spacing: 0.08em;
 }
 
-.sky-field-item {
+.sky-drawer-field-group .sky-field-item {
     display: flex;
     align-items: center;
     gap: 8px;

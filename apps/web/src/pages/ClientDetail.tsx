@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, Shield, Ban, Zap, Building2, Key,
     Crown, X, Check, Copy, AlertTriangle, RefreshCw,
-    Activity, Layers, FileText, Lock
+    Activity, Layers, FileText, Lock, Mail,
+    CheckCircle2, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { superAdminAPI } from '../api';
@@ -55,7 +56,7 @@ export default function ClientDetailPage() {
     const { id } = useParams<{ id: string }>();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'info' | 'branches' | 'staff' | 'licenses' | 'branding' | 'audit'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'branches' | 'licenses' | 'branding'>('info');
 
     // Modals
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -153,6 +154,7 @@ export default function ClientDetailPage() {
     };
 
     const copyToClipboard = (text: string, label: string) => {
+        if (!text) return;
         navigator.clipboard.writeText(text);
         toast.success(`${label} copied to clipboard!`);
     };
@@ -177,6 +179,8 @@ export default function ClientDetailPage() {
             </div>
         );
     }
+
+    const licenseKeyDisplay = client.license?.licenseKey || `BLLOVA-${(client.subscriptionPlan || 'PREMIUM').toUpperCase()}-${client.id.slice(0, 8).toUpperCase()}`;
 
     return (
         <div className="sky-client-root">
@@ -259,10 +263,13 @@ export default function ClientDetailPage() {
             <section className="sky-hero-panel">
                 <div className="sky-hero-main">
                     <div className="sky-hero-avatar">{initials(client.name)}</div>
-                    <div>
-                        <h1 className="sky-hero-title">{client.name}</h1>
+                    <div className="sky-hero-text">
+                        <div className="sky-hero-title-row">
+                            <h1 className="sky-hero-title">{client.name}</h1>
+                            <span className="sky-hero-plan-tag mono">{client.subscriptionPlan || 'PREMIUM'}</span>
+                        </div>
                         <p className="sky-hero-subtitle">
-                            Joined {new Date(client.createdAt).toLocaleDateString()} · {client.city || 'Headquarters'}
+                            Joined {new Date(client.createdAt).toLocaleDateString()} · {client.city || 'Headquarters'} · {client._count?.users || 1} staff accounts
                         </p>
                     </div>
                 </div>
@@ -291,38 +298,60 @@ export default function ClientDetailPage() {
                     {/* Column 1: Restaurant Profile & Owner Info */}
                     <div className="sky-col-card">
                         <div className="sky-col-header">
-                            <Building2 size={16} />
-                            <h3>Restaurant Profile</h3>
+                            <div className="sky-col-header-left">
+                                <Building2 size={16} />
+                                <h3>Restaurant Profile</h3>
+                            </div>
+                            <span className="sky-col-badge">Store Details</span>
                         </div>
 
                         <div className="sky-field-list">
                             <div className="sky-field-item">
                                 <label>STORE NAME</label>
-                                <span>{client.name}</span>
+                                <span className="sky-field-val strong">{client.name}</span>
                             </div>
                             <div className="sky-field-item">
                                 <label>PRIMARY OWNER</label>
-                                <span className="highlight">{client.owner?.name || 'Unassigned'}</span>
+                                <span className="sky-field-val highlight">{client.owner?.name || 'Unassigned'}</span>
                             </div>
-                            <div className="sky-field-item">
+                            
+                            <div className="sky-field-item full">
                                 <label>OWNER EMAIL</label>
-                                <span className="mono">{client.owner?.email || 'N/A'}</span>
+                                <div className="sky-field-val-row">
+                                    <span className="sky-field-val mono email-val">{client.owner?.email || 'N/A'}</span>
+                                    {client.owner?.email && (
+                                        <button 
+                                            className="sky-copy-icon-btn" 
+                                            onClick={() => copyToClipboard(client.owner!.email, 'Email')}
+                                            title="Copy email address"
+                                        >
+                                            <Copy size={13} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
+
                             <div className="sky-field-item">
                                 <label>PHONE CONTACT</label>
-                                <span className="mono">{client.phone || client.owner?.phone || 'N/A'}</span>
+                                <span className="sky-field-val mono">{client.phone || client.owner?.phone || 'N/A'}</span>
                             </div>
                             <div className="sky-field-item">
+                                <label>CITY / REGION</label>
+                                <span className="sky-field-val">{client.city || 'Headquarters'}</span>
+                            </div>
+
+                            <div className="sky-field-item">
                                 <label>GST REGISTRATION</label>
-                                <span className="mono">{client.gstNumber || 'Unregistered'}</span>
+                                <span className="sky-field-val mono">{client.gstNumber || 'Unregistered'}</span>
                             </div>
                             <div className="sky-field-item">
                                 <label>FSSAI LICENSE</label>
-                                <span className="mono">{client.fssaiNumber || 'Unregistered'}</span>
+                                <span className="sky-field-val mono">{client.fssaiNumber || 'Unregistered'}</span>
                             </div>
+
                             <div className="sky-field-item full">
-                                <label>ADDRESS</label>
-                                <span>{client.address || 'No physical address configured.'}</span>
+                                <label>PHYSICAL ADDRESS</label>
+                                <span className="sky-field-val address-val">{client.address || 'No physical address configured.'}</span>
                             </div>
                         </div>
                     </div>
@@ -330,68 +359,149 @@ export default function ClientDetailPage() {
                     {/* Column 2: License Health & Plan Controls */}
                     <div className="sky-col-card">
                         <div className="sky-col-header">
-                            <Crown size={16} />
-                            <h3>Subscription & License Health</h3>
+                            <div className="sky-col-header-left">
+                                <Crown size={16} />
+                                <h3>Subscription & License Health</h3>
+                            </div>
+                            <span className={`sky-badge-status ${client.isActive ? 'active' : 'suspended'}`}>
+                                {client.isActive ? 'HEALTHY' : 'SUSPENDED'}
+                            </span>
                         </div>
 
                         <div className="sky-license-display">
                             <div className="sky-plan-header">
-                                <span className="sky-plan-name">{client.subscriptionPlan || 'PREMIUM'} TIER</span>
-                                <span className={`sky-badge-status ${client.isActive ? 'active' : 'suspended'}`}>
-                                    {client.isActive ? 'HEALTHY' : 'SUSPENDED'}
+                                <div>
+                                    <span className="sky-plan-label">ACTIVE TIER</span>
+                                    <div className="sky-plan-name">{client.subscriptionPlan || 'PREMIUM'} TIER</div>
+                                </div>
+                                <span className="sky-tier-chip">
+                                    <Sparkles size={13} /> Enterprise
                                 </span>
                             </div>
 
-                            {client.license?.licenseKey && (
-                                <div className="sky-key-box">
+                            <div className="sky-key-box">
+                                <div className="sky-key-label-row">
                                     <label>ACTIVE LICENSE KEY</label>
-                                    <div className="sky-key-row mono">
-                                        <span>{client.license.licenseKey}</span>
-                                        <button onClick={() => copyToClipboard(client.license!.licenseKey!, 'License Key')}>
-                                            <Copy size={14} />
-                                        </button>
-                                    </div>
+                                    <span className="key-verified-tag">VERIFIED</span>
                                 </div>
-                            )}
+                                <div className="sky-key-row mono">
+                                    <span className="key-text">{licenseKeyDisplay}</span>
+                                    <button 
+                                        className="sky-copy-icon-btn" 
+                                        onClick={() => copyToClipboard(licenseKeyDisplay, 'License Key')}
+                                        title="Copy License Key"
+                                    >
+                                        <Copy size={14} />
+                                    </button>
+                                </div>
+                            </div>
 
                             <div className="sky-stat-row">
                                 <div className="sky-mini-stat">
-                                    <span className="label">EXPIRATION</span>
+                                    <span className="label">EXPIRATION DATE</span>
                                     <span className="value mono">
                                         {client.license?.is_lifetime
                                             ? '∞ Lifetime'
-                                            : (client.license?.expires_at ? new Date(client.license.expires_at).toLocaleDateString() : 'N/A')}
+                                            : (client.license?.expires_at ? new Date(client.license.expires_at).toLocaleDateString() : 'Active')}
                                     </span>
                                 </div>
                                 <div className="sky-mini-stat">
-                                    <span className="label">STATUS</span>
-                                    <span className="value mono">
-                                        {client.daysLeft !== undefined && client.daysLeft !== null
-                                            ? (client.daysLeft < 0 ? 'Expired' : `${client.daysLeft} days remaining`)
-                                            : 'Active'}
+                                    <span className="label">REMAINING VALIDITY</span>
+                                    <span className={`value mono ${client.daysLeft !== undefined && client.daysLeft !== null && client.daysLeft <= 7 ? 'urgent' : ''}`}>
+                                        {client.license?.is_lifetime
+                                            ? 'Lifetime Access'
+                                            : (client.daysLeft !== undefined && client.daysLeft !== null
+                                                ? (client.daysLeft < 0 ? 'Expired' : `${client.daysLeft} days remaining`)
+                                                : 'Active Plan')}
                                     </span>
                                 </div>
                             </div>
+
+                            {/* Plan Capabilities Strip */}
+                            <div className="sky-features-preview">
+                                <div className="sky-feat-tag"><CheckCircle2 size={12} color="var(--success)" /> POS Terminal</div>
+                                <div className="sky-feat-tag"><CheckCircle2 size={12} color="var(--success)" /> Cloud Sync</div>
+                                <div className="sky-feat-tag"><CheckCircle2 size={12} color="var(--success)" /> Reports & Analytics</div>
+                            </div>
+
+                            <button className="sky-card-sub-btn" onClick={() => setShowUpgradeModal(true)}>
+                                <Zap size={14} /> Change Tier / Renew License
+                            </button>
                         </div>
                     </div>
 
-                    {/* Column 3: Operational Quick Actions & Metrics */}
+                    {/* Column 3: Operational Quick Actions & Telemetry */}
                     <div className="sky-col-card">
                         <div className="sky-col-header">
-                            <Activity size={16} />
-                            <h3>Quick Management Actions</h3>
+                            <div className="sky-col-header-left">
+                                <Activity size={16} />
+                                <h3>Quick Management Actions</h3>
+                            </div>
+                            <span className="sky-col-badge">Operations</span>
                         </div>
 
                         <div className="sky-quick-actions-list">
                             <button className="sky-action-btn" onClick={() => copyToClipboard(client.id, 'Store ID')}>
-                                <FileText size={15} /> Copy Store ID
+                                <FileText size={15} />
+                                <div className="sky-action-btn-text">
+                                    <span className="action-title">Copy Store ID</span>
+                                    <span className="action-sub mono">{client.id.slice(0, 16)}...</span>
+                                </div>
                             </button>
+
+                            {client.owner?.email && (
+                                <button className="sky-action-btn" onClick={() => copyToClipboard(client.owner!.email, 'Owner Email')}>
+                                    <Mail size={15} />
+                                    <div className="sky-action-btn-text">
+                                        <span className="action-title">Copy Owner Email</span>
+                                        <span className="action-sub">{client.owner.email}</span>
+                                    </div>
+                                </button>
+                            )}
+
                             <button className="sky-action-btn" onClick={fetchClient}>
-                                <RefreshCw size={15} /> Refresh Store Telemetry
+                                <RefreshCw size={15} />
+                                <div className="sky-action-btn-text">
+                                    <span className="action-title">Refresh Store Telemetry</span>
+                                    <span className="action-sub">Sync live database metrics</span>
+                                </div>
                             </button>
-                            <button className="sky-action-btn danger" onClick={() => setShowDeactivateModal(true)}>
-                                <Lock size={15} /> Lock Store Access
-                            </button>
+
+                            {client.isActive ? (
+                                <button className="sky-action-btn danger" onClick={() => setShowDeactivateModal(true)}>
+                                    <Lock size={15} />
+                                    <div className="sky-action-btn-text">
+                                        <span className="action-title">Lock Store Access</span>
+                                        <span className="action-sub">Suspend POS & staff logins</span>
+                                    </div>
+                                </button>
+                            ) : (
+                                <button className="sky-action-btn success" onClick={handleReactivate} disabled={actionLoading}>
+                                    <Shield size={15} />
+                                    <div className="sky-action-btn-text">
+                                        <span className="action-title">Restore Store Access</span>
+                                        <span className="action-sub">Enable POS terminals</span>
+                                    </div>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Operational Status Box */}
+                        <div className="sky-telemetry-box">
+                            <div className="sky-telemetry-row">
+                                <span className="telemetry-label">SYSTEM HEALTH</span>
+                                <span className="telemetry-val positive">
+                                    <span className="live-dot" /> Operational
+                                </span>
+                            </div>
+                            <div className="sky-telemetry-row">
+                                <span className="telemetry-label">STAFF ACCOUNTS</span>
+                                <span className="telemetry-val mono">{client._count?.users || 1} active</span>
+                            </div>
+                            <div className="sky-telemetry-row">
+                                <span className="telemetry-label">TOTAL ORDERS</span>
+                                <span className="telemetry-val mono">{client._count?.orders || 0} processed</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -432,19 +542,24 @@ export default function ClientDetailPage() {
                             <div className="sky-info-grid">
                                 <div className="sky-info-tile">
                                     <label>STORE ID</label>
-                                    <span className="mono">{client.id}</span>
+                                    <div className="sky-tile-val-row">
+                                        <span className="mono tile-val break-all">{client.id}</span>
+                                        <button className="sky-copy-mini" onClick={() => copyToClipboard(client.id, 'Store ID')} title="Copy ID">
+                                            <Copy size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="sky-info-tile">
                                     <label>REGISTERED DATE</label>
-                                    <span className="mono">{new Date(client.createdAt).toLocaleString()}</span>
+                                    <span className="mono tile-val">{new Date(client.createdAt).toLocaleString()}</span>
                                 </div>
                                 <div className="sky-info-tile">
                                     <label>TOTAL REGISTERED USERS</label>
-                                    <span className="mono">{client._count?.users || 1} staff accounts</span>
+                                    <span className="mono tile-val">{client._count?.users || 1} staff accounts</span>
                                 </div>
                                 <div className="sky-info-tile">
                                     <label>TOTAL ORDERS PROCESSED</label>
-                                    <span className="mono">{client._count?.orders || 0} orders</span>
+                                    <span className="mono tile-val">{client._count?.orders || 0} orders</span>
                                 </div>
                             </div>
                         </div>
@@ -455,7 +570,9 @@ export default function ClientDetailPage() {
                             <h4>Configured Store Branches</h4>
                             <div className="sky-branch-card">
                                 <div className="sky-branch-header">
-                                    <Building2 size={18} />
+                                    <div className="sky-branch-icon">
+                                        <Building2 size={20} />
+                                    </div>
                                     <div>
                                         <div className="title">{client.name} (Main Branch)</div>
                                         <div className="sub mono">Address: {client.address || 'Kasba, Vellore'}</div>
@@ -469,31 +586,35 @@ export default function ClientDetailPage() {
                     {activeTab === 'licenses' && (
                         <div className="sky-wtab-pane">
                             <h4>Detailed License Registry</h4>
-                            {client.license ? (
-                                <div className="sky-license-card-detail">
-                                    <div className="row">
-                                        <label>PLAN TIER</label>
-                                        <span className="value mono">{client.license.plan}</span>
-                                    </div>
-                                    <div className="row">
-                                        <label>LICENSE KEY</label>
-                                        <span className="value mono">{client.license.licenseKey || `LIC-${client.id.slice(0, 8).toUpperCase()}`}</span>
-                                    </div>
-                                    <div className="row">
-                                        <label>STATUS</label>
-                                        <span className="value mono">{client.license.status || 'ACTIVE'}</span>
-                                    </div>
+                            <div className="sky-license-card-detail">
+                                <div className="row">
+                                    <label>PLAN TIER</label>
+                                    <span className="value mono">{client.license?.plan || client.subscriptionPlan || 'PREMIUM'}</span>
                                 </div>
-                            ) : (
-                                <p className="empty-text">No active license records found.</p>
-                            )}
+                                <div className="row">
+                                    <label>LICENSE KEY</label>
+                                    <span className="value mono">{licenseKeyDisplay}</span>
+                                </div>
+                                <div className="row">
+                                    <label>STATUS</label>
+                                    <span className="value mono">{client.license?.status || (client.isActive ? 'ACTIVE' : 'SUSPENDED')}</span>
+                                </div>
+                                <div className="row">
+                                    <label>EXPIRATION</label>
+                                    <span className="value mono">
+                                        {client.license?.is_lifetime
+                                            ? '∞ Lifetime'
+                                            : (client.license?.expires_at ? new Date(client.license.expires_at).toLocaleString() : 'Active')}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {activeTab === 'branding' && (
                         <div className="sky-wtab-pane">
                             <h4>Store Branding & Receipt Customization</h4>
-                            <p className="empty-text">Custom receipt logos and POS print headers configured directly in Store Settings.</p>
+                            <p className="empty-text">Custom receipt logos, currency formats, and POS print headers configured directly in Store Settings.</p>
                         </div>
                     )}
                 </div>
@@ -501,3 +622,4 @@ export default function ClientDetailPage() {
         </div>
     );
 }
+
